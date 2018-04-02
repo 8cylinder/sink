@@ -66,48 +66,29 @@ def database(action, sql_gz, server, real):
         db.put(server, sql_gz)
 
 # ------------------------------- Files -------------------------------
-@util.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('action', type=click.Choice([i.value for i in Action]))
-@click.argument('sync-point')  # autocompletion=get_sync_points
-@click.argument('server')
-@click.option('-d', '--real', is_flag=True)
-def rsync(action, sync_point, server, real):
-    """Rsync files to and fro.
-
-    \b
-    ACTION: pull or put
-    SYNC-POINT: name of dir to sync (defined in util.yaml).
-    SERVER: server name (defined in util.yaml).
-    """
-    files = Transfer(real)
-    if action == Action.PULL.value:
-        files.pull(sync_point, server)
-    elif action == Action.PUT.value:
-        files.put(sync_point, server)
-
-@util.command(context_settings=CONTEXT_SETTINGS)
+@util.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', required=False)
-@click.option('--dry-run', '-d', is_flag=True,
-              help='Do nothing, show the command only.')
-def single(action, filename, server, dry_run):
-    """Push or pull a single file to a remote server.
+@click.option('-d', '--real', '-r', is_flag=True)
+@click.option('--extra-flags',
+              help='extra flags to pass to rsync.')
+def files(action, filename, server, real, extra_flags):
+    """Push or pull a single file or directory from a remote server.
 
     \b
     ACTION: pull or put
-    FILENAME: file to be transfered
-    SERVER: server name (defined in sink.yaml)."""
-    real = True
-    if dry_run:
-        real = False
+    FILENAME: file/dir to be transfered.
+    SERVER: server name, if not specified sink will use the default server."""
+
     f = Path(os.path.abspath(filename))
-    files = Transfer(real)
+    xfer = Transfer(real)
+    extra_flags = '' if not extra_flags else extra_flags
 
     if action == Action.PULL.value:
-        files.single_pull(f, server)
+        xfer.pull(f, server, extra_flags)
     elif action == Action.PUT.value:
-        files.single_put(f, server)
+        xfer.put(f, server, extra_flags)
 
 @util.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', required=False)
@@ -118,18 +99,23 @@ def ssh(server, dry_run):
     ssh = SSH()
     ssh.ssh(server=server, dry_run=dry_run)
 
-@util.command(context_settings=CONTEXT_SETTINGS)
+@util.command('diff', context_settings=CONTEXT_SETTINGS)
 @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', required=False)
-@click.option('--dry-run', '-d', is_flag=True,
-              help='Do nothing, show the command only.')
-def diff(filename, server, dry_run):
+@click.option('--ignore-whitespace', '-i', is_flag=True,
+              help='Ignore whitespace in diff.')
+@click.option('--difftool', '-d', is_flag=True,
+              help='Use meld instead of "git diff".')
+def diff_files(filename, server, ignore_whitespace, difftool):
     """Diff a local and remote file.
 
     \b
     FILENAME: file to be transfered
     SERVER: server name (defined in sink.yaml)."""
-    pass
+
+    fx = Path(os.path.abspath(filename))
+    xfer = Transfer(True)
+    xfer.diff(fx, server, ignore=ignore_whitespace, difftool=difftool)
 
 # ------------------------------- Misc --------------------------------
 
@@ -246,12 +232,6 @@ def generate_config(servers):
         name:
         # dir to put pulled db's in
         pulls_dir:
-        # dir that contains logs that can be viewed
-        log_dir:
-        # dir with cached data that can be deleted
-        cache_dir:
-        # dir that matches root in the servers section.  Every thing
-        # below this must be exaxtly the same on each server.
         root:
         exclude:
           - .well-known
@@ -260,25 +240,45 @@ def generate_config(servers):
           - '.sass-cache'
           - storage/runtime
 
-      # sync points are named dir's which can be synced.
-      sync points:
-        test: dir/dir/
-
       servers:'''
     if not servers:
         servers = ['example_server']
     for server in servers:
         blank_config = blank_config + f'''
         {server}:
-          user:
-          password:
-          server:
-          mysql_user:
-          mysql_password:
-          mysql_db:
+          name: {server.upper()}
           root:
-          id: {server.upper()}
-          warn: yes'''
+          warn: yes
+          note: |
+          ssh:
+            username:
+            password:
+            server:
+            key:
+            note: |
+          mysql:
+            username:
+            password:
+            db:
+            note: |
+          hosting:
+            name:
+            url:
+            username:
+            password:
+            note: |
+          urls:
+            - url:
+              admin_url:
+              username:
+              password:
+              note: |
+            - url:
+              admin_url:
+              username:
+              password:
+              note: |
+        '''
 
     blank_config = blank_config.split('\n')
     blank_config = '\n'.join([i[6:] for i in blank_config])

@@ -31,7 +31,7 @@ class ui:
     def display_cmd(cmd, indent=0):
         console_width = os.get_terminal_size().columns
         indent = ' ' * indent
-        leader = '> '
+        leader = '+ '
         initial_indent = indent + leader
         subsequent_indent = indent + (' ' * len(leader))
         w = TextWrapper(initial_indent=initial_indent,

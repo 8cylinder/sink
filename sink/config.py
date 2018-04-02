@@ -67,8 +67,53 @@ class dict2obj:
             else:
                 self.__dict__[k] = v
 
+
 class Config:
     config_file = 'sink.yaml'
+    default_project = {
+        'name': None,
+        'root': None,
+        'rsync_flags': None,
+        'pulls_dir': None,
+        'cache_dir': None,
+        'log_dir': None,
+        'note': None,
+        'exclude': [],
+    }
+    default_server = {
+        'name': None,
+        'note': None,
+        'root': None,
+        'warn': False,
+        'default': False,
+        'hosting': {
+            'name': None,
+            'note': None,
+            'url': None,
+            'username': None
+        },
+        'mysql': {
+            'db': None,
+            'note': None,
+            'password': None,
+            'username': None
+        },
+        'ssh': {
+            'key': None,
+            'note': None,
+            'password': None,
+            'server': None,
+            'username': None
+        },
+        'urls': []
+    }
+    default_url = {
+        'admin_url': None,
+        'note': None,
+        'password': None,
+        'url': None,
+        'username': None
+    }
 
     def __init__(self, suppress_config_location=False):
         self.suppress = suppress_config_location
@@ -79,6 +124,7 @@ class Config:
 
         with open(self.config) as f:
             data = yaml.safe_load(f)
+
         self.data = data
         self.o = dict2obj(**data)
         # pp(data['xsync points'])
@@ -87,6 +133,7 @@ class Config:
         # exit()
 
     def find_config(self):
+        """Walk up the dir tree to find a config file"""
         if self.config_file in os.listdir():
             cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
             if not self.suppress:
@@ -97,10 +144,17 @@ class Config:
             self.find_config()
 
     def project(self):
+        """Return the project info as a namedtupple
+
+        Convert the project dict to a namedtuple and convert the paths
+        to pathlib paths."""
         try:
-            p = self.data['project']
+            project = self.data['project']
         except KeyError:
             ui.error(f'project section in {self.config_file} does not exist')
+
+        p = self.default_project
+        p.update(project)
 
         # convert the path to absolute paths
         for d in ['pulls_dir', 'log_dir', 'cache_dir', 'root']:
@@ -109,23 +163,30 @@ class Config:
             except KeyError:
                 continue
 
-        p = namedtuple('project', p.keys())(**self.data['project'])
+        # pp(p)
+        # p = namedtuple('project', p.keys())(**self.data['project'])
+        p = dict2obj(**p)
         return p
 
     def server(self, name):
+        """Return the requested server as an object
+
+        If the server name is None, return the default server"""
+
         # if not name, then try to find the default server
         if not name:
-            default = False
             for server_name in self.data['servers']:
                 try:
-                    name = self.data['servers'][server_name]['default']
-                    break
+                    if self.data['servers'][server_name]['default'] is True:
+                        name = server_name
                 except KeyError:
                     continue
+                break
             if not name:
                 ui.error('No default server found')
+
         try:
-            s = self.data['servers'][name]
+            server = self.data['servers'][name]
         except KeyError:
             ui.error(f'Server: "{name}" does not exist in {self.config_file}',
                      exit=False)
@@ -133,14 +194,17 @@ class Config:
             options = {}
             for key in self.data['servers']:
                 options[key] = '{}@{}'.format(
-                    self.data['servers'][key]['user'],
-                    self.data['servers'][key]['server'],
+                    self.data['servers'][key]['ssh']['username'],
+                    self.data['servers'][key]['ssh']['server'],
                 )
             ui.display_options(options)
             exit()
 
+        s = self.default_server
+        s.update(server)
+
         s['root'] = Path(s['root'])
-        s = namedtuple('server', s.keys())(**self.data['servers'][name])
+        s = dict2obj(**s)
         return s
 
     def servers(self):
@@ -189,7 +253,7 @@ class TestConfig:
         click.echo()
         click.secho('Servers', fg=Color.GREEN.value, bold=True)
         INDENT = 4
-        for s in self.config.servers():
+        for k, s in self.config.servers().items():
             click.secho(f'  {s.name}', fg=Color.GREEN.value)
             try:
                 user = s.ssh.username

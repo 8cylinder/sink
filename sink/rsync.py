@@ -11,6 +11,7 @@ from collections import namedtuple
 import tempfile
 import gzip
 from enum import Enum
+import tempfile
 
 from sink.config import Config
 from sink.ui import Color
@@ -26,74 +27,91 @@ class Transfer:
         self.real = real
         self.dryrun = '' if real else '--dry-run'
         self.config = Config()
+        self.multiple = False
 
-    def put(self, sync_point, server):
-        locations = self.locations(server, sync_point=sync_point)
+    def put(self, filename, server, extra_flags):
+        locations = self.locations(server, filename)
+        local = locations['local']
+        # append a / to the remote path if its a dir so rsync will
+        # sync two dirs with the same name
+        if local.is_dir():
+            local = '{}/'.format(local)
+            self.multiple = True
+        remote = locations['remote']
+        self._rsync(local, remote, server, Action.PUT, extra_flags)
+
+    def pull(self, filename, server, extra_flags):
+        locations = self.locations(server, filename)
         local = locations['local']
         remote = locations['remote']
-        self._build_cmd(sync_point, server, Action.PUT)
+        # append a / to the remote path if its a dir so rsync will
+        # sync two dirs with the same name
+        if local.is_dir():
+            remote = '{}/'.format(remote)
+            self.multiple = True
+        self._rsync(local, remote, server, Action.PULL, extra_flags)
 
-    def pull(self, sync_point, server):
-        locations = self.locations(server, sync_point=sync_point)
-        local = locations['local']
-        remote = locations['remote']
-        self._build_cmd(local, remote, server, Action.PULL)
+    def diff(self, local_file, server, ignore=False, difftool=False):
+        with tempfile.TemporaryDirectory() as diffdir:
+            tmp_file = f'{diffdir}/{local_file.name}'
+            locations = self.locations(server, local_file)
+            remotef = locations['remote']
 
-    def single_put(self, filename, server):
-        locations = self.locations(server, filename=filename)
-        local = locations['local']
-        remote = locations['remote']
-        self._build_cmd(local, remote, server, Action.PUT)
+            self._rsync(tmp_file, remotef, server, Action.PULL)
 
-    def single_pull(self, filename, server):
-        locations = self.locations(server, filename=filename)
-        local = locations['local']
-        remote = locations['remote']
-        self._build_cmd(local, remote, server, Action.PULL)
+            if difftool:
+                cmd = f'''meld {tmp_file} {local_file}'''
+            else:
+                cmd = f'''git --no-pager diff --word-diff=color --word-diff-regex=. \
+                          {tmp_file} {local_file}'''
+            cmd = ' '.join(cmd.split())
 
-    def locations(self, server, sync_point=None, filename=None):
+            ui.display_cmd(cmd)
+            result = subprocess.run(cmd, shell=True)
+            if result.returncode == 0:
+                click.echo('Files are the same.')
+
+    def locations(self, server, filename, ignore=False, difftool=False):
         p = self.config.project()
         s = self.config.server(server)
-
-        if(sync_point):
-            sp = self.config.data['sync points'][sync_point]
-            local = p.root / sp
-            remote = s.root / sp
-        elif(filename):
-            local = filename
-            remote = str(local)
-            # remove the local project root from the file
-            remote = remote.replace(str(p.root), '.')
-            # add the server root
-            remote = Path(s.root, remote)
-
+        local = filename
+        remote = str(local)
+        # remove the local project root from the file
+        remote = remote.replace(str(p.root), '.')
+        # add the server root
+        remote = Path(s.root, remote)
         file_locations = {
             'local': local,
             'remote': remote,
         }
         return file_locations
 
-    def _build_cmd(self, localf, remotef, server, action):
-        # s = self.config.servers()[server]
+    def _rsync(self, localf, remotef, server, action, extra_flags):
         s = self.config.server(server)
-
         try:
             identity = f'--rsh="ssh -i {s.ssh.key}"'
         except AttributeError:
             identity = ''
-        excluded = self.config.excluded()
 
-        #     --no-perms --no-owner --no-group --no-times --ignore-times \
-        cmd = f'''rsync {self.dryrun} {identity} --verbose --compress --checksum
-            --recursive {excluded}'''
+        excluded = ''
+        recursive = ''
+        if self.multiple:
+            excluded = self.config.excluded()
+            recursive = '--recursive'
+
+        # --no-perms --no-owner --no-group --no-times --ignore-times
+        # flags = ['--verbose', '--compress', '--checksum', '--recursive']
+        cmd = f'''rsync {self.dryrun} {identity} {extra_flags} --verbose --itemize-changes
+                  --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
-            cmd = f'''{cmd} '{localf}/' {s.ssh.username}@{s.ssh.server}:{remotef}'''
+            cmd = f'''{cmd} '{localf}' {s.ssh.username}@{s.ssh.server}:{remotef}'''
         elif action == Action.PULL:
-            cmd = f'''{cmd} '{s.ssh.username}@{s.ssh.server}:{remotef}/' '{localf}' '''
+            cmd = f'''{cmd} '{s.ssh.username}@{s.ssh.server}:{remotef}' '{localf}' '''
         cmd = ' '.join(cmd.split())  # remove extra spaces
 
         doit = True
+        # if the server has warn = True, then pause here to query the user.
         if action == Action.PUT and s.warn and self.real:
             doit = False
             warn = click.style(
