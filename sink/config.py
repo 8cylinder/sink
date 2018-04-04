@@ -6,11 +6,13 @@ import click
 import subprocess
 from pprint import pprint as pp
 import yaml
+import json
 from pathlib import Path
 from collections import namedtuple
 import tempfile
 from enum import Enum
 import itertools
+import urllib.request, urllib.error
 
 from sink.ui import ui
 from sink.ui import Color
@@ -68,6 +70,41 @@ class dict2obj:
                 self.__dict__[k] = v
 
 
+class Project:
+    def __init__(self):
+        projectf = Path('~/.sink-projects.yaml')
+        projectf = Path(projectf.expanduser())
+        # print(projectf.expanduser())
+        if not projectf.exists():
+            click.echo(f'Creating {projectf}')
+            projectf.touch()
+
+        self.projects = {}
+        self.projectf = projectf
+
+        self.read_config()
+
+    def first_match(self, root):
+        for k, p in self.projects.items():
+            if root in k:
+                return p
+
+    def add(self, project_name, project_root):
+        data = self.projects
+        data[project_name] = str(Path(project_root).absolute())
+        self.projects = data
+
+    def save(self):
+        with self.projectf.open('w') as f:
+            f.write(yaml.dump(self.projects, default_flow_style=False))
+
+    def read_config(self):
+        projectf = str(self.projectf)
+        with open(projectf) as f:
+            projects = yaml.safe_load(f)
+        self.projects = projects
+
+
 class Config:
     config_file = 'sink.yaml'
     default_project = {
@@ -86,16 +123,16 @@ class Config:
         'root': None,
         'warn': False,
         'default': False,
+        'control_panel': {
+            'url': None,
+            'usename': None,
+            'password': None,
+            'note': None,
+        },
         'hosting': {
             'name': None,
             'note': None,
             'url': None,
-            'username': None
-        },
-        'mysql': {
-            'db': None,
-            'note': None,
-            'password': None,
             'username': None
         },
         'ssh': {
@@ -105,8 +142,16 @@ class Config:
             'server': None,
             'username': None
         },
+        'mysql': [],
         'urls': []
     }
+    default_mysql = {
+        'db': None,
+        'note': None,
+        'password': None,
+        'username': None,
+        'hostname': None,
+    },
     default_url = {
         'admin_url': None,
         'note': None,
@@ -125,12 +170,16 @@ class Config:
         with open(self.config) as f:
             data = yaml.safe_load(f)
 
+        data = self.set_defaults(data)
         self.data = data
         self.o = dict2obj(**data)
-        # pp(data['xsync points'])
-        # xx = dict2obj(**data['xsync points'])
-        # print('>>>', xx.pm_old.extra_flags)
-        # exit()
+
+        self.save_project_name(data['project']['name'], os.path.curdir)
+
+    def save_project_name(self, name, path):
+        p = Project()
+        p.add(name, path)
+        p.save()
 
     def find_config(self):
         """Walk up the dir tree to find a config file"""
@@ -161,6 +210,10 @@ class Config:
             try:
                 p[d] = Path(os.path.abspath(p[d]))
             except KeyError:
+                # this field is blank
+                continue
+            except TypeError:
+                # this fields does not exist
                 continue
 
         # pp(p)
@@ -192,10 +245,15 @@ class Config:
                      exit=False)
             click.echo('\nExisting servers:')
             options = {}
-            for key in self.data['servers']:
-                options[key] = '{}@{}'.format(
-                    self.data['servers'][key]['ssh']['username'],
-                    self.data['servers'][key]['ssh']['server'],
+            # for key in self.data['servers']:
+            #     options[key] = '{}@{}'.format(
+            #         self.data['servers'][key]['ssh']['username'],
+            #         self.data['servers'][key]['ssh']['server'],
+            #     )
+            for server in self.servers():
+                options[server.name] = '{}@{}'.format(
+                    server.ssh.usename,
+                    server.ssh.server
                 )
             ui.display_options(options)
             exit()
@@ -207,11 +265,42 @@ class Config:
         s = dict2obj(**s)
         return s
 
+    def set_defaults(self, data):
+        for server in data['servers']:
+            default_server = self.default_server.copy()
+            default_server.update(data['servers'][server])
+            data['servers'][server] = default_server
+        return data
+
     def servers(self):
-        all_servers = {}
-        for k, s in self.data['servers'].items():
-            all_servers[k] = dict2obj(**s)
+        all_servers = []
+        try:
+            for k, s in self.data['servers'].items():
+                all_servers.append(dict2obj(**s))
+        except KeyError:
+            pass
         return all_servers
+
+    def xservers(self):
+        all_servers = {}
+        try:
+            for k, s in self.data['servers'].items():
+                all_servers[k] = dict2obj(**s)
+        except KeyError:
+            pass
+        return all_servers
+
+    def dbs(self, dbs):
+        all_dbs = []
+        for db in dbs:
+            all_dbs.append(dict2obj(**db))
+        return all_dbs
+
+    def urls(self, urls):
+        all_urls = []
+        for url in urls:
+            all_urls.append(dict2obj(**url))
+        return all_urls
 
     def syncpoint(self):
         s = namedtuple('syncpoint', self.data['sync points'].keys())(
@@ -233,28 +322,33 @@ class TestConfig:
     def __init__(self):
         self.config = Config()
 
-    def test_project(self):
-        click.echo()
-        click.secho('Local dirs', fg=Color.GREEN.value, bold=True)
+    # def test_project(self):
+    #     click.echo()
+    #     click.secho('Local dirs', fg=Color.GREEN.value, bold=True)
 
-        INDENT = 2
-        for local_dir in ['pulls_dir', 'log_dir', 'cache_dir']:
-            try:
-                d = Path(self.config.data['project'][local_dir])
-            except KeyError:
-                self.out(f'{self.bad} "{local_dir}" setting in {self.config.config_file} does not exist.', INDENT)
-                continue
-            if d.exists():
-                self.out(f'{self.good} {d}', INDENT)
-            else:
-                self.out(f'{self.bad} {d}', INDENT)
+    #     INDENT = 2
+    #     for local_dir in ['pulls_dir', 'log_dir', 'cache_dir']:
+    #         try:
+    #             d = Path(self.config.data['project'][local_dir])
+    #         except KeyError:
+    #             self.out(f'{self.bad} "{local_dir}" setting in {self.config.config_file} does not exist.', INDENT)
+    #             continue
+    #         if d.exists():
+    #             self.out(f'{self.good} {d}', INDENT)
+    #         else:
+    #             self.out(f'{self.bad} {d}', INDENT)
 
     def test_servers(self):
         click.echo()
         click.secho('Servers', fg=Color.GREEN.value, bold=True)
         INDENT = 4
-        for k, s in self.config.servers().items():
-            click.secho(f'  {s.name}', fg=Color.GREEN.value)
+        # for k, s in self.config.servers().items():
+        for s in self.config.servers():
+            try:
+                click.secho(f'  {s.name}', fg=Color.GREEN.value)
+            except AttributeError:
+                pass
+
             try:
                 user = s.ssh.username
                 url = s.ssh.server
@@ -277,38 +371,64 @@ class TestConfig:
             good = 'ssh login good.'
             bad = f'ssh login failed for "{user}@{url}".'
 
-            if self.run_cmd(user, url, cmd, good, bad, key=key):
-
+            if self.run_cmd_on_server(user, url, cmd, good, bad, key=key):
                 # root
                 cmd = f'cd "{s.root}"'
                 good = f'root dir exists.'
                 bad = f'root dir does not exist on server: {s.root}.'
-                self.run_cmd(user, url, cmd, good, bad, key=key)
+                self.run_cmd_on_server(user, url, cmd, good, bad, key=key)
 
                 # mysql
+                # pp(s.mysql)
+                # exit()
+                dbs = self.config.dbs(s.mysql)
+                # pp(dbs)
+                # exit()
+                for db in dbs:
+                    try:
+                        db.username
+                        db.password
+                        db.db
+                    except AttributeError:
+                        ui.error(f'Mysql names are wrong in {s.name}')
+                        continue
+                    cmd = f'mysql --user={db.username} --password={db.password} {db.db} --execute="exit";'
+                    good = f'DB({db.db}): mysql username, password and db are good.'
+                    bad = f'DB({db.db}): mysql error.'
+                    self.run_cmd_on_server(user, url, cmd, good, bad, key=key)
+
+            urls = self.config.urls(s.urls)
+            for u in urls:
+                spinner = Spinner(indent=4, delay=0.1)
+                spinner.start()
                 try:
-                    s.mysql.username
-                    s.mysql.password
-                    s.mysql.db
-                except AttributeError:
-                    ui.error(f'Mysql names are wrong in {s.name}')
-                    continue
-                cmd = f'mysql --user={s.mysql.username} --password={s.mysql.password} {s.mysql.db} --execute="exit";'
-                good = f'mysql username, password and db are good.'
-                bad = f'mysql error.'
-                self.run_cmd(user, url, cmd, good, bad, key=key)
+                    result = urllib.request.urlopen(u.url)
+                except urllib.error.HTTPError as e:
+                    # Return code error (e.g. 404, 501, ...)
+                    msg = f'{self.bad} URL({u.url}): HTTPError: {e.code}.'
+                except urllib.error.URLError as e:
+                    # Not an HTTP-specific error (e.g. connection refused)
+                    msg = f'{self.bad} URL({u.url}): URLError: {e.reason}.'
+                except ValueError:
+                    msg = f'{self.bad} URL({u.url}): Not a valid URL.'
+                else:
+                    # 200
+                    msg = f'{self.good} URL({u.url})'
+                spinner.stop()
+                self.out(msg, 4)
 
     def out(self, msg, spaces):
         indent = ' ' * spaces
         click.echo(f'{indent}{msg}')
 
-    def test_syncpoints(self):
-        ...
+    def run_cmd_on_server(self, user, url, cmd, good, bad, key=''):
 
-    def run_cmd(self, user, url, cmd, good, bad, key=''):
-
-        timeout = 10
+        timeout = 5
         cmd = f'''ssh -o 'ConnectTimeout {timeout}'{key} {user}@{url} {cmd}'''
+        result = self.run_cmd(cmd, good, bad)
+        return result
+
+    def run_cmd(self, cmd, good, bad):
 
         spinner = Spinner(indent=4, delay=0.1)
         spinner.start()
@@ -317,10 +437,14 @@ class TestConfig:
                                 stdout=subprocess.DEVNULL)
         spinner.stop()
         if result.returncode:
-            click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
+            # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
+            self.out(f'{self.bad} {bad} (error: {result.returncode})', 4)
             ui.display_cmd(cmd, indent=8)
             return False
         else:
-            click.echo(f'    {self.good} {good}')
+            # click.echo(f'    {self.good} {good}')
+            self.out(f'{self.good} {good}', 4)
             ui.display_cmd(cmd, indent=8)
             return True
+
+

@@ -19,7 +19,9 @@ class DB:
 
     def pull(self, server):
         p = self.config.project()
-        s = self.config.ssh_server(server)
+        s = self.config.server(server)
+        print(s)
+        exit()
 
         if not p.pulls_dir.exist():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
@@ -30,10 +32,12 @@ class DB:
         except AttributeError:
             identity = ''
 
+        hostname = '127.0.0.1'
+
         sqlfile = self._dest(p.name, p.pulls_dir, s.name)
-        cmd = f'''ssh -T {identity} {s.ssh_user}@{s.ssh_server} \
-            mysqldump --user={s.mysql_user} --password={s.mysql_password} \
-            --single-transaction --triggers --events --routines {s.mysql_db} \
+        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} \
+            mysqldump --hostname={hostname} --user={s.mysql.username} --password={s.mysql.password} \
+            --single-transaction --triggers --events --routines {s.mysql.db} \
             | gzip -c > "{sqlfile}"'''
         cmd = ' '.join(cmd.split())
 
@@ -68,8 +72,8 @@ class DB:
         except AttributeError:
             identity = ''
 
-        cmd = f'''ssh -T {identity} {s.ssh_user}@{s.ssh_server} mysql --user={s.mysql_user} \
-            --password={s.mysql_password} {s.mysql_db} < "{t.name}"'''
+        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql --user={s.mysql.username} \
+            --password={s.mysql.password} {s.mysql.db} < "{t.name}"'''
         cmd = ' '.join(cmd.split())
 
         if self.real:

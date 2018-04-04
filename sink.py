@@ -16,15 +16,16 @@ from sink.config import Config
 from sink.config import TestConfig
 from sink.config import Color
 from sink.config import Action
+from sink.config import Project
 from sink.db import DB
 from sink.rsync import Transfer
 from sink.ui import ui
 from sink.ssh import SSH
 
-def get_servers(ctx, args, incomplete):
-    config = Config()
-    servers = config.data['servers']
-    return servers
+# def get_servers(ctx, args, incomplete):
+    # config = Config()
+    # servers = config.data['servers']
+    # return servers
 
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help'],
@@ -119,13 +120,6 @@ def diff_files(filename, server, ignore_whitespace, difftool):
 
 # ------------------------------- Misc --------------------------------
 
-@util.command(context_settings=CONTEXT_SETTINGS)
-@click.option('--show-passwords', '-s', is_flag=True,
-              help='Show the passwords instead of ***.')
-def info(show_passwords):
-    """Show all of the projects info."""
-    pass
-
 @util.group(context_settings=CONTEXT_SETTINGS)
 def misc():
     """Misc stuff."""
@@ -166,53 +160,20 @@ def api(keys):
 
     click.echo(data)
 
-def key_get(data, keys):
-    for k in keys:
-        data = data[k]
-
 # @misc.command(context_settings=CONTEXT_SETTINGS)
-# def clearassets():
-#     commercial_docs = 'maccom/macdonaldcommercial.com/html/docs/listings/'
-#     commercial_listings = 'maccom/macdonaldcommercial.com/html/img/listings/'
-#     pm_listings = ''
-
-# @misc.command(context_settings=CONTEXT_SETTINGS)
-# @click.argument('log-name', required=False)
-# def viewlog(log_name):
-#     """List log files.
-
-#     If LOG-NAME is passed, load that file into multitail.
-#     """
-#     c = Config()
-#     p = c.project()
-#     log_dir = os.path.abspath(p.log_dir)
-#     os.chdir(log_dir)
-#     ui.display_cmd(log_dir)
-#     if not log_name:
-#         cmd = 'ls -lh'
-#         subprocess.run(cmd, shell=True)
-#     else:
-#         cmd = f'''multitail -x 'Logging window' -cS craft -ev '^in ' \
-#                   -ke '^.*\[plugin\] ' -n 1000 {log_name}'''
-#         subprocess.run(cmd, shell=True)
-
-# @misc.command(context_settings=CONTEXT_SETTINGS)
-# def clearcache():
-#     c = Config()
-#     p = c.project()
-#     cache_dir = os.path.abspath(p.cache_dir)
-#     cmd = f'ls "{cache_dir}" | wc -l'
-#     ui.display_cmd(cmd)
-#     subprocess.run(cmd, shell=True)
-#     delcmd = f'rm "{cache_dir}/"*'
-#     ui.display_cmd(delcmd)
-#     subprocess.run(delcmd, shell=True)
+# @click.argument('root')
+# def roots(root):
+#     """"""
+#     # config = Config()
+#     projects = Project()
+#     match = projects.first_match(root)
+#     click.echo(match)
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def test():
     """Test settings in config"""
     tc = TestConfig()
-    tc.test_project()
+    # tc.test_project()
     tc.test_servers()
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
@@ -228,11 +189,12 @@ def generate_config(servers):
     """
     blank_config = '''
       project:
-        # used for db pull file name (as well as the server id)
+        # used for db pull file name (as well as the server id).
         name:
-        # dir to put pulled db's in
+        # dir to put pulled db's in.
         pulls_dir:
         root:
+        # these files will be excluded from any dir syncing.
         exclude:
           - .well-known
           - '*.sass'
@@ -246,20 +208,22 @@ def generate_config(servers):
     for server in servers:
         blank_config = blank_config + f'''
         {server}:
-          name: {server.upper()}
+          name: {server.upper()}  # this is used for the pulled filename.
           root:
-          warn: yes
+          warn: yes  # this will warn you when puting multiple files to this server.
+          default: no
           note: |
+          control_panel:
+            url:
+            username:
+            password:
+            note: |
           ssh:
             username:
             password:
             server:
             key:
-            note: |
-          mysql:
-            username:
-            password:
-            db:
+            port:
             note: |
           hosting:
             name:
@@ -267,6 +231,12 @@ def generate_config(servers):
             username:
             password:
             note: |
+          mysql:
+            - username:
+              password:
+              db:
+              hostname:
+              note: |
           urls:
             - url:
               admin_url:
