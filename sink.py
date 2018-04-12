@@ -16,7 +16,7 @@ from sink.config import Config
 from sink.config import TestConfig
 from sink.config import Color
 from sink.config import Action
-from sink.config import Project
+from sink.config import GlobalProjects
 from sink.db import DB
 from sink.rsync import Transfer
 from sink.ui import ui
@@ -160,26 +160,48 @@ def api(keys):
 
     click.echo(data)
 
-# @misc.command(context_settings=CONTEXT_SETTINGS)
-# @click.argument('root')
-# def roots(root):
-#     """"""
-#     # config = Config()
-#     projects = Project()
-#     match = projects.first_match(root)
-#     click.echo(match)
+@misc.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--required', '-r', is_flag=True)
+def check(required):
+    """Test server settings in config."""
+    tc = TestConfig()
+    if required:
+        tc.test_requirements()
+    else:
+        # tc.test_project()
+        tc.test_servers()
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
-def test():
-    """Test settings in config"""
-    tc = TestConfig()
-    # tc.test_project()
-    tc.test_servers()
+@click.option('--pager/--no-pager', '-p/-n', default=True,
+              help='User pager for output or not.')
+def info(pager):
+    """Display the config file."""
+    config = Config()
+
+    with open(config.config_file) as f:
+        contents = f.read()
+        if pager:
+            click.echo_via_pager(contents)
+        else:
+            click.echo(contents)
+
+@misc.command(context_settings=CONTEXT_SETTINGS)
+def pack():
+    """Display a command to gzip uncommited files."""
+    config = Config()
+    now = datetime.datetime.now()
+    now = now.strftime('%y-%m-%d-%H-%M-%S')
+
+    tarname = f'changed-{config.project().name}-{now}.tar.gz'
+    cmd = f'git ls-files -mz | xargs -0 tar -czvf {tarname}'
+    cmd = click.style(cmd, bold=True)
+    title = click.style('Run:', fg=Color.YELLOW.value)
+    click.echo(f'{title} {cmd}')
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('servers', nargs=-1)
 def generate_config(servers):
-    """Create a blank config
+    """Create a blank config.
 
     The servers arg will create an entry for each server name given.
 
@@ -193,6 +215,7 @@ def generate_config(servers):
         name:
         # dir to put pulled db's in.
         pulls_dir:
+        # dir to the common root.
         root:
         # these files will be excluded from any dir syncing.
         exclude:

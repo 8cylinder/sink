@@ -62,7 +62,8 @@ class Transfer:
             if difftool:
                 cmd = f'''meld {tmp_file} {local_file}'''
             else:
-                cmd = f'''git --no-pager diff --word-diff=color --word-diff-regex=. \
+                #   --word-diff=color --word-diff-regex=.
+                cmd = f'''git --no-pager diff \
                           {tmp_file} {local_file}'''
             cmd = ' '.join(cmd.split())
 
@@ -77,7 +78,7 @@ class Transfer:
         local = filename
         remote = str(local)
         # remove the local project root from the file
-        remote = remote.replace(str(p.root), '.')
+        remote = remote.replace(str(p.root.absolute()), '.')
         # add the server root
         remote = Path(s.root, remote)
         file_locations = {
@@ -86,12 +87,11 @@ class Transfer:
         }
         return file_locations
 
-    def _rsync(self, localf, remotef, server, action, extra_flags):
+    def _rsync(self, localf, remotef, server, action, extra_flags=None):
         s = self.config.server(server)
-        try:
+        identity = ''
+        if s.ssh.key:
             identity = f'--rsh="ssh -i {s.ssh.key}"'
-        except AttributeError:
-            identity = ''
 
         excluded = ''
         recursive = ''
@@ -101,6 +101,7 @@ class Transfer:
 
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
+        extra_flags = ''
         cmd = f'''rsync {self.dryrun} {identity} {extra_flags} --verbose --itemize-changes
                   --compress --checksum {recursive} {excluded}'''
 
