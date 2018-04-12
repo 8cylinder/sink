@@ -75,7 +75,9 @@ def database(action, sql_gz, server, real):
 @click.option('--extra-flags',
               help='extra flags to pass to rsync.')
 def files(action, filename, server, real, extra_flags):
-    """Push or pull a single file or directory from a remote server.
+    """Send files to and fro.
+
+    Push or pull a single file or directory from a remote server.
 
     \b
     ACTION: pull or put

@@ -7,6 +7,7 @@ import subprocess
 from pprint import pprint as pp
 import yaml
 import json
+import csv
 from pathlib import Path
 from collections import namedtuple
 import tempfile
@@ -20,10 +21,10 @@ import random
 from sink.ui import ui
 from sink.ui import Color
 
+
 class Action(Enum):
     PUT = 'put'
     PULL = 'pull'
-
 
 class Spinner:
     busy = False
@@ -80,17 +81,18 @@ class dict2obj:
 
 class GlobalProjects:
     def __init__(self):
-        projectf = Path('~/.sink-projects.yaml')
+        projectf = Path('~/.sink-projects')
         projectf = Path(projectf.expanduser())
-        # print(projectf.expanduser())
         if not projectf.exists():
             click.echo(f'Creating {projectf}')
             projectf.touch()
 
         self.projects = {}
+        # self.projects = []
         self.projectf = projectf
 
-        self.read_config()
+        # self.read_config()
+        self.read_csv()
 
     def first_match(self, root):
         for k, p in self.projects.items():
@@ -98,15 +100,33 @@ class GlobalProjects:
                 return p
 
     def add(self, project_name, project_root):
-        data = self.projects
-        data[project_name] = str(Path(project_root).absolute())
-        self.projects = data
+        if not project_name in self.projects:
+            color = random.choice(list(Color)).value
+            self.projects[project_name] = [
+                project_name,
+                str(Path(project_root).absolute()),
+                color,
+            ]
+
+    def save_csv(self):
+        with self.projectf.open('w') as f:
+            writer = csv.writer(f, delimiter='\t', lineterminator='\n')
+            for name, row in self.projects.items():
+                writer.writerow(row)
+
+    def read_csv(self):
+        with self.projectf.open() as f:
+            reader = csv.reader(f, delimiter='\t')
+            for row in reader:
+                self.projects[row[0]] = row
 
     def save(self):
+        """Write data to file as yaml"""
         with self.projectf.open('w') as f:
             f.write(yaml.dump(self.projects, default_flow_style=False))
 
     def read_config(self):
+        """Read yaml from file"""
         projectf = str(self.projectf)
         with open(projectf) as f:
             projects = yaml.safe_load(f)
@@ -187,7 +207,9 @@ class Config:
     def save_project_name(self, name, path):
         p = GlobalProjects()
         p.add(name, path)
-        p.save()
+        # p.save()
+        p.save_csv()
+        pp(p.projects)
 
     def find_config(self):
         """Walk up the dir tree to find a config file"""

@@ -7,15 +7,15 @@ from textwrap import TextWrapper
 
 
 class Color(Enum):
-    BLACK = 'black'
+    # BLACK = 'black'
     RED = 'red'
     GREEN = 'green'
     YELLOW = 'yellow'
     BLUE = 'blue'
     MAGENTA = 'magenta'
     CYAN = 'cyan'
-    WHITE = 'white'
-    RESET = 'reset'
+    # WHITE = 'white'
+    # RESET = 'reset'
 
 
 class ui:
