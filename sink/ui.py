@@ -7,14 +7,14 @@ from textwrap import TextWrapper
 
 
 class Color(Enum):
-    # BLACK = 'black'
+    BLACK = 'black'
     RED = 'red'
     GREEN = 'green'
     YELLOW = 'yellow'
     BLUE = 'blue'
     MAGENTA = 'magenta'
     CYAN = 'cyan'
-    # WHITE = 'white'
+    WHITE = 'white'
     # RESET = 'reset'
 
 
@@ -30,6 +30,8 @@ class ui:
     @staticmethod
     def display_cmd(cmd, indent=0):
         console_width = os.get_terminal_size().columns
+        if not console_width:
+            console_width = 80
         indent = ' ' * indent
         leader = '+ '
         initial_indent = indent + leader

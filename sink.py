@@ -120,6 +120,42 @@ def diff_files(filename, server, ignore_whitespace, difftool):
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace, difftool=difftool)
 
+@util.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--view/--edit', '-v/-e', default=True,
+              help='View or edit config file.')
+def info(view):
+    """View or edit the config file.
+
+    If edit, it will be opened in the default editor.
+
+    To config the default editor, add the following lines to
+    ~/.bashrc.  Change the 'program' to editor name.
+
+    \b
+    export EDITOR='program'
+    export VISUAL='program'
+
+    """
+    config = Config()
+
+    if view:
+        with open(config.config_file) as f:
+            contents = f.read()
+            click.echo_via_pager(contents)
+    else:
+        click.edit(filename=config.config_file)
+
+@util.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--required', '-r', is_flag=True)
+def check(required):
+    """Test server settings in config."""
+    tc = TestConfig()
+    if required:
+        tc.test_requirements()
+    else:
+        # tc.test_project()
+        tc.test_servers()
+
 # ------------------------------- Misc --------------------------------
 
 @util.group(context_settings=CONTEXT_SETTINGS)
@@ -131,7 +167,9 @@ def misc():
 def api(keys):
     '''Retrieve information from the config file.
 
-    Some examples
+    The data will be output as json.
+
+    Some examples:
 
     \b
     To get the project name:
@@ -154,38 +192,13 @@ def api(keys):
         except ValueError:
             # could not convert to an int, continue on as string.
             pass
-
         try:
             data = data[k]
         except KeyError:
             ui.error(f'key "{k}" does not exist in config.')
-
-    click.echo(data)
-
-@misc.command(context_settings=CONTEXT_SETTINGS)
-@click.option('--required', '-r', is_flag=True)
-def check(required):
-    """Test server settings in config."""
-    tc = TestConfig()
-    if required:
-        tc.test_requirements()
-    else:
-        # tc.test_project()
-        tc.test_servers()
-
-@misc.command(context_settings=CONTEXT_SETTINGS)
-@click.option('--pager/--no-pager', '-p/-n', default=True,
-              help='User pager for output or not.')
-def info(pager):
-    """Display the config file."""
-    config = Config()
-
-    with open(config.config_file) as f:
-        contents = f.read()
-        if pager:
-            click.echo_via_pager(contents)
-        else:
-            click.echo(contents)
+    import json
+    click.echo(json.dumps(data))
+    # click.echo(data)
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def pack():
@@ -193,6 +206,7 @@ def pack():
     config = Config()
     now = datetime.datetime.now()
     now = now.strftime('%y-%m-%d-%H-%M-%S')
+    # from IPython import embed; embed()
 
     tarname = f'changed-{config.project().name}-{now}.tar.gz'
     cmd = f'git ls-files -mz | xargs -0 tar -czvf {tarname}'

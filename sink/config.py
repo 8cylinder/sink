@@ -36,15 +36,15 @@ class Spinner:
             '|/-\\',
             '_.oO||Oo._',
             '⎺⎻⎼⎽__⎽⎼⎻⎺',
-            '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
-            ' ░▒▓██▓▒░ ',
+            # '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
+            # ' ░▒▓██▓▒░ ',
         ]
         cursors = random.choice(cursors)
         while True:
             for cursor in cursors:
-                yield click.style(f'{indent}[{cursor}]',
-                                  # bold=True,
-                                  fg=Color.YELLOW.value)
+                yield click.style(
+                    f'{indent}[{cursor}]',
+                    fg=Color.YELLOW.value)
 
     def __init__(self, delay=None, indent=0):
         self.indent = indent
@@ -88,11 +88,16 @@ class GlobalProjects:
             projectf.touch()
 
         self.projects = {}
-        # self.projects = []
         self.projectf = projectf
 
-        # self.read_config()
-        self.read_csv()
+        self.read_tsv()
+
+        comments = '''
+        # The format for this file should be tab seperated fields in this order:
+        # [project name] [project] [color]
+        # color can be one of: red, green, yellow, blue, magenta, cyan
+        '''
+        self.comments = '\n'.join([i.strip() for i in comments.split('\n')])
 
     def first_match(self, root):
         for k, p in self.projects.items():
@@ -100,7 +105,7 @@ class GlobalProjects:
                 return p
 
     def add(self, project_name, project_root):
-        if not project_name in self.projects:
+        if project_name not in self.projects:
             color = random.choice(list(Color)).value
             self.projects[project_name] = [
                 project_name,
@@ -108,29 +113,22 @@ class GlobalProjects:
                 color,
             ]
 
-    def save_csv(self):
+    def save_tsv(self):
+        """Write a tab seperated file"""
         with self.projectf.open('w') as f:
+            f.write(self.comments)
             writer = csv.writer(f, delimiter='\t', lineterminator='\n')
             for name, row in self.projects.items():
                 writer.writerow(row)
 
-    def read_csv(self):
+    def read_tsv(self):
+        """Read a tab sepertated file"""
         with self.projectf.open() as f:
             reader = csv.reader(f, delimiter='\t')
             for row in reader:
-                self.projects[row[0]] = row
-
-    def save(self):
-        """Write data to file as yaml"""
-        with self.projectf.open('w') as f:
-            f.write(yaml.dump(self.projects, default_flow_style=False))
-
-    def read_config(self):
-        """Read yaml from file"""
-        projectf = str(self.projectf)
-        with open(projectf) as f:
-            projects = yaml.safe_load(f)
-        self.projects = projects
+                if row:
+                    if not row[0].startswith('#'):
+                        self.projects[row[0]] = row
 
 
 class Config:
@@ -207,9 +205,7 @@ class Config:
     def save_project_name(self, name, path):
         p = GlobalProjects()
         p.add(name, path)
-        # p.save()
-        p.save_csv()
-        pp(p.projects)
+        p.save_tsv()
 
     def find_config(self):
         """Walk up the dir tree to find a config file"""
@@ -257,15 +253,18 @@ class Config:
 
         # if not name, then try to find the default server
         if not name:
+            default_count = 0
             for server_name in self.data['servers']:
                 try:
                     if self.data['servers'][server_name]['default'] is True:
                         name = server_name
+                        default_count += 1
                 except KeyError:
                     continue
-                break
-            if not name:
-                ui.error('No default server found')
+            if default_count > 1:
+                ui.error('Only one server can be set to default.')
+            elif not name:
+                ui.error('No server was specified and no server is set to default.')
 
         try:
             server = self.data['servers'][name]
@@ -276,7 +275,7 @@ class Config:
             options = {}
             for server in self.servers():
                 options[server.name] = '{}@{}'.format(
-                    server.ssh.usename,
+                    server.ssh.username,
                     server.ssh.server
                 )
             ui.display_options(options)
@@ -385,12 +384,12 @@ class TestConfig:
 
     def test_servers(self):
         click.echo()
-        click.secho('Servers', fg=Color.GREEN.value, bold=True)
-        INDENT = 4
+        # click.secho('Servers', fg=Color.GREEN.value, bold=True)
+        INDENT = 2
         # for k, s in self.config.servers().items():
         for s in self.config.servers():
             try:
-                click.secho(f'  {s.name}', fg=Color.GREEN.value)
+                click.secho(f'{s.name}', fg=Color.GREEN.value)
             except AttributeError:
                 pass
 
@@ -440,7 +439,7 @@ class TestConfig:
 
             urls = self.config.urls(s.urls)
             for u in urls:
-                spinner = Spinner(indent=4, delay=0.1)
+                spinner = Spinner(indent=2, delay=0.1)
                 spinner.start()
                 try:
                     # urllib checks the cert and if it's self signed,
@@ -469,7 +468,7 @@ class TestConfig:
                     # 200
                     msg = f'{self.good} URL({u.url})'
                 spinner.stop()
-                self.out(msg, 4)
+                self.out(msg, 2)
 
     def out(self, msg, spaces):
         indent = ' ' * spaces
@@ -483,7 +482,7 @@ class TestConfig:
 
     def run_cmd(self, cmd, good, bad):
 
-        spinner = Spinner(indent=4, delay=0.1)
+        spinner = Spinner(indent=2, delay=0.1)
         spinner.start()
         result = subprocess.run(cmd, shell=True,
                                 stderr=subprocess.DEVNULL,
@@ -491,13 +490,13 @@ class TestConfig:
         spinner.stop()
         if result.returncode:
             # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
-            self.out(f'{self.bad} {bad} (error: {result.returncode})', 4)
+            self.out(f'{self.bad} {bad} (error: {result.returncode})', 2)
             ui.display_cmd(cmd, indent=8)
             return False
         else:
             # click.echo(f'    {self.good} {good}')
-            self.out(f'{self.good} {good}', 4)
-            ui.display_cmd(cmd, indent=8)
+            self.out(f'{self.good} {good}', 2)
+            ui.display_cmd(cmd, indent=6)
             return True
 
 

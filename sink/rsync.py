@@ -119,7 +119,7 @@ class Transfer:
                 ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
                 bold=True, dim=True)
             msg = click.style(
-                f': You are about to overwrite the {s.ssh.id} "{remotef}" files, continue?',
+                f': You are about to overwrite the {s.name} "{remotef}" files, continue?',
                 fg=Color.YELLOW.value)
             msg = warn + msg
             if click.confirm(msg):
