@@ -439,6 +439,9 @@ class TestConfig:
 
             urls = self.config.urls(s.urls)
             for u in urls:
+                if not u.url:
+                    # if there is a url section in the yaml file, but no values for it, continue.
+                    continue
                 spinner = Spinner(indent=2, delay=0.1)
                 spinner.start()
                 try:
@@ -455,11 +458,9 @@ class TestConfig:
                     # Not an HTTP-specific error (e.g. connection refused)
                     msg = f'{self.bad} URL({u.url}): URLError: {e.reason}.'
                 except ValueError as e:
-                    pp(e)
                     msg = f'{self.bad} URL({u.url}): Not a valid URL.'
                 except AttributeError as e:
-                    pp(e)
-                    msg = f'AttributeError? {u.url}'
+                    msg = f'AttributeError? {u.url} {e}'
                 except socket.timeout:
                     msg = f'{self.bad} URL({u.url}) Timeout.'
                 # except:  # socket.timeout:

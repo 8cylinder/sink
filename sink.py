@@ -231,15 +231,21 @@ def generate_config(servers):
         name:
         # dir to put pulled db's in.
         pulls_dir:
-        # dir to the common root.
+        # dir to the common root.  Everything below this point must be
+        # the same structure on all the servers.  This can be an
+        # absolute path or a relative path.  A relative path will be
+        # relative to the location of this file.
         root:
-        # these files will be excluded from any dir syncing.
+        # these files will be excluded from any dir syncing:
         exclude:
           - .well-known
           - '*.sass'
           - '*.scss'
+          - '*.pyc'
           - '.sass-cache'
+          - .git
           - storage/runtime
+          - __pycache__
 
       servers:'''
     if not servers:
