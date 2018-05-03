@@ -42,7 +42,7 @@ def util():
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('server', type=click.STRING)  # autocompletion=get_servers
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
-@click.option('-d', '--real', is_flag=True)
+@click.option('--real', '-r', is_flag=True)
 def database(action, sql_gz, server, real):
     """Overwrite a db with a gzipped sql file.
 
@@ -228,6 +228,8 @@ def generate_config(servers):
     `hurl generate_config > hurl.yaml`
     """
     blank_config = '''
+      # -*- make-backup-files: nil; -*-
+
       project:
         # used for db pull file name (as well as the server id).
         name:
@@ -255,11 +257,21 @@ def generate_config(servers):
     for server in servers:
         blank_config = blank_config + f'''
         {server}:
-          name: {server.upper()}  # this is used for the pulled filename.
+          # This is used for the pulled filename.
+          # It can be changed to anything.
+          name: {server.upper()}
+          # Everything below this point should match
+          # everything below the project root.
           root:
-          warn: yes  # this will warn you when puting multiple files to this server.
+          # This will warn you when puting files or a db to this server.
+          warn: yes
+          # If this is set to yes, then this server will
+          # be used if no server is specified on the command line.
           default: no
           note: |
+            Notes are written like this and can be
+            on multiple lines.  They cannot start on the same
+            line as the vertical bar.
           control_panel:
             url:
             username:
@@ -278,6 +290,8 @@ def generate_config(servers):
             username:
             password:
             note: |
+          # Each db listed here will be checked with 'sink check'
+          # but only the first one can be used with the db command.
           mysql:
             - username:
               password:
