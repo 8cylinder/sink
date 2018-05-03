@@ -22,11 +22,12 @@ from sink.ui import ui
 # Rsync ignore owner, group, time, and perms:
 # https://unix.stackexchange.com/q/102211
 class Transfer:
-    def __init__(self, real, verbose=False):
+    def __init__(self, real, verbose=False, quiet=False):
         self.verbose = True if verbose else False
         self.real = real
         self.dryrun = '' if real else '--dry-run'
-        self.config = Config()
+        self.config = Config(suppress_config_location=quiet)
+        self.quiet = quiet
         self.multiple = False
 
     def put(self, filename, server, extra_flags):
@@ -99,9 +100,11 @@ class Transfer:
             excluded = self.config.excluded()
             recursive = '--recursive'
 
+        extra_flags = ''
+        if self.quiet:
+            extra_flags += ' --quiet '
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        extra_flags = ''
         cmd = f'''rsync {self.dryrun} {identity} {extra_flags} --verbose --itemize-changes
                   --compress --checksum {recursive} {excluded}'''
 
@@ -128,8 +131,10 @@ class Transfer:
         if doit:
             result = subprocess.run(cmd, shell=True)
             if result.returncode:
-                ui.display_cmd(cmd)
+                if not self.quiet:
+                    ui.display_cmd(cmd)
                 click.secho('Command failed', fg=Color.RED.value)
             else:
-                ui.display_cmd(cmd)
+                if not self.quiet:
+                    ui.display_cmd(cmd)
                 ui.display_success(self.real)

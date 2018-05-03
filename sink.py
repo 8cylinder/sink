@@ -71,10 +71,12 @@ def database(action, sql_gz, server, real):
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', required=False)
-@click.option('-d', '--real', '-r', is_flag=True)
+@click.option('--real', '-r', is_flag=True)
+@click.option('--quiet', '-q', is_flag=True,
+              help='Reduce the noise.')
 @click.option('--extra-flags',
               help='extra flags to pass to rsync.')
-def files(action, filename, server, real, extra_flags):
+def files(action, filename, server, real, quiet, extra_flags):
     """Send files to and fro.
 
     Push or pull a single file or directory from a remote server.
@@ -85,7 +87,7 @@ def files(action, filename, server, real, extra_flags):
     SERVER: server name, if not specified sink will use the default server."""
 
     f = Path(os.path.abspath(filename))
-    xfer = Transfer(real)
+    xfer = Transfer(real, quiet=quiet)
     extra_flags = '' if not extra_flags else extra_flags
 
     if action == Action.PULL.value:

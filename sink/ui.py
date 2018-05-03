@@ -29,7 +29,10 @@ class ui:
 
     @staticmethod
     def display_cmd(cmd, indent=0):
-        console_width = os.get_terminal_size().columns
+        try:
+            console_width = os.get_terminal_size().columns
+        except OSError:
+            console_width = 80
         if not console_width:
             console_width = 80
         indent = ' ' * indent
