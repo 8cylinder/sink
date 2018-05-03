@@ -8,6 +8,7 @@ import tempfile
 import gzip
 
 from sink.config import Config
+from sink.config import dict2obj
 from sink.ui import Color
 from sink.ui import ui
 
@@ -20,10 +21,9 @@ class DB:
     def pull(self, server):
         p = self.config.project()
         s = self.config.server(server)
-        print(s)
-        exit()
+        db = dict2obj(**s.mysql[0])
 
-        if not p.pulls_dir.exist():
+        if not p.pulls_dir.exists():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
 
         try:
@@ -32,12 +32,18 @@ class DB:
         except AttributeError:
             identity = ''
 
-        hostname = '127.0.0.1'
+        hostname = ''
+        try:
+            if db.hostname:
+                # hostname = '127.0.0.1'
+                hostname = f'--hostname={db.hostname}'
+        except AttributeError:
+            hostname = ''
 
         sqlfile = self._dest(p.name, p.pulls_dir, s.name)
         cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} \
-            mysqldump --hostname={hostname} --user={s.mysql.username} --password={s.mysql.password} \
-            --single-transaction --triggers --events --routines {s.mysql.db} \
+            mysqldump {hostname} --user={db.username} --password={db.password} \
+            --single-transaction --triggers --events --routines {db.db} \
             | gzip -c > "{sqlfile}"'''
         cmd = ' '.join(cmd.split())
 
@@ -56,7 +62,8 @@ class DB:
             ui.display_success(self.real)
 
     def put(self, server, sqlfile):
-        s = self.config.ssh_server(server)
+        s = self.config.server(server)
+        db = dict2obj(**s.mysql[0])
         sql = Path(sqlfile)
         if not sql.exists():
             ui.error(f'{sql} does not exist')
@@ -72,8 +79,8 @@ class DB:
         except AttributeError:
             identity = ''
 
-        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql --user={s.mysql.username} \
-            --password={s.mysql.password} {s.mysql.db} < "{t.name}"'''
+        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql --user={db.username} \
+            --password={db.password} {db.db} < "{t.name}"'''
         cmd = ' '.join(cmd.split())
 
         if self.real:

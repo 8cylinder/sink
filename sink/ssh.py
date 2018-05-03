@@ -15,7 +15,7 @@ class SSH:
 
         identity = self.get_key(s)
 
-        cmd = f'''ssh -o 'ConnectTimeout 10' {identity} {s.ssh.username}@{s.ssh.server}'''
+        cmd = f'''ssh {identity} {s.ssh.username}@{s.ssh.server}'''
         cmd = ' '.join(cmd.split())
 
         self.run_cmd(cmd, dry_run)
@@ -34,7 +34,10 @@ class SSH:
     def get_key(self, server):
         try:
             identity = f'-i "{server.ssh.key}"'
-            click.echo(f'Using identity: "{server.ssh.key}"')
+            if server.ssh.key:
+                click.echo(f'Using identity: "{server.ssh.key}"')
+            else:
+                identity = ''
         except AttributeError:
             identity = ''
 
