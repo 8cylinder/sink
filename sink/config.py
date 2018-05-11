@@ -382,12 +382,12 @@ class TestConfig:
         cmd = f'''echo; for prg in {req}; do echo '{spliter}'; $prg; done'''
         click.echo(cmd)
 
-    def test_servers(self):
+    def test_servers(self, server_names=None):
         click.echo()
-        # click.secho('Servers', fg=Color.GREEN.value, bold=True)
         INDENT = 2
-        # for k, s in self.config.servers().items():
         for s in self.config.servers():
+            if s.name.lower() not in server_names:
+                continue
             try:
                 click.secho(f'{s.name}', fg=Color.GREEN.value)
             except AttributeError:

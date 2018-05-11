@@ -148,15 +148,19 @@ def info(view):
         click.edit(filename=config.config_file)
 
 @util.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server-names', nargs=-1)
 @click.option('--required', '-r', is_flag=True)
-def check(required):
+# @click.option('--name', '-n',
+              # help='Restrict check to only this name.')
+def check(required, server_names):
     """Test server settings in config."""
+    if server_names:
+        server_names = [i.lower() for i in server_names]
     tc = TestConfig()
     if required:
         tc.test_requirements()
     else:
-        # tc.test_project()
-        tc.test_servers()
+        tc.test_servers(server_names)
 
 # ------------------------------- Misc --------------------------------
 
