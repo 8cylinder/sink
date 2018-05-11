@@ -26,17 +26,16 @@ class DB:
         if not p.pulls_dir.exists():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
 
-        try:
-            identity = f'-i "{s.key}"'
-            click.echo(f'Using identity: "{s.key}"')
-        except AttributeError:
+        if s.ssh.key:
+            identity = f'-i "{s.ssh.key}"'
+            click.echo(f'Using identity: "{s.ssh.key}"')
+        else:
             identity = ''
 
         hostname = ''
         try:
             if db.hostname:
-                # hostname = '127.0.0.1'
-                hostname = f'--hostname={db.hostname}'
+                hostname = f'--host={db.hostname}'
         except AttributeError:
             hostname = ''
 

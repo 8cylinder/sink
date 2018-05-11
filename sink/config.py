@@ -194,8 +194,20 @@ class Config:
         except RecursionError:
             ui.error('You are not in a project.', True)
 
-        with open(self.config) as f:
-            data = yaml.safe_load(f)
+        try:
+            with open(self.config) as f:
+                data = yaml.safe_load(f)
+
+        except yaml.YAMLError as e:
+            if hasattr(e, 'problem_mark'):
+                msg = 'There was an error while parsing the config file'
+                if e.context is not None:
+                    click.echo(f'{msg}:\n{e.problem_mark}\n{e.problem} {e.context}.')
+                else:
+                    click.echo(f'{msg}:\n{e.problem_mark} {e.problem}.')
+            else:
+                print ("Something went wrong while parsing the yaml file.")
+            exit()
 
         self.data = data
         self.o = dict2obj(**data)
@@ -299,6 +311,10 @@ class Config:
                 ssh = self.default_server['ssh'].copy()
                 ssh.update(v)
                 server['ssh'] = ssh
+                ssh_key = server['ssh']['key']
+                if ssh_key:
+                    ssh_key = os.path.abspath(ssh_key)
+                    server['ssh']['key'] = ssh_key
 
         s = self.default_server.copy()
         s.update(server)
@@ -379,7 +395,9 @@ class TestConfig:
         required = [f"'{i}'" for i in required]
         req = ' '.join(required)
         spliter = '==='
-        cmd = f'''echo; for prg in {req}; do echo '{spliter}'; $prg; done'''
+        cmd = f'''for prg in {req}; do echo '{spliter}'; $prg; done'''
+        click.echo()
+        click.echo('Run the following bash command:')
         click.echo(cmd)
 
     def test_servers(self, server_names=None):

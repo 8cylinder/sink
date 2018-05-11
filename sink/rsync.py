@@ -81,7 +81,10 @@ class Transfer:
         # remove the local project root from the file
         remote = remote.replace(str(p.root.absolute()), '.')
         # add the server root
-        remote = Path(s.root, remote)
+        try:
+            remote = Path(s.root, remote)
+        except TypeError:
+            ui.error(f'Server has no root ({s.name}).')
         file_locations = {
             'local': local,
             'remote': remote,
