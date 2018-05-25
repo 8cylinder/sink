@@ -27,18 +27,20 @@ from sink.ssh import SSH
     # servers = config.data['servers']
     # return servers
 
+__version__ = '0.1.0'
+
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help'],
     # 'token_normalize_func': lambda x: x.lower(),
 }
 @click.group(context_settings=CONTEXT_SETTINGS)
-def util():
-    """Tools to manage project."""
+def sink():
+    """Tools to manage projects."""
     # global config
     # config = Config()
 
 # --------------------------------- DB ---------------------------------
-@util.command('db', context_settings=CONTEXT_SETTINGS)
+@sink.command('db', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('server', type=click.STRING)  # autocompletion=get_servers
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
@@ -67,7 +69,7 @@ def database(action, sql_gz, server, real):
         db.put(server, sql_gz)
 
 # ------------------------------- Files -------------------------------
-@util.command('file', context_settings=CONTEXT_SETTINGS)
+@sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', required=False)
@@ -95,7 +97,7 @@ def files(action, filename, server, real, quiet, extra_flags):
     elif action == Action.PUT.value:
         xfer.put(f, server, extra_flags)
 
-@util.command(context_settings=CONTEXT_SETTINGS)
+@sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', required=False)
 @click.option('--dry-run', '-d', is_flag=True,
               help='Do nothing, show the command only.')
@@ -104,7 +106,7 @@ def ssh(server, dry_run):
     ssh = SSH()
     ssh.ssh(server=server, dry_run=dry_run)
 
-@util.command('diff', context_settings=CONTEXT_SETTINGS)
+@sink.command('diff', context_settings=CONTEXT_SETTINGS)
 @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', required=False)
 @click.option('--ignore-whitespace', '-i', is_flag=True,
@@ -122,7 +124,7 @@ def diff_files(filename, server, ignore_whitespace, difftool):
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace, difftool=difftool)
 
-@util.command(context_settings=CONTEXT_SETTINGS)
+@sink.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--view/--edit', '-v/-e', default=True,
               help='View or edit config file.')
 def info(view):
@@ -147,7 +149,7 @@ def info(view):
     else:
         click.edit(filename=config.config_file)
 
-@util.command(context_settings=CONTEXT_SETTINGS)
+@sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server-names', nargs=-1)
 @click.option('--required', '-r', is_flag=True)
 # @click.option('--name', '-n',
@@ -164,7 +166,7 @@ def check(required, server_names):
 
 # ------------------------------- Misc --------------------------------
 
-@util.group(context_settings=CONTEXT_SETTINGS)
+@sink.group(context_settings=CONTEXT_SETTINGS)
 def misc():
     """Misc stuff."""
 
@@ -320,8 +322,8 @@ def generate_config(servers):
     click.echo(blank_config)
 
 
-if __name__ == '__main__':
-    try:
-        util()
-    except KeyboardInterrupt:
-        sys.exit(1)
+# if __name__ == '__main__':
+#     try:
+#         util()
+#     except KeyboardInterrupt:
+#         sys.exit(1)

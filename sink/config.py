@@ -404,8 +404,9 @@ class TestConfig:
         click.echo()
         INDENT = 2
         for s in self.config.servers():
-            if s.name.lower() not in server_names:
-                continue
+            if server_names:
+                if s.name.lower() not in server_names:
+                    continue
             try:
                 click.secho(f'{s.name}', fg=Color.GREEN.value)
             except AttributeError:
