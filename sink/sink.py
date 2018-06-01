@@ -22,6 +22,7 @@ from sink.rsync import Transfer
 from sink.ui import ui
 from sink.ssh import SSH
 from sink.applications import Applications
+from sink.init import Init
 
 # def get_servers(ctx, args, incomplete):
     # config = Config()
@@ -225,109 +226,20 @@ def pack():
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('servers', nargs=-1)
-def generate_config(servers):
+def init(servers):
     """Create a blank config.
 
     The servers arg will create an entry for each server name given.
 
     \b
     To write the config to a file use:
-    `hurl generate_config > hurl.yaml`
+    `sink misc init > sink.yaml`
     """
-    blank_config = '''
-      # -*- make-backup-files: nil; -*-
-
-      project:
-        # used for db pull file name (as well as the server id).
-        name:
-        # dir to put pulled db's in.
-        pulls_dir:
-        # dir to the common root.  Everything below this point must be
-        # the same structure on all the servers.  This can be an
-        # absolute path or a relative path.  A relative path will be
-        # relative to the location of this file.
-        root:
-        # these files will be excluded from any dir syncing:
-        exclude:
-          - .well-known
-          - '*.sass'
-          - '*.scss'
-          - '*.pyc'
-          - '.sass-cache'
-          - .git
-          - storage/runtime
-          - __pycache__
-
-      servers:'''
-    if not servers:
-        servers = ['example_server']
-    for server in servers:
-        blank_config = blank_config + f'''
-        {server}:
-          # This is used for the pulled filename.
-          # It can be changed to anything.
-          name: {server.upper()}
-          # Everything below this point should match
-          # everything below the project root.
-          root:
-          # This will warn you when puting files or a db to this server.
-          warn: yes
-          # If this is set to yes, then this server will
-          # be used if no server is specified on the command line.
-          default: no
-          note: |
-            Notes are written like this and can be
-            on multiple lines.  They cannot start on the same
-            line as the vertical bar.
-          control_panel:
-            url:
-            username:
-            password:
-            note: |
-          ssh:
-            username:
-            password:
-            server:
-            key:
-            port:
-            note: |
-          hosting:
-            name:
-            url:
-            username:
-            password:
-            note: |
-          # Each db listed here will be checked with 'sink check'
-          # but only the first one can be used with the db command.
-          mysql:
-            - username:
-              password:
-              db:
-              hostname:
-              note: |
-          urls:
-            - url:
-              admin_url:
-              username:
-              password:
-              note: |
-            - url:
-              admin_url:
-              username:
-              password:
-              note: |
-        '''
-
-    blank_config = blank_config.split('\n')
-    blank_config = '\n'.join([i[6:] for i in blank_config])
-    click.echo(blank_config)
+    init = Init()
+    init.servers(servers)
+    click.echo(init.create())
 
 
-# if __name__ == '__main__':
-#     try:
-#         util()
-#     except KeyboardInterrupt:
-#         sys.exit(1)
 @misc.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('application', nargs=1)
 def settings(application):
