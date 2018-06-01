@@ -21,6 +21,7 @@ from sink.db import DB
 from sink.rsync import Transfer
 from sink.ui import ui
 from sink.ssh import SSH
+from sink.applications import Applications
 
 # def get_servers(ctx, args, incomplete):
     # config = Config()
@@ -327,3 +328,18 @@ def generate_config(servers):
 #         util()
 #     except KeyboardInterrupt:
 #         sys.exit(1)
+@misc.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('application', nargs=1)
+def settings(application):
+    """Output settings values for the requested application.
+
+    For the requested application, output settings in a format thats
+    easy to copy & paste.
+    """
+
+    app = Applications()
+    if not app.name(application):
+        click.echo(f'Unknown application: {application}')
+        click.echo(f'Known are: {app.known()}')
+    else:
+        click.echo(app.app_settings())

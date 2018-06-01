@@ -166,7 +166,8 @@ class Config:
             'note': None,
             'password': None,
             'server': None,
-            'username': None
+            'username': None,
+            'port': None,
         },
         'mysql': [],
         'urls': []
