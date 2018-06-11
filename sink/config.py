@@ -212,7 +212,6 @@ class Config:
 
         self.data = data
         self.o = dict2obj(**data)
-        # self.project_root
         self.save_project_name(data['project']['name'], os.path.curdir)
 
     def save_project_name(self, name, path):
@@ -314,7 +313,9 @@ class Config:
                 server['ssh'] = ssh
                 ssh_key = server['ssh']['key']
                 if ssh_key:
-                    ssh_key = os.path.abspath(ssh_key)
+                    ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
+                    if not os.path.exists(ssh_key):
+                        ui.warn(f'ssh key does not exist: {ssh_key}')
                     server['ssh']['key'] = ssh_key
 
         s = self.default_server.copy()
@@ -358,8 +359,6 @@ class Config:
         s = namedtuple('syncpoint', self.data['sync points'].keys())(
             **self.data['sync points'])
         return s
-
-    # def syncpoints(self)
 
     def excluded(self):
         ex = self.data['project']['exclude']
@@ -413,17 +412,10 @@ class TestConfig:
             except AttributeError:
                 pass
 
-            # try:
-            #     user = s.ssh.username
-            #     url = s.ssh.server
-            # except AttributeError:
-            #     self.out('No ssh info', INDENT)
-            #     continue
             user = s.ssh.username
             url = s.ssh.server
 
             key = ''
-            # pp(dir(s.ssh))
             if s.ssh.key:
                 key = f' -i "{s.ssh.key}"'
 

@@ -20,10 +20,15 @@ class Color(Enum):
 
 class ui:
     @staticmethod
+    def warn(msg):
+        w = click.style('Warning:', bold=True, fg=Color.YELLOW.value)
+        m = click.style(msg, fg='yellow', reset=True)
+        click.echo(f'{w} {m}', err=True)
+
     def error(msg, exit=True):
-        # e = click.style('\nError', fg=Color.WHITE.value, bg=Color.RED.value)
-        # msg = click.style(msg, reset=True)
-        click.secho(f'\nError: {msg}', err=True, reset=True)
+        e = click.style('\nError:', bold=True, fg=Color.RED.value)
+        m = click.style(msg, fg='red', reset=True)
+        click.echo(f'{e} {m}', err=True)
         if exit:
             sys.exit(1)
 
