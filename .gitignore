@@ -2,3 +2,6 @@ sink.yaml
 build
 dist
 sink.egg-info
+*.pyc
+.mypy_cache
+man

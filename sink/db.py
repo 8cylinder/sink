@@ -7,7 +7,7 @@ import datetime
 import tempfile
 import gzip
 
-from sink.config import Config
+from sink.config import config
 from sink.config import dict2obj
 from sink.ui import Color
 from sink.ui import ui
@@ -16,7 +16,7 @@ class DB:
     def __init__(self, real, verbose=False):
         self.verbose = True if verbose else False
         self.real = real
-        self.config = Config()
+        self.config = config
 
     def pull(self, server):
         p = self.config.project()
@@ -28,7 +28,7 @@ class DB:
 
         if s.ssh.key:
             identity = f'-i "{s.ssh.key}"'
-            click.echo(f'Using identity: "{s.ssh.key}"')
+            # click.echo(f'Using identity: "{s.ssh.key}"')
         else:
             identity = ''
 
@@ -72,16 +72,16 @@ class DB:
             sql = gz.read()
             t.write(sql)
 
-        try:
-            identity = f'-i "{s.key}"'
-            print(s.key)
-        except AttributeError:
+        if s.ssh.key:
+            identity = f'-i "{s.ssh.key}"'
+            # click.echo(f'Using identity: "{s.ssh.key}"')
+        else:
             identity = ''
 
         cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql --user={db.username} \
             --password={db.password} {db.db} < "{t.name}"'''
         cmd = ' '.join(cmd.split())
-
+        print('>>>', cmd)
         if self.real:
             doit = True
             if s.warn:

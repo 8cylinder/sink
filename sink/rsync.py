@@ -13,7 +13,7 @@ import gzip
 from enum import Enum
 import tempfile
 
-from sink.config import Config
+from sink.config import config
 from sink.ui import Color
 from sink.config import Action
 from sink.ui import ui
@@ -26,12 +26,14 @@ class Transfer:
         self.verbose = True if verbose else False
         self.real = real
         self.dryrun = '' if real else '--dry-run'
-        self.config = Config(suppress_config_location=quiet)
+        # self.config = Config(suppress_config_location=quiet)  # fixme
+        self.config = config
         self.quiet = quiet
         self.multiple = False
 
     def put(self, filename, server, extra_flags):
         locations = self.locations(server, filename)
+        print(locations)
         local = locations['local']
         # append a / to the remote path if its a dir so rsync will
         # sync two dirs with the same name
@@ -91,7 +93,7 @@ class Transfer:
         }
         return file_locations
 
-    def _rsync(self, localf, remotef, server, action, extra_flags=None):
+    def _rsync(self, localf, remotef, server, action, extra_flags=''):
         s = self.config.server(server)
         identity = ''
         if s.ssh.key:
@@ -103,12 +105,16 @@ class Transfer:
             excluded = self.config.excluded()
             recursive = '--recursive'
 
-        extra_flags = ''
+        group = ''
+        if action == Action.PUT and s.group:
+            # --group needs to be used along with --chown to change group on the server
+            group = f'--group --chown=:{s.group}'
+
         if self.quiet:
             extra_flags += ' --quiet '
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f'''rsync {self.dryrun} {identity} {extra_flags} --verbose --itemize-changes
+        cmd = f'''rsync {self.dryrun} {identity} {group} {extra_flags} --verbose --itemize-changes
                   --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:

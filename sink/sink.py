@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 import os
-import sys
-import re
-import subprocess
 import click
 from pprint import pprint as pp
-import yaml
 from pathlib import Path
 import datetime
-from collections import namedtuple
-import tempfile
-import gzip
 
-from sink.config import Config
-from sink.config import TestConfig
+from sink.config import config
+# from sink.config import TestConfig
 from sink.config import Color
 from sink.config import Action
-from sink.config import GlobalProjects
 from sink.db import DB
 from sink.rsync import Transfer
 from sink.ui import ui
 from sink.ssh import SSH
+from sink.applications import Applications
+from sink.init import Init
+from sink.deploy import Deploy
+from sink.check import TestConfig
 
 # def get_servers(ctx, args, incomplete):
     # config = Config()
@@ -71,7 +67,8 @@ def database(action, sql_gz, server, real):
 # ------------------------------- Files -------------------------------
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
-@click.argument('filename', type=click.Path(exists=True), required=True)
+# @click.argument('filename', type=click.Path(exists=True), required=True)
+@click.argument('filename', type=click.Path(), required=True)
 @click.argument('server', required=False)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--quiet', '-q', is_flag=True,
@@ -140,7 +137,7 @@ def info(view):
     export VISUAL='program'
 
     """
-    config = Config()
+    # config = Config()
 
     if view:
         with open(config.config_file) as f:
@@ -152,8 +149,6 @@ def info(view):
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server-names', nargs=-1)
 @click.option('--required', '-r', is_flag=True)
-# @click.option('--name', '-n',
-              # help='Restrict check to only this name.')
 def check(required, server_names):
     """Test server settings in config."""
     if server_names:
@@ -163,6 +158,48 @@ def check(required, server_names):
         tc.test_requirements()
     else:
         tc.test_servers(server_names)
+
+# ------------------------------- Deploy ------------------------------
+
+@sink.group(context_settings=CONTEXT_SETTINGS)
+def deploy():
+    """Deploy site to server with rollback.
+
+    Each deploy after init will be hard-linked to the previous deploy.
+    Each deploy's dir will be have the format YY-MM-DD-HH-MM-SS."""
+
+@deploy.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server')
+def init(server):
+    """Initialize and setup a deploy.
+
+    Create a dir to hold the uploaded versions, and create a symlink
+    to it.  Future uploads will be hard-linked in a chain back to this
+    one."""
+
+    deploy = Deploy(server, real=True)
+    deploy.init_deploy()
+
+@deploy.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server')
+@click.option('--real', '-r', is_flag=True)
+def new(server, real):
+    """Upload a new version of the site.
+
+    Upload a new version to a dir with the current date.  The symlink
+    is changed to point to this new dir."""
+
+    deploy = Deploy(server, real)
+    deploy.new()
+
+@deploy.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server')
+@click.option('--real', '-r', is_flag=True)
+def change(server, real):
+    """Revert back to a previous deploy"""
+
+    deploy = Deploy(server, real)
+    deploy.change_current()
 
 # ------------------------------- Misc --------------------------------
 
@@ -191,7 +228,7 @@ def api(keys):
     To get the dev servers user name:
       sink misc api servers dev user
     '''
-    config = Config(suppress_config_location=True)
+    # config = Config(suppress_config_location=True)
     data = config.data
 
     for k in keys:
@@ -211,7 +248,7 @@ def api(keys):
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def pack():
     """Display a command to gzip uncommited files."""
-    config = Config()
+    # config = Config()
     now = datetime.datetime.now()
     now = now.strftime('%y-%m-%d-%H-%M-%S')
     # from IPython import embed; embed()
@@ -222,108 +259,34 @@ def pack():
     title = click.style('Run:', fg=Color.YELLOW.value)
     click.echo(f'{title} {cmd}')
 
-@misc.command(context_settings=CONTEXT_SETTINGS)
+@misc.command('init', context_settings=CONTEXT_SETTINGS)
 @click.argument('servers', nargs=-1)
-def generate_config(servers):
+def init_config(servers):
     """Create a blank config.
 
     The servers arg will create an entry for each server name given.
 
     \b
     To write the config to a file use:
-    `hurl generate_config > hurl.yaml`
+    `sink misc init > sink.yaml`
     """
-    blank_config = '''
-      # -*- make-backup-files: nil; -*-
-
-      project:
-        # used for db pull file name (as well as the server id).
-        name:
-        # dir to put pulled db's in.
-        pulls_dir:
-        # dir to the common root.  Everything below this point must be
-        # the same structure on all the servers.  This can be an
-        # absolute path or a relative path.  A relative path will be
-        # relative to the location of this file.
-        root:
-        # these files will be excluded from any dir syncing:
-        exclude:
-          - .well-known
-          - '*.sass'
-          - '*.scss'
-          - '*.pyc'
-          - '.sass-cache'
-          - .git
-          - storage/runtime
-          - __pycache__
-
-      servers:'''
-    if not servers:
-        servers = ['example_server']
-    for server in servers:
-        blank_config = blank_config + f'''
-        {server}:
-          # This is used for the pulled filename.
-          # It can be changed to anything.
-          name: {server.upper()}
-          # Everything below this point should match
-          # everything below the project root.
-          root:
-          # This will warn you when puting files or a db to this server.
-          warn: yes
-          # If this is set to yes, then this server will
-          # be used if no server is specified on the command line.
-          default: no
-          note: |
-            Notes are written like this and can be
-            on multiple lines.  They cannot start on the same
-            line as the vertical bar.
-          control_panel:
-            url:
-            username:
-            password:
-            note: |
-          ssh:
-            username:
-            password:
-            server:
-            key:
-            port:
-            note: |
-          hosting:
-            name:
-            url:
-            username:
-            password:
-            note: |
-          # Each db listed here will be checked with 'sink check'
-          # but only the first one can be used with the db command.
-          mysql:
-            - username:
-              password:
-              db:
-              hostname:
-              note: |
-          urls:
-            - url:
-              admin_url:
-              username:
-              password:
-              note: |
-            - url:
-              admin_url:
-              username:
-              password:
-              note: |
-        '''
-
-    blank_config = blank_config.split('\n')
-    blank_config = '\n'.join([i[6:] for i in blank_config])
-    click.echo(blank_config)
+    init = Init()
+    init.servers(servers)
+    click.echo(init.create())
 
 
-# if __name__ == '__main__':
-#     try:
-#         util()
-#     except KeyboardInterrupt:
-#         sys.exit(1)
+@misc.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('application', nargs=1)
+def settings(application):
+    """Output settings values for the requested application.
+
+    For the requested application, output settings in a format thats
+    easy to copy & paste.
+    """
+
+    app = Applications()
+    if not app.name(application):
+        click.echo(f'Unknown application: {application}')
+        click.echo(f'Known are: {app.known()}')
+    else:
+        click.echo(app.app_settings())
