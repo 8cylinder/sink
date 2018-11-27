@@ -23,7 +23,7 @@ class DB:
         s = self.config.server(server)
         db = dict2obj(**s.mysql[0])
 
-        if not p.pulls_dir.exists():
+        if p.pulls_dir is None or not p.pulls_dir.exists():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
 
         if s.ssh.key:
@@ -39,22 +39,33 @@ class DB:
         except AttributeError:
             hostname = ''
 
-        sqlfile = self._dest(p.name, p.pulls_dir, s.name)
+        skip_secure = ''
+        try:
+            if db.skip_secure_auth:
+                skip_secure = '--skip-secure-auth'
+        except AttributeError:
+            skip_secure = ''
+
+        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name)
         cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} \
-            mysqldump {hostname} --user={db.username} --password={db.password} \
+            mysqldump {hostname} {skip_secure} --user={db.username} --password={db.password} \
             --single-transaction --triggers --events --routines {db.db} \
             | gzip -c > "{sqlfile}"'''
         cmd = ' '.join(cmd.split())
 
         if self.real:
-            result = subprocess.run(cmd, shell=True)
-            if sqlfile.exists():
+            result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+            ui.display_cmd(cmd)
+            error_msg = result.stderr.decode("utf-8").replace('Warning: Using a password on the command line interface can be insecure.\n', '')
+            if error_msg:
+                click.secho('\nEmpty file created:', fg=Color.YELLOW.value, bold=True)
+                click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
+                ui.error(f'\n{error_msg}')
+            elif sqlfile.exists():
                 filename = str(sqlfile.absolute())
                 click.secho(filename, fg=Color.GREEN.value)
-                ui.display_cmd(cmd)
                 ui.display_success(self.real)
             else:
-                ui.display_cmd(cmd)
                 click.secho('Command failed', fg=Color.RED.value)
         else:
             ui.display_cmd(cmd)
@@ -78,10 +89,17 @@ class DB:
         else:
             identity = ''
 
-        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql --user={db.username} \
+        skip_secure = ''
+        try:
+            if db.skip_secure_auth:
+                skip_secure = '--skip-secure-auth'
+        except AttributeError:
+            skip_secure = ''
+
+        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql {skip_secure} --user={db.username} \
             --password={db.password} {db.db} < "{t.name}"'''
         cmd = ' '.join(cmd.split())
-        print('>>>', cmd)
+
         if self.real:
             doit = True
             if s.warn:
@@ -97,20 +115,20 @@ class DB:
                     doit = True
 
             if doit:
-                result = subprocess.run(cmd, shell=True)
-                if result.returncode:
-                    ui.display_cmd(cmd)
-                    click.secho('Command failed', fg='red')
+                result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+                ui.display_cmd(cmd)
+                error_msg = result.stderr.decode("utf-8").replace('Warning: Using a password on the command line interface can be insecure.\n', '')
+                if error_msg:
+                    ui.error(f'\n{error_msg}')
                 else:
-                    ui.display_cmd(cmd)
                     ui.display_success(self.real)
         else:
             ui.display_cmd(cmd)
             ui.display_success(self.real)
 
-    def _dest(self, project_name, dirname, id):
+    def _dest(self, project_name, dbname, dirname, id):
         now = datetime.datetime.now()
         now = now.strftime('%y-%m-%d_%H-%M-%S')
-        name = f'{project_name}-{id}-{now}.sql.gz'
+        name = f'{dbname}-{id}-{now}.sql.gz'
         p = Path(dirname, name).absolute().resolve()
         return p
