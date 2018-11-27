@@ -210,7 +210,7 @@ class Configuration:
                 else:
                     click.echo(f'{msg}:\n{e.problem_mark} {e.problem}.')
             else:
-                print ("Something went wrong while parsing the yaml file.")
+                print("Something went wrong while parsing the yaml file.")
             exit()
 
         self.data = data
@@ -246,18 +246,27 @@ class Configuration:
         p = self.default_project
         p.update(project)
 
-        # convert paths to absolute paths
-        for d in ['root', 'pulls_dir']:
-            try:
-                fixed = os.path.expanduser(p[d])
-                fixed = os.path.abspath(fixed)
-                p[d] = Path(fixed)
-            except KeyError:
-                # this field is blank
-                continue
-            except TypeError:
-                # this fields does not exist
-                continue
+        # root is required
+        try:
+            root_d = Path(p['root'])
+            root_d = root_d.expanduser().absolute()
+            if not root_d.exists():
+                ui.error(f'Root dir does not exist: {root_d}')
+            p['root'] = root_d
+        except TypeError:
+            # this fields does not exist
+            ui.error('Root is a required setting in project')
+
+        # db pulls dir
+        pulls_dir = p['pulls_dir']
+        if pulls_dir:
+            pulls_dir = Path(pulls_dir)
+            pulls_dir = pulls_dir.expanduser().absolute().resolve()
+            # pulls_dir = pulls_dir
+            if not pulls_dir.exists():
+                ui.error(f'DB pull dir does not exist: {pulls_dir}')
+        p['pulls_dir'] = pulls_dir
+
         p = dict2obj(**p)
         return p
 
