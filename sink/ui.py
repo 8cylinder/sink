@@ -25,8 +25,13 @@ class ui:
         m = click.style(msg, fg='yellow', reset=True)
         click.echo(f'{w} {m}', err=True)
 
-    def error(msg, exit=True):
-        e = click.style('\nError:', bold=True, fg=Color.RED.value)
+    @staticmethod
+    def error(msg, exit=True, indent=0):
+        distance = ''
+        if indent:
+            distance = ' ' * indent
+            msg = '\n'.join([f'{distance}{i}' for i in msg.split('\n')])
+        e = click.style(f'\n{distance}Error:', bold=True, fg=Color.RED.value)
         m = click.style(msg, fg='red', reset=True)
         click.echo(f'{e} {m}', err=True)
         if exit:
@@ -72,3 +77,4 @@ class ui:
             key = click.style(key.ljust(max), bold=True)
             val = click.style(f'({val})', fg=Color.BLUE.value)
             click.echo(f'  {key}  {val}')
+
