@@ -53,7 +53,7 @@ class Transfer:
             self.multiple = True
         self._rsync(local, remote, server, Action.PULL, extra_flags)
 
-    def diff(self, local_file, server, ignore=False, difftool=False):
+    def diff(self, local_file, server, ignore=False, word_diff=None, difftool=False):
         with tempfile.TemporaryDirectory() as diffdir:
             tmp_file = f'{diffdir}/{local_file.name}'
             locations = self.locations(server, local_file)
@@ -64,8 +64,16 @@ class Transfer:
             if difftool:
                 cmd = f'''meld {tmp_file} {local_file}'''
             else:
-                #   --word-diff=color --word-diff-regex=.
-                cmd = f'''git --no-pager diff \
+                flags = []
+                if ignore:
+                    flags.append('--ignore-all-space')  # --ignore-space-change
+                if word_diff == 'word':
+                    flags.append('--word-diff=color')
+                elif word_diff == 'letter':
+                    flags.append('--word-diff=color --word-diff-regex=.')
+                flags = ' '.join(flags)
+
+                cmd = f'''git --no-pager diff {flags} --diff-algorithm=minimal\
                           {tmp_file} {local_file}'''
             cmd = ' '.join(cmd.split())
 

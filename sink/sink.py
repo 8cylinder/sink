@@ -110,7 +110,9 @@ def ssh(server, dry_run):
               help='Ignore whitespace in diff.')
 @click.option('--difftool', '-d', is_flag=True,
               help='Use meld instead of "git diff".')
-def diff_files(filename, server, ignore_whitespace, difftool):
+@click.option('--word-diff', '-w', type=click.Choice(['word', 'letter']),
+              help='Refine diffs to word or letter differences.')
+def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
     """Diff a local and remote file.
 
     \b
@@ -119,7 +121,8 @@ def diff_files(filename, server, ignore_whitespace, difftool):
 
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(True)
-    xfer.diff(fx, server, ignore=ignore_whitespace, difftool=difftool)
+    xfer.diff(fx, server, ignore=ignore_whitespace,
+              word_diff=word_diff, difftool=difftool)
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--view/--edit', '-v/-e', default=True,
