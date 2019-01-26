@@ -17,7 +17,7 @@ from sink.ui import ui
 class TestConfig:
     good = click.style('[\u2713]', fg=Color.GREEN.value)
     bad = click.style('[X]', fg=Color.RED.value)
-    timeout = 5
+    timeout = 20
 
     def __init__(self):
         self.config = config
@@ -137,7 +137,9 @@ class TestConfig:
 
     def run_cmd_on_server(self, user, url, cmd, good, bad, key=''):
 
-        cmd = f'''ssh -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
+        cmd = f'''ssh -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
+        # print(cmd)
+        # exit()
         result = self.run_cmd(cmd, good, bad)
         return result
 
@@ -146,13 +148,14 @@ class TestConfig:
         spinner = Spinner(indent=2, delay=0.1)
         spinner.start()
         result = subprocess.run(cmd, shell=True,
-                                stderr=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE,
                                 stdout=subprocess.DEVNULL)
         spinner.stop()
         if result.returncode:
             # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
             self.out(f'{self.bad} {bad} (error: {result.returncode})', 2)
             ui.display_cmd(cmd, indent=8)
+            ui.error(f'\n{result.stderr.decode("utf-8")}', exit=False, indent=8)
             return False
         else:
             # click.echo(f'    {self.good} {good}')
