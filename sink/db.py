@@ -117,7 +117,9 @@ class DB:
             if doit:
                 result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
                 ui.display_cmd(cmd)
-                error_msg = result.stderr.decode("utf-8").replace('Warning: Using a password on the command line interface can be insecure.\n', '')
+                error_msg = result.stderr.decode("utf-8").replace(
+                    'Warning: Using a password on the command line interface can be insecure.\n', '').replace(
+                        'mysql: [Warning] Using a password on the command line interface can be insecure.\n', '')
                 if error_msg:
                     ui.error(f'\n{error_msg}')
                 else:
