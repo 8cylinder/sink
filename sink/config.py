@@ -22,7 +22,6 @@ import traceback
 from sink.ui import ui
 from sink.ui import Color
 
-
 class Action(Enum):
     PUT = 'put'
     PULL = 'pull'
@@ -194,12 +193,12 @@ class Configuration:
     def __init__(self, suppress_config_location=True):
         self.suppress = suppress_config_location
         try:
-            self.find_config()
+            self.find_config(os.curdir)
         except RecursionError:
             ui.error('You are not in a project.', True)
 
         try:
-            with open(self.config) as f:
+            with open(self.config_file) as f:
                 data = yaml.safe_load(f)
 
         except yaml.YAMLError as e:
@@ -222,16 +221,28 @@ class Configuration:
         p.add(name, path)
         p.save_tsv()
 
-    def find_config(self):
+    # def find_config(self):
+    #     """Walk up the dir tree to find a config file"""
+    #     if self.config_file in os.listdir():
+    #         cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
+    #         if not self.suppress:
+    #             click.secho(f'Using {self.config_file} in {cwd}', dim=True)
+    #         self.config = Path(self.config_file)
+    #     else:
+    #         os.chdir('..')
+    #         self.find_config()
+
+    def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
-        if self.config_file in os.listdir():
+        if self.config_file in os.listdir(cur):
             cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
             if not self.suppress:
                 click.secho(f'Using {self.config_file} in {cwd}', dim=True)
-            self.config = Path(self.config_file)
+            self.config_file = Path(cur, self.config_file)
+            self.project_root = Path(cur)
         else:
-            os.chdir('..')
-            self.find_config()
+            cur = os.path.abspath(os.path.join(cur, '..'))
+            self.find_config(cur)
 
     def project(self):
         """Return the project info as a namedtupple
@@ -248,7 +259,8 @@ class Configuration:
 
         # root is required
         try:
-            root_d = Path(p['root'])
+            p['root'] = os.path.expanduser(p['root'])
+            root_d = Path(self.project_root, p['root'])
             root_d = root_d.expanduser().absolute()
             if not root_d.exists():
                 ui.error(f'Root dir does not exist: {root_d}')
@@ -260,7 +272,7 @@ class Configuration:
         # db pulls dir
         pulls_dir = p['pulls_dir']
         if pulls_dir:
-            pulls_dir = Path(pulls_dir)
+            pulls_dir = Path(self.project_root, pulls_dir)
             pulls_dir = pulls_dir.expanduser().absolute().resolve()
             # pulls_dir = pulls_dir
             if not pulls_dir.exists():
