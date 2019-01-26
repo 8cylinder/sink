@@ -191,8 +191,8 @@ class Configuration:
         'username': None
     }
 
-    def __init__(self, suppress_config_location=False):
-        self.suppress = True # suppress_config_location
+    def __init__(self, suppress_config_location=True):
+        self.suppress = suppress_config_location
         try:
             self.find_config()
         except RecursionError:
