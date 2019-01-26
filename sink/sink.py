@@ -6,9 +6,9 @@ from pathlib import Path
 import datetime
 
 from sink.config import config
-# from sink.config import TestConfig
 from sink.config import Color
 from sink.config import Action
+from sink.check import TestConfig
 from sink.db import DB
 from sink.rsync import Transfer
 from sink.ui import ui
