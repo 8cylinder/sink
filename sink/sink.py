@@ -33,7 +33,6 @@ CONTEXT_SETTINGS = {
 def sink():
     """Tools to manage projects."""
     # global config
-    # config = Config()
 
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
@@ -138,10 +137,7 @@ def info(view):
     \b
     export EDITOR='program'
     export VISUAL='program'
-
     """
-    # config = Config()
-
     if view:
         with open(config.config_file) as f:
             contents = f.read()
@@ -231,7 +227,6 @@ def api(keys):
     To get the dev servers user name:
       sink misc api servers dev user
     '''
-    # config = Config(suppress_config_location=True)
     data = config.data
 
     for k in keys:
@@ -251,7 +246,6 @@ def api(keys):
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def pack():
     """Display a command to gzip uncommited files."""
-    # config = Config()
     now = datetime.datetime.now()
     now = now.strftime('%y-%m-%d-%H-%M-%S')
     # from IPython import embed; embed()
