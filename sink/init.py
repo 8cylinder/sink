@@ -84,6 +84,11 @@ class Init:
                   password:
                   db:
                   hostname:
+                  # If getting 'Error: Connection using old (pre-4.1.1)
+                  # authentication protocol refused (client option
+                  # 'secure_auth' enabled)' errors, set skip_secure_auth to 'yes';
+                  # https://serverfault.com/a/573816
+                  skip_secure_auth:
                   note: |
               urls:
                 - url:

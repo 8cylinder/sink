@@ -96,7 +96,7 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
-        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql {skip_secure} --user={db.username} \
+        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql {self.dryrun} {skip_secure} --user={db.username} \
             --password={db.password} {db.db} < "{t.name}"'''
         cmd = ' '.join(cmd.split())
 

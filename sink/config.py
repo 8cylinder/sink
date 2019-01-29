@@ -180,6 +180,7 @@ class Configuration:
         'password': None,
         'username': None,
         'hostname': None,
+        'skip_secure_auth': None,
         'port': 3306,
     }
     default_url = {
