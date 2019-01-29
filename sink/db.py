@@ -16,9 +16,22 @@ class DB:
     def __init__(self, real, verbose=False):
         self.verbose = True if verbose else False
         self.real = real
+        self.dryrun = '' if real else '--dry-run'
         self.config = config
 
+    def dump_remote(self, dest, server):
+        dest = Path(dest)
+        self._pull(dest, server, local=False)
+
     def pull(self, server):
+        p = self.config.project()
+        s = self.config.server(server)
+        db = dict2obj(**s.mysql[0])
+        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name)
+        sqlfile = sqlfile.trim()
+        self._pull(sqlfile, server, local=True)
+
+    def _pull(self, sqlfile, server, local=True):
         p = self.config.project()
         s = self.config.server(server)
         db = dict2obj(**s.mysql[0])
@@ -46,11 +59,14 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
-        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name)
-        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} \
-            mysqldump {hostname} {skip_secure} --user={db.username} --password={db.password} \
-            --single-transaction --triggers --events --routines {db.db} \
-            | gzip -c > "{sqlfile}"'''
+        cmd = [f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}''',
+               f'''mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
+               f'''| gzip -c > "{sqlfile}"'''
+        ]
+        if local:
+            cmd = f"""{cmd[0]} '{cmd[1]}' {cmd[2]}"""
+        else:
+            cmd = f"""{cmd[0]} '{cmd[1]} {cmd[2]}'"""
         cmd = ' '.join(cmd.split())
 
         if self.real:
@@ -58,10 +74,10 @@ class DB:
             ui.display_cmd(cmd)
             error_msg = result.stderr.decode("utf-8").replace('Warning: Using a password on the command line interface can be insecure.\n', '')
             if error_msg:
-                click.secho('\nEmpty file created:', fg=Color.YELLOW.value, bold=True)
+                # click.secho('\nEmpty file created:', fg=Color.YELLOW.value, bold=True)
                 click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
                 ui.error(f'\n{error_msg}')
-            elif sqlfile.exists():
+            elif local and sqlfile.exists():
                 filename = str(sqlfile.absolute())
                 click.secho(filename, fg=Color.GREEN.value)
                 ui.display_success(self.real)

@@ -47,6 +47,8 @@ class Init:
               # Everything below this point should match
               # everything below the project root.
               root:
+              # deploy root must be an absolute path.
+              deploy_root:
               # This will warn you when puting files or a db to this server.
               warn: yes
               # If this is set to yes, then this server will

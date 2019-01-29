@@ -9,13 +9,13 @@ from pathlib import Path
 from pprint import pprint as pp
 
 from sink.config import config
-from sink.ui import Color
 from sink.config import Action
+from sink.ui import Color
 from sink.ui import ui
 from sink.rsync import Transfer
 from sink.ssh import SSH
-from sink.rsync import Transfer
-from sink.config import Action
+from sink.db import DB
+
 
 # https://gist.github.com/datagrok/3807742
 # rsync --link-dest
@@ -37,7 +37,7 @@ class Deploy:
         server to set up the directories for using hardlinks.
 
         The first command renames the <root> directory to
-        <root>.<timestamp>.original
+        <root>.<timestamp>
 
         The second creates a symlink with the original <root> directory
         name that points to the new <root>.<timestamp>.original dir.
@@ -47,29 +47,35 @@ class Deploy:
         ui.display_cmd(f'sudo mv {self.s.root} {self.s.deploy_root}/{self.stamp}')
         ui.display_cmd(f'sudo ln -s {self.s.deploy_root}/{self.stamp} {self.s.root}')
 
-    def new(self):
+    def new(self, dump_db=False):
         """Create a new dir for a future deploy
 
         It will be created in the server's deploy_root config location.
         """
         dry_run = True if not self.real else False
+
         deploy_dest = os.path.join(self.s.deploy_root, self.stamp)
+        if not deploy_dest.startswith('/'):
+            ui.error('Deploy root must be an absolute path.')
         ssh = SSH()
         cmd = f"'mkdir {deploy_dest}'"
         ssh.run(cmd, dry_run=dry_run, server=self.s.name.lower())
         deploy_dest_pretty = click.style(deploy_dest, fg='green')
         click.secho(f'\nNew dir created: {deploy_dest_pretty}')
 
-        xfer = Transfer(self.real)
+        xfer = Transfer(self.real, quiet=self.quiet)
         xfer.multiple = True
         local_root = f'{self.p.root}/'
         xfer._rsync(local_root, deploy_dest, self.s.name.lower(), Action.PUT)
 
-        # click.echo()
-        # ui.display_success(self.real)
+        if dump_db:
+            db = DB(real=self.real)
+            dump_file = os.path.join(deploy_dest, 'DB-DUMP.sql.gz')
+            db.dump_remote(dump_file, self.s.name.lower())
+
 
     def change_current(self):
-        """"""
+        """Change the symlink destination"""
         ssh = SSH()
         dry_run = True if not self.real else False
         deploy_base = Path(self.s.root).parts[-1]
@@ -78,6 +84,7 @@ class Deploy:
 
         active_cmd = f'readlink --verbose {self.s.root}'
         active = ssh.run(active_cmd, server=self.s.name.lower())
+        active = active.strip()
         active = Path(active).parts[-1].strip()
 
         data = {}
@@ -85,7 +92,7 @@ class Deploy:
             data[letter] = full_filename
 
         click.echo()
-        # pointer = '-->'
+        # pointer = '->'
         pointer = '▶'
         pointer_pretty = click.style(pointer, fg='green', bold=True)
         click.echo(f'Select a letter to change the symlink to.  The {pointer_pretty} indicates')
@@ -104,32 +111,24 @@ class Deploy:
             letter = click.style(f'{letter})', fg='green', bold=True)
             click.echo(f'{indicator} {letter} {full_filename} {pretty_date}')
 
-        msg = click.style('Select a dir to link to (ctrl-c to cancel)', fg='white')
+        msg = click.style('Select a dir to link to (ctrl-c to abort)', fg='white')
         choice = click.prompt(msg)
-        link_cmd = f"'sudo test -h {self.s.root} && sudo rm {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
-        ssh.run(link_cmd, dry_run=dry_run, server=self.s.name.lower())
+        link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
+        r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.name.lower())
 
         click.echo()
         ui.display_success(self.real)
 
 
 
+
     def server_time(self, server):
         """Retrieve the remote server time"""
-        # sudo ln -s www.18-08-10__09:18:33.original/ www/
-        # sudo ln -s www.18-08-10_09-18-33.original/ www/
-        # sudo ln -s www.18-08-10_091833.original/ www/  Aug 10/2018, 9:18AM
-        # sudo ln -s www.180810_091833.original/ www/
-        # sudo ln -s www.180810091833.original/ www/
-        #
-        # servers date: $(date "+%y-%m-%d_%H%M%S_%Z")
         dry_run = True if not self.real else False
         ssh = SSH()
         s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
                          server=self.s.name.lower())
-        s_time = s_time.strip().split('|')
-        # stamp = datetime.datetime.now()
-        # stamp = stamp.strftime('%y-%m-%d_%H%M%S')
+        s_time = s_time.strip()
         deploy_name = Path(self.s.root).parts[-1]
-        stamp = f"{deploy_name}.{s_time[0]}"
+        stamp = f"{deploy_name}.{s_time}"
         return stamp

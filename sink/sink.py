@@ -173,8 +173,10 @@ def init(server):
     """Initialize and setup a deploy.
 
     Create a dir to hold the uploaded versions, and create a symlink
-    to it.  Future uploads will be hard-linked in a chain back to this
-    one."""
+    to it.
+
+    This command only outputs commands to be copied and pasted.
+    """
 
     deploy = Deploy(server, real=True)
     deploy.init_deploy()
@@ -183,13 +185,16 @@ def init(server):
 @click.argument('server')
 @click.option('--real', '-r', is_flag=True)
 def new(server, real):
+@click.option('-d', '--dump-db', is_flag=True,
+              help='Take a snapshot of the db.')
+def new(server, real, quiet, dump_db):
     """Upload a new version of the site.
 
     Upload a new version to a dir with the current date.  The symlink
     is changed to point to this new dir."""
 
-    deploy = Deploy(server, real)
-    deploy.new()
+    deploy = Deploy(server, real, quiet=quiet)
+    deploy.new(dump_db=dump_db)
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server')
