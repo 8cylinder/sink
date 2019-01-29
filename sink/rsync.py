@@ -22,13 +22,21 @@ from sink.ui import ui
 # Rsync ignore owner, group, time, and perms:
 # https://unix.stackexchange.com/q/102211
 class Transfer:
-    def __init__(self, real, verbose=False, quiet=False):
+    def __init__(self, real, verbose=False, silent=False, quiet=False):
+        """Transfer files to and from a server with rsync
+
+        verbose: adds --verbose to rsync
+        silent: adds --quiet to rsync & does not display command output
+        quiet: adds --quiet to rsync
+        suppress:
+        """
         self.verbose = True if verbose else False
         self.real = real
         self.dryrun = '' if real else '--dry-run'
         # self.config = Config(suppress_config_location=quiet)  # fixme
         self.config = config
         self.quiet = quiet
+        self.silent = silent
         self.multiple = False
 
     def put(self, filename, server, extra_flags):
@@ -117,12 +125,13 @@ class Transfer:
             # --group needs to be used along with --chown to change group on the server
             group = f'--group --chown=:{s.group}'
 
-        if self.quiet:
+        if self.silent or self.quiet:
             extra_flags += ' --quiet '
+
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
         cmd = f'''rsync {self.dryrun} {identity} {group} {extra_flags} --verbose --itemize-changes
-                  --compress --checksum {recursive} {excluded}'''
+                  --links --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
             cmd = f'''{cmd} '{localf}' {s.ssh.username}@{s.ssh.server}:{remotef}'''
@@ -147,12 +156,12 @@ class Transfer:
         if doit:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             if result.returncode:
-                if not self.quiet:
+                if not self.silent:
                     ui.display_cmd(cmd)
                 click.secho('Command failed', fg=Color.RED.value)
                 ui.error(f'\n{result.stderr.decode("utf-8")}')
             else:
-                if not self.quiet:
+                if not self.silent:
                     ui.display_cmd(cmd)
                 ui.display_success(self.real)
 

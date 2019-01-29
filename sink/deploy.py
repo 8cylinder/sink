@@ -21,7 +21,7 @@ from sink.db import DB
 # rsync --link-dest
 
 class Deploy:
-    def __init__(self, servername, real=False):
+    def __init__(self, servername, real=False, quiet=False, suppress_command=False):
         self.p = config.project()
         self.s = config.server(servername)
         if not self.s.deploy_root:
@@ -29,6 +29,7 @@ class Deploy:
         self.real = real
         self.rsync = Transfer(real)
         self.stamp = self.server_time(self.s)
+        self.quiet = quiet
 
     def init_deploy(self):
         """Display bash commands to set up for deploy

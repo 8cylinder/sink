@@ -70,11 +70,11 @@ def database(action, sql_gz, server, real):
 @click.argument('filename', type=click.Path(), required=True)
 @click.argument('server', required=False)
 @click.option('--real', '-r', is_flag=True)
-@click.option('--quiet', '-q', is_flag=True,
-              help='Reduce the noise.')
+@click.option('--silent', '-s', is_flag=True,
+              help='Zero output, for use in Emacs.')
 @click.option('--extra-flags',
               help='extra flags to pass to rsync.')
-def files(action, filename, server, real, quiet, extra_flags):
+def files(action, filename, server, real, silent, extra_flags):
     """Send files to and fro.
 
     Push or pull a single file or directory from a remote server.
@@ -85,7 +85,7 @@ def files(action, filename, server, real, quiet, extra_flags):
     SERVER: server name, if not specified sink will use the default server."""
 
     f = Path(os.path.abspath(filename))
-    xfer = Transfer(real, quiet=quiet)
+    xfer = Transfer(real, silent=silent)
     extra_flags = '' if not extra_flags else extra_flags
 
     if action == Action.PULL.value:
@@ -184,7 +184,8 @@ def init(server):
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server')
 @click.option('--real', '-r', is_flag=True)
-def new(server, real):
+@click.option('--quiet', '-q', is_flag=True,
+              help='No itemized output from rsync.')
 @click.option('-d', '--dump-db', is_flag=True,
               help='Take a snapshot of the db.')
 def new(server, real, quiet, dump_db):
