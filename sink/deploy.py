@@ -5,6 +5,7 @@ import subprocess
 import datetime
 import click
 import string
+import uuid
 from pathlib import Path
 from pprint import pprint as pp
 
@@ -22,6 +23,7 @@ from sink.db import DB
 
 class Deploy:
     def __init__(self, servername, real=False, quiet=False, suppress_command=False):
+        self.ssh = SSH()
         self.p = config.project()
         self.s = config.server(servername)
         if not self.s.deploy_root:
@@ -48,6 +50,12 @@ class Deploy:
         ui.display_cmd(f'sudo mv {self.s.root} {self.s.deploy_root}/{self.stamp}')
         ui.display_cmd(f'sudo ln -s {self.s.deploy_root}/{self.stamp} {self.s.root}')
 
+    def _get_active(self):
+        active_cmd = f'readlink --verbose {self.s.root}'
+        active = self.ssh.run(active_cmd, server=self.s.name.lower()).strip()
+        active = Path(active)
+        return active
+
     def new(self, dump_db=False):
         """Create a new dir for a future deploy
 
@@ -58,35 +66,31 @@ class Deploy:
         deploy_dest = os.path.join(self.s.deploy_root, self.stamp)
         if not deploy_dest.startswith('/'):
             ui.error('Deploy root must be an absolute path.')
-        ssh = SSH()
-        cmd = f"'mkdir {deploy_dest}'"
+        ssh = self.ssh
+        cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
         ssh.run(cmd, dry_run=dry_run, server=self.s.name.lower())
-        deploy_dest_pretty = click.style(deploy_dest, fg='green')
-        click.secho(f'\nNew dir created: {deploy_dest_pretty}')
+        click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
+
+        previous_dest = self._get_active()
+        if dump_db:
+            db = DB(real=self.real)
+            dump_file = os.path.join(previous_dest, f'DB-DUMP-{self.stamp}.sql.gz')
+            db.dump_remote(dump_file, self.s.name.lower())
 
         xfer = Transfer(self.real, quiet=self.quiet)
         xfer.multiple = True
         local_root = f'{self.p.root}/'
-        xfer._rsync(local_root, deploy_dest, self.s.name.lower(), Action.PUT)
+        compare_dir = f'--link-dest="{previous_dest}"'
+        xfer._rsync(local_root, deploy_dest, self.s.name.lower(), Action.PUT, extra_flags=compare_dir)
 
-        if dump_db:
-            db = DB(real=self.real)
-            dump_file = os.path.join(deploy_dest, 'DB-DUMP.sql.gz')
-            db.dump_remote(dump_file, self.s.name.lower())
-
-
-    def change_current(self):
+    def change_current(self, load_db=False):
         """Change the symlink destination"""
-        ssh = SSH()
+        ssh = self.ssh
         dry_run = True if not self.real else False
         deploy_base = Path(self.s.root).parts[-1]
         cmd = f"'find {self.s.deploy_root}/{deploy_base}* -maxdepth 0'"
         result = ssh.run(cmd, server=self.s.name.lower()).strip()
-
-        active_cmd = f'readlink --verbose {self.s.root}'
-        active = ssh.run(active_cmd, server=self.s.name.lower())
-        active = active.strip()
-        active = Path(active).parts[-1].strip()
+        active = self._get_active()
 
         data = {}
         for letter, full_filename in zip(string.ascii_lowercase, result.split('\n')):
@@ -102,7 +106,7 @@ class Deploy:
         for letter, full_filename in data.items():
             filename = Path(full_filename).parts[-1]
             indicator = ' ' * len(pointer)
-            if filename == active:
+            if filename == active.parts[-1]:
                 indicator = pointer_pretty
             pretty_date = datetime.datetime.strptime(filename, 'www.%y-%m-%d_%H%M%S_%Z')
             pretty_date = pretty_date.strftime('%b %d/%Y, %I:%M%p %Z').strip()
@@ -114,19 +118,33 @@ class Deploy:
 
         msg = click.style('Select a dir to link to (ctrl-c to abort)', fg='white')
         choice = click.prompt(msg)
-        link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
+
+        if load_db:
+            db = DB(real=self.real)
+            dump_file = os.path.join(data[choice], 'DB-DUMP.sql.gz')
+            db.load_remote(dump_file, self.s.name.lower())
+
+        temp_symname = str(uuid.uuid1())
+        # link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
+
+        # create a temperary symlink first then rename the temp one to
+        # the real symlink, this overwrites the previous one.  The
+        # rename causes the symlink to be changed with on step, as
+        # opposed to `ln -sfn ...` which deletes the symlink and then
+        # creates a new one with a brief period of time with no symlink.
+        link_cmd = f"""'sudo test -h {self.s.root} &&
+                        sudo ln -s {data[choice]} {temp_symname} &&
+                        sudo mv -Tf {temp_symname} {self.s.root}'"""
+        link_cmd = ' '.join(link_cmd.split())
         r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.name.lower())
 
         click.echo()
         ui.display_success(self.real)
 
-
-
-
     def server_time(self, server):
         """Retrieve the remote server time"""
         dry_run = True if not self.real else False
-        ssh = SSH()
+        ssh = self.ssh
         s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
                          server=self.s.name.lower())
         s_time = s_time.strip()

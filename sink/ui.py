@@ -39,6 +39,8 @@ class ui:
 
     @staticmethod
     def display_cmd(cmd, indent=0):
+        # if config.suppress_command:
+            # return
         try:
             console_width = os.get_terminal_size().columns
         except OSError:

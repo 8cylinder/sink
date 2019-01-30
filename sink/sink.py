@@ -30,9 +30,15 @@ CONTEXT_SETTINGS = {
     # 'token_normalize_func': lambda x: x.lower(),
 }
 @click.group(context_settings=CONTEXT_SETTINGS)
-def sink():
+@click.option('-s', '--suppress-command', is_flag=True,
+              help="Don't display the commands used")
+@click.pass_context
+def sink(ctx, suppress_command):
     """Tools to manage projects."""
-    # global config
+    suppress_command = suppress_command
+    ctx.ensure_object(dict)
+    ctx.obj['SUPPRESS_COMMAND'] = suppress_command
+
 
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
@@ -191,8 +197,8 @@ def init(server):
 def new(server, real, quiet, dump_db):
     """Upload a new version of the site.
 
-    Upload a new version to a dir with the current date.  The symlink
-    is changed to point to this new dir."""
+    Upload a new version to the deploy root.  Also a snapshot of the
+    db is put in the root dir."""
 
     deploy = Deploy(server, real, quiet=quiet)
     deploy.new(dump_db=dump_db)
@@ -200,11 +206,15 @@ def new(server, real, quiet, dump_db):
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server')
 @click.option('--real', '-r', is_flag=True)
-def change(server, real):
-    """Revert back to a previous deploy"""
+@click.option('-l', '--load-db', is_flag=True,
+              help='Take a snapshot of the db.')
+@click.pass_context
+def switch(ctx, server, real, load_db):
+    """Change the symlink to point to a different dir in the deploy root."""
 
-    deploy = Deploy(server, real)
-    deploy.change_current()
+    suppress = ctx.obj['SUPPRESS_COMMAND']
+    deploy = Deploy(server, real, suppress_command=suppress)
+    deploy.change_current(load_db=load_db)
 
 # ------------------------------- Misc --------------------------------
 

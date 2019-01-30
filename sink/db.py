@@ -28,7 +28,6 @@ class DB:
         s = self.config.server(server)
         db = dict2obj(**s.mysql[0])
         sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name)
-        sqlfile = sqlfile.trim()
         self._pull(sqlfile, server, local=True)
 
     def _pull(self, sqlfile, server, local=True):
@@ -60,19 +59,24 @@ class DB:
             skip_secure = ''
 
         cmd = [f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}''',
-               f'''mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
+               f'''sudo mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
                f'''| gzip -c > "{sqlfile}"'''
         ]
         if local:
             cmd = f"""{cmd[0]} '{cmd[1]}' {cmd[2]}"""
         else:
-            cmd = f"""{cmd[0]} '{cmd[1]} {cmd[2]}'"""
+            cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
         cmd = ' '.join(cmd.split())
 
         if self.real:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             ui.display_cmd(cmd)
-            error_msg = result.stderr.decode("utf-8").replace('Warning: Using a password on the command line interface can be insecure.\n', '')
+
+            error_msg = result.stderr.decode("utf-8")
+            mysql_warning = 'Using a password on the command line interface can be insecure'
+            if mysql_warning in error_msg:
+                ui.warn(error_msg)
+                error_msg = None
             if error_msg:
                 # click.secho('\nEmpty file created:', fg=Color.YELLOW.value, bold=True)
                 click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
@@ -81,27 +85,43 @@ class DB:
                 filename = str(sqlfile.absolute())
                 click.secho(filename, fg=Color.GREEN.value)
                 ui.display_success(self.real)
-            else:
+            elif local:
                 click.secho('Command failed', fg=Color.RED.value)
         else:
             ui.display_cmd(cmd)
             ui.display_success(self.real)
 
+    def load_remote(self, source, server):
+        source = Path(source)
+        self._put(source, server, local=True)
+
     def put(self, server, sqlfile):
         s = self.config.server(server)
         db = dict2obj(**s.mysql[0])
         sql = Path(sqlfile)
-        if not sql.exists():
-            ui.error(f'{sql} does not exist')
+        self._put(server, sql)
 
-        t = tempfile.NamedTemporaryFile()
-        with gzip.open(str(sql), 'r') as gz:
-            sql = gz.read()
-            t.write(sql)
+    def _put(self, server, sqlfile, local=True):
+        s = self.config.server(server)
+        db = dict2obj(**s.mysql[0])
+        if local:
+            if not sqlfile.exists():
+                ui.error(f'{sqlfile} does not exist')
+
+            t = tempfile.NamedTemporaryFile()
+
+            with gzip.open(str(sqlfile), 'r') as gz:
+                sql = gz.read()
+                t.write(sql)
+        else:
+            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
+            result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+            ui.display_cmd(cmd)
+            if result.returncode:
+                error(f'{sqlfile} does not exist')
 
         if s.ssh.key:
             identity = f'-i "{s.ssh.key}"'
-            # click.echo(f'Using identity: "{s.ssh.key}"')
         else:
             identity = ''
 
@@ -112,8 +132,14 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
-        cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} mysql {self.dryrun} {skip_secure} --user={db.username} \
-            --password={db.password} {db.db} < "{t.name}"'''
+        if local:
+            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
+                      mysql {self.dryrun} {skip_secure} --user={db.username} --password={db.password}
+                      {db.db} < "{t.name}"'''
+        else:
+            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
+                      "zcat {sqlfile} | mysql --user={db.username} --password={db.password}
+                      {db.db}"'''
         cmd = ' '.join(cmd.split())
 
         if self.real:
