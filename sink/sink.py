@@ -17,6 +17,7 @@ from sink.applications import Applications
 from sink.init import Init
 from sink.deploy import Deploy
 from sink.check import TestConfig
+from sink.actions import Actions
 
 # def get_servers(ctx, args, incomplete):
     # config = Config()
@@ -216,6 +217,20 @@ def switch(ctx, server, real, load_db):
     deploy = Deploy(server, real, suppress_command=suppress)
     deploy.change_current(load_db=load_db)
 
+
+# ------------------------------- Actions -------------------------------
+@sink.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server')
+@click.argument('action_name', required=False)
+@click.option('--real', '-r', is_flag=True)
+def action(server, action_name, real):
+    'Run a pre defined command on the server.'
+    actions = Actions(server, real)
+    if action_name:
+        actions.run(action_name)
+    else:
+        actions.list_actions()
+
 # ------------------------------- Misc --------------------------------
 
 @sink.group(context_settings=CONTEXT_SETTINGS)
@@ -282,6 +297,7 @@ def init_config(servers):
     \b
     To write the config to a file use:
     `sink misc init > sink.yaml`
+    `sink misc init dev stag prod > sink.yaml`
     """
     init = Init()
     init.servers(servers)
@@ -289,7 +305,7 @@ def init_config(servers):
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('application', nargs=1)
+@click.argument('application', required=False)
 def settings(application):
     """Output settings values for the requested application.
 

@@ -172,7 +172,8 @@ class Configuration:
             'port': None,
         },
         'mysql': [],
-        'urls': []
+        'urls': [],
+        'actions': [],
     }
     default_mysql = {
         'db': None,
