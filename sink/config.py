@@ -216,8 +216,11 @@ class Configuration:
 
         # take the name of the server and add it to the server data
         # structure for easier extraction.
-        for servername in data['servers']:
-            data['servers'][servername]['servername'] = servername
+        try:
+            for servername in data['servers']:
+                data['servers'][servername]['servername'] = servername
+        except KeyError:
+            pass  # no servers defined
 
         self.data = data
         self.o = dict2obj(**data)
