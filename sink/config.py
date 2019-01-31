@@ -214,6 +214,11 @@ class Configuration:
                 print("Something went wrong while parsing the yaml file.")
             exit()
 
+        # take the name of the server and add it to the server data
+        # structure for easier extraction.
+        for servername in data['servers']:
+            data['servers'][servername]['servername'] = servername
+
         self.data = data
         self.o = dict2obj(**data)
         self.save_project_name(data['project']['name'], os.path.curdir)

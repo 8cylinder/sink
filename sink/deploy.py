@@ -27,7 +27,7 @@ class Deploy:
         self.p = config.project()
         self.s = config.server(servername)
         if not self.s.deploy_root:
-            ui.error(f'deploy_root not set in sink.yaml for {self.s.name}')
+            ui.error(f'deploy_root not set in sink.yaml for {self.s.servername}')
         self.real = real
         self.rsync = Transfer(real)
         self.stamp = self.server_time(self.s)
@@ -45,14 +45,14 @@ class Deploy:
         The second creates a symlink with the original <root> directory
         name that points to the new <root>.<timestamp>.original dir.
         """
-        click.secho(f'\nOn remote server ({self.s.name}) run:', bold=True)
+        click.secho(f'\nOn remote server ({self.s.servername}) run:', bold=True)
         ui.display_cmd(f'mkdir {self.s.deploy_root}')
         ui.display_cmd(f'sudo mv {self.s.root} {self.s.deploy_root}/{self.stamp}')
         ui.display_cmd(f'sudo ln -s {self.s.deploy_root}/{self.stamp} {self.s.root}')
 
     def _get_active(self):
         active_cmd = f'readlink --verbose {self.s.root}'
-        active = self.ssh.run(active_cmd, server=self.s.name.lower()).strip()
+        active = self.ssh.run(active_cmd, server=self.s.servername).strip()
         active = Path(active)
         return active
 
@@ -68,20 +68,20 @@ class Deploy:
             ui.error('Deploy root must be an absolute path.')
         ssh = self.ssh
         cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
-        ssh.run(cmd, dry_run=dry_run, server=self.s.name.lower())
+        ssh.run(cmd, dry_run=dry_run, server=self.s.servername)
         click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
 
         previous_dest = self._get_active()
         if dump_db:
             db = DB(real=self.real)
             dump_file = os.path.join(previous_dest, f'DB-DUMP-{self.stamp}.sql.gz')
-            db.dump_remote(dump_file, self.s.name.lower())
+            db.dump_remote(dump_file, self.s.servername)
 
         xfer = Transfer(self.real, quiet=self.quiet)
         xfer.multiple = True
         local_root = f'{self.p.root}/'
         compare_dir = f'--link-dest="{previous_dest}"'
-        xfer._rsync(local_root, deploy_dest, self.s.name.lower(), Action.PUT, extra_flags=compare_dir)
+        xfer._rsync(local_root, deploy_dest, self.s.servername, Action.PUT, extra_flags=compare_dir)
 
     def change_current(self, load_db=False):
         """Change the symlink destination"""
@@ -89,7 +89,7 @@ class Deploy:
         dry_run = True if not self.real else False
         deploy_base = Path(self.s.root).parts[-1]
         cmd = f"'find {self.s.deploy_root}/{deploy_base}* -maxdepth 0'"
-        result = ssh.run(cmd, server=self.s.name.lower()).strip()
+        result = ssh.run(cmd, server=self.s.servername).strip()
         active = self._get_active()
 
         data = {}
@@ -122,7 +122,7 @@ class Deploy:
         if load_db:
             db = DB(real=self.real)
             dump_file = os.path.join(data[choice], 'DB-DUMP.sql.gz')
-            db.load_remote(dump_file, self.s.name.lower())
+            db.load_remote(dump_file, self.s.servername)
 
         temp_symname = str(uuid.uuid1())
         # link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
@@ -136,7 +136,7 @@ class Deploy:
                         sudo ln -s {data[choice]} {temp_symname} &&
                         sudo mv -Tf {temp_symname} {self.s.root}'"""
         link_cmd = ' '.join(link_cmd.split())
-        r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.name.lower())
+        r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.servername)
 
         click.echo()
         ui.display_success(self.real)
@@ -146,7 +146,7 @@ class Deploy:
         dry_run = True if not self.real else False
         ssh = self.ssh
         s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
-                         server=self.s.name.lower())
+                         server=self.s.servername)
         s_time = s_time.strip()
         deploy_name = Path(self.s.root).parts[-1]
         stamp = f"{deploy_name}.{s_time}"

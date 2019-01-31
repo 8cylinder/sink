@@ -101,7 +101,7 @@ class Transfer:
         try:
             remote = Path(s.root, remote)
         except TypeError:
-            ui.error(f'Server has no root ({s.name}).')
+            ui.error(f'Server has no root ({s.servername}).')
         file_locations = {
             'local': local,
             'remote': remote,
@@ -128,9 +128,13 @@ class Transfer:
         if self.silent or self.quiet:
             extra_flags += ' --quiet '
 
+        verbose_flag = ''
+        if self.verbose:
+            verbose_flag = '--verbose'
+
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f'''rsync {self.dryrun} {identity} {group} {extra_flags} --verbose --itemize-changes
+        cmd = f'''rsync {self.dryrun} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
                   --links --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
@@ -147,7 +151,7 @@ class Transfer:
                 ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
                 bold=True, dim=True)
             msg = click.style(
-                f': You are about to overwrite the {s.name} "{remotef}" files, continue?',
+                f': You are about to overwrite the {s.servername} "{remotef}" files, continue?',
                 fg=Color.YELLOW.value)
             msg = warn + msg
             if click.confirm(msg):
@@ -158,7 +162,6 @@ class Transfer:
             if result.returncode:
                 if not self.silent:
                     ui.display_cmd(cmd)
-                click.secho('Command failed', fg=Color.RED.value)
                 ui.error(f'\n{result.stderr.decode("utf-8")}')
             else:
                 if not self.silent:

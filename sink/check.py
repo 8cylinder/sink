@@ -53,10 +53,10 @@ class TestConfig:
         INDENT = 2
         for s in self.config.servers():
             if server_names:
-                if s.name.lower() not in server_names:
+                if s.servername not in server_names:
                     continue
             try:
-                click.secho(f'{s.name}', fg=Color.GREEN.value)
+                click.secho(f'{s.servername}', fg=Color.GREEN.value)
             except AttributeError:
                 pass
 
@@ -73,7 +73,7 @@ class TestConfig:
                 # s.ssh.password
                 s.ssh.server
             except AttributeError:
-                ui.error(f'ssh values are wrong in {s.name}')
+                ui.error(f'ssh values are wrong in {s.servername}')
             if not s.ssh.username or not s.ssh.server:
                 ui.error('missing values for ssh.')
             cmd = 'exit'

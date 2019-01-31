@@ -150,7 +150,7 @@ class DB:
                     ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
                     bold=True, dim=True)
                 msg = click.style(
-                    f': You are about to overwrite the {s.name} database, continue?',
+                    f': You are about to overwrite the {s.servername} database, continue?',
                     fg=Color.YELLOW.value)
                 msg = warn + msg
                 if click.confirm(msg):

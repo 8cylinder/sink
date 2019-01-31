@@ -54,9 +54,10 @@ class Init:
               # If this is set to yes, then this server will
               # be used if no server is specified on the command line.
               default: no
-              # If you want the group to be changed when uploading set group
-              # to the desired group name.
+              # If you want the group and user to be changed when uploading
+              # set group and user to the desired names.
               group:
+              user:
               note: |
                 Notes are written like this and can be
                 on multiple lines.  They cannot start on the same
@@ -103,6 +104,12 @@ class Init:
                   username:
                   password:
                   note: |
+              # Actions are any command that can be run on the server. Each command
+              # must start with a dash, the command name, and the command itself.
+              actions:
+                - clearcache: 'sudo -u www-data php /var/www/craft/craft clear-caches/all'
+                - restartapache: sudo service apache2 restart
+                - files: ls -al
             '''
 
         # remove the leading spaces

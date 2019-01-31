@@ -14,10 +14,10 @@ class Actions:
         self.s = config.server(servername)
         self.p = config.project()
         self.dry_run = not real
-        # self.actions = self.s.actions
         self.actions = dict([(list(i.keys())[0], list(i.values())[0]) for i in self.s.actions])
 
     def list_actions(self):
+        pp(self.s)
         commands = self.actions
         for name, cmd in commands.items():
             name = click.style(name, bold=True)
@@ -26,7 +26,6 @@ class Actions:
 
     def run(self, command_name):
         commands = self.actions
-        # print(commands[command_name])
         try:
             cmd = commands[command_name]
         except KeyError:
@@ -35,5 +34,5 @@ class Actions:
             exit(1)
 
         ssh = SSH()
-        result = ssh.run(cmd, server=self.s.name.lower(), dry_run=self.dry_run)
+        result = ssh.run(cmd, server=self.s.servername, dry_run=self.dry_run)
         print(result)

@@ -46,7 +46,7 @@ class Applications:
         for s in self.config.servers():
             for db in self.config.dbs(s.mysql):
                 connection = []
-                title = '--'.join([i for i in [p.name, s.name, db.db] if i])
+                title = '--'.join([i for i in [p.name, s.servername, db.db] if i])
                 connection.append(['Connection Name', f'{title}'])
                 connection.append(['SSH Hostname', s.ssh.server])
                 connection.append(['SSH Username', s.ssh.username])
@@ -65,7 +65,7 @@ class Applications:
         p = self.config.project()
         for s in self.config.servers():
             connection = []
-            title = '--'.join([i for i in [p.name, s.name] if i])
+            title = '--'.join([i for i in [p.name, s.servername] if i])
             connection.append(['Site name', f'{title}'])
             connection.append(['Host', s.ssh.server])
             connection.append(['Port', s.ssh.port])
