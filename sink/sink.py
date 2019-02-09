@@ -39,7 +39,7 @@ def sink(ctx, suppress_command):
     suppress_command = suppress_command
     ctx.ensure_object(dict)
     ctx.obj['SUPPRESS_COMMAND'] = suppress_command
-
+    config.load_config()
 
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)

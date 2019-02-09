@@ -186,15 +186,19 @@ class Configuration:
 
     def __init__(self, suppress_config_location=True):
         self.suppress = suppress_config_location
-        try:
-            self.find_config(os.curdir)
-        except RecursionError:
-            ui.error('You are not in a project.', True)
+
+    def save_project_name(self, name, path):
+        p = GlobalProjects()
+        p.add(name, path)
+        p.save_tsv()
+
+    def load_config(self):
+        if not self.find_config(os.curdir):
+            ui.error('You are not in a project')
 
         try:
             with open(self.config_file) as f:
                 data = yaml.safe_load(f)
-
         except yaml.YAMLError as e:
             if hasattr(e, 'problem_mark'):
                 msg = 'There was an error while parsing the config file'
