@@ -14,19 +14,15 @@ class Actions:
         self.s = config.server(servername)
         self.p = config.project()
         self.dry_run = not real
-        self.actions = dict(
-            [(list(i.keys())[0], list(i.values())[0]) for i in self.s.actions]
-        )
 
     def list_actions(self):
-        commands = self.actions
-        for name, cmd in commands.items():
+        for name, cmd in self.s.actions:
             name = click.style(name, bold=True)
             cmd = click.style(f'"{cmd}"', dim=True)
             click.echo(f'{name} - {cmd}')
 
     def run(self, command_name):
-        commands = self.actions
+        commands = dict(self.s.actions)
         try:
             cmd = commands[command_name]
         except KeyError:

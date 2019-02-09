@@ -41,9 +41,6 @@ class Init:
         for server in self.server_names:
             blank_config = blank_config + f'''
             {server}:
-              # This is used for the pulled filename.
-              # It can be changed to anything.
-              name: {server.upper()}
               # Everything below this point should match
               # everything below the project root.
               root:
@@ -107,9 +104,9 @@ class Init:
               # Actions are any command that can be run on the server. Each command
               # must start with a dash, the command name, and the command itself.
               actions:
-                - clearcache: 'sudo -u www-data php /var/www/craft/craft clear-caches/all'
-                - restartapache: sudo service apache2 restart
-                - files: ls -al
+                clearcache: 'sudo -u www-data php /var/www/craft/craft clear-caches/all'
+                restartapache: sudo service apache2 restart
+                files: ls -al
             '''
 
         # remove the leading spaces

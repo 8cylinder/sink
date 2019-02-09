@@ -70,6 +70,11 @@ class dict2obj:
             else:
                 self.__dict__[k] = v
 
+    def __iter__(self):
+        for k, v in self.__dict__.items():
+            if not k.startswith("__"):
+                yield (k, v)
+
 
 class GlobalProjects:
     def __init__(self):
