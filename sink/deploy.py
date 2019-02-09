@@ -18,9 +18,6 @@ from sink.ssh import SSH
 from sink.db import DB
 
 
-# https://gist.github.com/datagrok/3807742
-# rsync --link-dest
-
 class Deploy:
     def __init__(self, servername, real=False, quiet=False, suppress_command=False):
         self.ssh = SSH()
@@ -32,6 +29,7 @@ class Deploy:
         self.rsync = Transfer(real)
         self.stamp = self.server_time(self.s)
         self.quiet = quiet
+
 
     def init_deploy(self):
         """Display bash commands to set up for deploy

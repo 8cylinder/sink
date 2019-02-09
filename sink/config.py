@@ -3,21 +3,13 @@ import sys
 import time
 import threading
 import click
-import subprocess
 from pprint import pprint as pp
 import yaml
-import json
 import csv
 from pathlib import Path
 from collections import namedtuple
-import tempfile
 from enum import Enum
-import itertools
-import urllib.request, urllib.error
-import ssl
-import socket
 import random
-import traceback
 
 from sink.ui import ui
 from sink.ui import Color
@@ -226,30 +218,17 @@ class Configuration:
         self.o = dict2obj(**data)
         self.save_project_name(data['project']['name'], os.path.curdir)
 
-    def save_project_name(self, name, path):
-        p = GlobalProjects()
-        p.add(name, path)
-        p.save_tsv()
-
-    # def find_config(self):
-    #     """Walk up the dir tree to find a config file"""
-    #     if self.config_file in os.listdir():
-    #         cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
-    #         if not self.suppress:
-    #             click.secho(f'Using {self.config_file} in {cwd}', dim=True)
-    #         self.config = Path(self.config_file)
-    #     else:
-    #         os.chdir('..')
-    #         self.find_config()
-
     def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
-        if self.config_file in os.listdir(cur):
+        if cur == '/':
+            return False
+        elif self.config_file in os.listdir(cur):
             cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
             if not self.suppress:
                 click.secho(f'Using {self.config_file} in {cwd}', dim=True)
             self.config_file = Path(cur, self.config_file)
             self.project_root = Path(cur)
+            return True
         else:
             cur = os.path.abspath(os.path.join(cur, '..'))
             self.find_config(cur)
