@@ -310,10 +310,9 @@ class Configuration:
             ui.display_options(options)
             exit()
 
-        s = self._server(server)
-        return s
+        return self._server(server, name)
 
-    def _server(self, server):
+    def _server(self, server, name):
         """Convert a server dict to obj"""
         for k, v in server.items():
             if k == 'hosting':
@@ -334,6 +333,8 @@ class Configuration:
                     if not os.path.exists(ssh_key):
                         ui.warn(f'ssh key does not exist: {ssh_key}')
                     server['ssh']['key'] = ssh_key
+        # add the server name to a 'name' field
+        server['name'] = name
 
         s = self.default_server.copy()
         s.update(server)
@@ -347,7 +348,7 @@ class Configuration:
             return all_servers
 
         for server_name, server in servers.items():
-            all_servers.append(self._server(server))
+            all_servers.append(self._server(server, server_name))
 
         return all_servers
 

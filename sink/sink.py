@@ -16,13 +16,16 @@ from sink.ssh import SSH
 from sink.applications import Applications
 from sink.init import Init
 from sink.deploy import Deploy
-from sink.check import TestConfig
 from sink.actions import Actions
 
-# def get_servers(ctx, args, incomplete):
-    # config = Config()
-    # servers = config.data['servers']
-    # return servers
+
+# from IPython import embed
+# embed()
+
+def get_servers(ctx, args, incomplete):
+    config.load_config()
+    servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
+    return servers
 
 __version__ = '0.1.0'
 
@@ -44,7 +47,7 @@ def sink(ctx, suppress_command):
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
-@click.argument('server', type=click.STRING)  # autocompletion=get_servers
+@click.argument('server', type=click.STRING, autocompletion=get_servers)
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
 @click.option('--real', '-r', is_flag=True)
 def database(action, sql_gz, server, real):
@@ -75,7 +78,7 @@ def database(action, sql_gz, server, real):
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 # @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('filename', type=click.Path(), required=True)
-@click.argument('server', required=False)
+@click.argument('server', required=False, autocompletion=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
               help='Zero output, for use in Emacs.')
@@ -101,7 +104,7 @@ def files(action, filename, server, real, silent, extra_flags):
         xfer.put(f, server, extra_flags)
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', required=False)
+@click.argument('server', autocompletion=get_servers)
 @click.option('--dry-run', '-d', is_flag=True,
               help='Do nothing, show the command only.')
 def ssh(server, dry_run):
@@ -111,7 +114,7 @@ def ssh(server, dry_run):
 
 @sink.command('diff', context_settings=CONTEXT_SETTINGS)
 @click.argument('filename', type=click.Path(exists=True), required=True)
-@click.argument('server', required=False)
+@click.argument('server', autocompletion=get_servers)
 @click.option('--ignore-whitespace', '-i', is_flag=True,
               help='Ignore whitespace in diff.')
 @click.option('--difftool', '-d', is_flag=True,
@@ -175,7 +178,7 @@ def deploy():
     Each deploy's dir will be have the format YY-MM-DD-HH-MM-SS."""
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server')
+@click.argument('server', autocompletion=get_servers)
 def init(server):
     """Initialize and setup a deploy.
 
@@ -189,7 +192,7 @@ def init(server):
     deploy.init_deploy()
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server')
+@click.argument('server', autocompletion=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--quiet', '-q', is_flag=True,
               help='No itemized output from rsync.')
@@ -205,7 +208,7 @@ def new(server, real, quiet, dump_db):
     deploy.new(dump_db=dump_db)
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server')
+@click.argument('server', autocompletion=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('-l', '--load-db', is_flag=True,
               help='Take a snapshot of the db.')
@@ -220,7 +223,7 @@ def switch(ctx, server, real, load_db):
 
 # ------------------------------- Actions -------------------------------
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server')
+@click.argument('server', autocompletion=get_servers)
 @click.argument('action_name', required=False)
 @click.option('--real', '-r', is_flag=True)
 def action(server, action_name, real):
@@ -236,6 +239,7 @@ def action(server, action_name, real):
 @sink.group(context_settings=CONTEXT_SETTINGS)
 def misc():
     """Misc stuff."""
+
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('keys', nargs=-1, required=True)
@@ -272,20 +276,20 @@ def api(keys):
             ui.error(f'key "{k}" does not exist in config.')
     import json
     click.echo(json.dumps(data))
-    # click.echo(data)
+
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def pack():
     """Display a command to gzip uncommited files."""
     now = datetime.datetime.now()
     now = now.strftime('%y-%m-%d-%H-%M-%S')
-    # from IPython import embed; embed()
 
     tarname = f'changed-{config.project().name}-{now}.tar.gz'
     cmd = f'git ls-files -mz | xargs -0 tar -czvf {tarname}'
     cmd = click.style(cmd, bold=True)
     title = click.style('Run:', fg=Color.YELLOW.value)
     click.echo(f'{title} {cmd}')
+
 
 @misc.command('init', context_settings=CONTEXT_SETTINGS)
 @click.argument('servers', nargs=-1)
