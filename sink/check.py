@@ -154,11 +154,11 @@ class TestConfig:
         if result.returncode:
             # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
             self.out(f'{self.bad} {bad} (error: {result.returncode})', 2)
-            ui.display_cmd(cmd, indent=8)
+            ui.display_cmd(cmd, indent=8, suppress_commands=config.suppress_commands)
             ui.error(f'\n{result.stderr.decode("utf-8")}', exit=False, indent=8)
             return False
         else:
             # click.echo(f'    {self.good} {good}')
             self.out(f'{self.good} {good}', 2)
-            ui.display_cmd(cmd, indent=6)
+            ui.display_cmd(cmd, indent=6, suppress_commands=config.suppress_commands)
             return True

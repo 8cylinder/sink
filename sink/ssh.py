@@ -57,12 +57,12 @@ class SSH:
         return identity
 
     def run_cmd(self, cmd, dry_run):
-        ui.display_cmd(cmd)
+        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
         if not dry_run:
             subprocess.run(cmd, shell=True)
 
     def run_cmd_result(self, cmd, dry_run):
-        ui.display_cmd(cmd)
+        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
         if dry_run:
             return ''
         else:

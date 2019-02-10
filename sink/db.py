@@ -70,7 +70,7 @@ class DB:
 
         if self.real:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-            ui.display_cmd(cmd)
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
 
             error_msg = result.stderr.decode("utf-8")
             mysql_warning = 'Using a password on the command line interface can be insecure'
@@ -88,7 +88,7 @@ class DB:
             elif local:
                 click.secho('Command failed', fg=Color.RED.value)
         else:
-            ui.display_cmd(cmd)
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             ui.display_success(self.real)
 
     def load_remote(self, source, server):
@@ -116,7 +116,7 @@ class DB:
         else:
             cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-            ui.display_cmd(cmd)
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             if result.returncode:
                 error(f'{sqlfile} does not exist')
 
@@ -158,7 +158,7 @@ class DB:
 
             if doit:
                 result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-                ui.display_cmd(cmd)
+                ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
                 error_msg = result.stderr.decode("utf-8").replace(
                     'Warning: Using a password on the command line interface can be insecure.\n', '').replace(
                         'mysql: [Warning] Using a password on the command line interface can be insecure.\n', '')
@@ -167,7 +167,7 @@ class DB:
                 else:
                     ui.display_success(self.real)
         else:
-            ui.display_cmd(cmd)
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             ui.display_success(self.real)
 
     def _dest(self, project_name, dbname, dirname, id):

@@ -34,14 +34,11 @@ CONTEXT_SETTINGS = {
     # 'token_normalize_func': lambda x: x.lower(),
 }
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option('-s', '--suppress-command', is_flag=True,
-              help="Don't display the commands used")
-@click.pass_context
-def sink(ctx, suppress_command):
+@click.option('-s', '--suppress-commands', is_flag=True,
+              help="Don't display the bash commands used.")
+def sink(suppress_commands):
     """Tools to manage projects."""
-    suppress_command = suppress_command
-    ctx.ensure_object(dict)
-    ctx.obj['SUPPRESS_COMMAND'] = suppress_command
+    config.suppress_commands = suppress_commands
     config.load_config()
 
 # --------------------------------- DB ---------------------------------
@@ -212,12 +209,10 @@ def new(server, real, quiet, dump_db):
 @click.option('--real', '-r', is_flag=True)
 @click.option('-l', '--load-db', is_flag=True,
               help='Take a snapshot of the db.')
-@click.pass_context
-def switch(ctx, server, real, load_db):
+def switch(server, real, load_db):
     """Change the symlink to point to a different dir in the deploy root."""
 
-    suppress = ctx.obj['SUPPRESS_COMMAND']
-    deploy = Deploy(server, real, suppress_command=suppress)
+    deploy = Deploy(server, real)
     deploy.change_current(load_db=load_db)
 
 

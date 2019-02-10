@@ -38,9 +38,9 @@ class ui:
             sys.exit(1)
 
     @staticmethod
-    def display_cmd(cmd, indent=0):
-        # if config.suppress_command:
-            # return
+    def display_cmd(cmd, indent=0, suppress_commands=False):
+        if suppress_commands:
+            return
         try:
             console_width = os.get_terminal_size().columns
         except OSError:

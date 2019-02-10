@@ -85,7 +85,7 @@ class Transfer:
                           {tmp_file} {local_file}'''
             cmd = ' '.join(cmd.split())
 
-            ui.display_cmd(cmd)
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             result = subprocess.run(cmd, shell=True)
             if result.returncode == 0:
                 click.echo('Files are the same.')
@@ -161,11 +161,11 @@ class Transfer:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             if result.returncode:
                 if not self.silent:
-                    ui.display_cmd(cmd)
+                    ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
                 ui.error(f'\n{result.stderr.decode("utf-8")}')
             else:
                 if not self.silent:
-                    ui.display_cmd(cmd)
+                    ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
                 ui.display_success(self.real)
 
     def error_code(self, code):

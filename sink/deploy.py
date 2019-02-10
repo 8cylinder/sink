@@ -19,7 +19,7 @@ from sink.db import DB
 
 
 class Deploy:
-    def __init__(self, servername, real=False, quiet=False, suppress_command=False):
+    def __init__(self, servername, real=False, quiet=False):
         self.ssh = SSH()
         self.p = config.project()
         self.s = config.server(servername)

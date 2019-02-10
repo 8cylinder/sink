@@ -191,6 +191,7 @@ class Configuration:
 
     def __init__(self, suppress_config_location=True):
         self.suppress = suppress_config_location
+        self.suppress_commands = False
 
     def save_project_name(self, name, path):
         p = GlobalProjects()
