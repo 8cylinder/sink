@@ -30,7 +30,7 @@ setup(
         sink=sink.sink:sink
     ''',
     install_requires=[
-        'click',
+        'click', 'PyYAML'
     ],
     version=version,
     description=long_description,

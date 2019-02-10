@@ -37,7 +37,7 @@ CONTEXT_SETTINGS = {
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
 def sink(suppress_commands):
-    """Tools to manage projects."""
+    """🚣 Tools to manage projects."""
     config.suppress_commands = suppress_commands
     config.load_config()
 
