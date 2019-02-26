@@ -1,1 +1,32 @@
-* Sink
+
+[[sink-logo.png?raw=true]]
+
+Sink is a web development project management tool for the command
+line.  The main things it does are:
+
+- Sync files between servers.
+- Sync databases between servers.
+- Atomic deploys.
+- Diffs between a local file and a remote file.
+
+One of its main philosophies is that every command is a bash command
+(run via Python's subprocess module) that is displayed in the
+terminal.  The user has to explicitly execute the command with the
+=-r= (=--real=) flag.
+
+It has been developed on Ubuntu and is untested on any other
+platform.  The remote server must be Linux.
+
+It considers a project root to be the dir that has the =sink.yaml=
+config file.  This file holds all the information to make the commands
+work.
+
+*** sink.yaml
+Running =sink init= will output to the console a basic config file.  If
+any arguments are passed they will become the names of servers.  The
+output can be redirected to a file.
+
+#+begin_src bash
+sink misc init > sink.yaml
+sink misc init dev stag prod > sink.yaml
+#+end_src
