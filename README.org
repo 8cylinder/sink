@@ -1,3 +1,4 @@
+#+STARTUP: indent
 
 [[sink-logo.png?raw=true]]
 
@@ -8,18 +9,23 @@ line.  The main things it does are:
 - Sync databases between servers.
 - Atomic deploys.
 - Diffs between a local file and a remote file.
+- Central storage (sink.yaml) for all website data; passwords,
+  usernames, urls, etc.
+- An API to access stored data from other scripts.
+- Run a check on each server; urls, db, ssh.
 
-One of its main philosophies is that every command is a bash command
-(run via Python's subprocess module) that is displayed in the
-terminal.  The user has to explicitly execute the command with the
-=-r= (=--real=) flag.
+By default when a command is run such as =sink file put=, it outputs
+only the commands that would be run.  The user can then examine or
+copy and paste the commands to modify them.  If they look correct use
+the =--real= flag to run the command "for real".
 
-It has been developed on Ubuntu and is untested on any other
-platform.  The remote server must be Linux.
+The commands displayed are the actual bash commands that are used.
+They are run using Python's subprocess module.
 
-It considers a project root to be the dir that has the =sink.yaml=
-config file.  This file holds all the information to make the commands
-work.
+It has been developed on Ubuntu and is untested on any other platform.
+The remote server must be Linux.
+
+A project is defined by putting a sink.yaml file in the projects root dir.
 
 *** sink.yaml
 Running =sink init= will output to the console a basic config file.  If
@@ -29,4 +35,25 @@ output can be redirected to a file.
 #+begin_src bash
 sink misc init > sink.yaml
 sink misc init dev stag prod > sink.yaml
+#+end_src
+
+Nothing is required except for the project name.
+
+#+begin_src yaml
+project
+  name: "projectname"
+#+end_src
+
+The standard yaml structure is a project section and a servers
+section.  There are many fields that can be added.  Also extra fields
+can be added that sink doesn't use but can be accessed via the API.
+
+#+begin_src yaml
+project:
+  name: "projectname"
+servers:
+  dev:
+    root: /var/www
+  prod:
+    root: /var/www
 #+end_src
