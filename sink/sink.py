@@ -37,7 +37,7 @@ CONTEXT_SETTINGS = {
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
 def sink(suppress_commands):
-    """🚣 Tools to manage projects."""
+    """🐙 Tools to manage projects."""
     config.suppress_commands = suppress_commands
     config.load_config()
 
@@ -258,7 +258,6 @@ def api(keys):
       sink misc api servers dev user
     '''
     data = config.data
-
     for k in keys:
         try:
             k = int(k)
@@ -269,6 +268,8 @@ def api(keys):
             data = data[k]
         except KeyError:
             ui.error(f'key "{k}" does not exist in config.')
+        except IndexError as e:
+            ui.error(str(e))
     import json
     click.echo(json.dumps(data))
 

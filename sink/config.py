@@ -233,15 +233,12 @@ class Configuration:
         if cur == '/':
             return False
         elif self.config_file in os.listdir(cur):
-            cwd = click.style(os.path.abspath(os.path.curdir), underline=True)
-            if not self.suppress:
-                click.secho(f'Using {self.config_file} in {cwd}', dim=True)
             self.config_file = Path(cur, self.config_file)
             self.project_root = Path(cur)
             return True
         else:
             cur = os.path.abspath(os.path.join(cur, '..'))
-            self.find_config(cur)
+            return self.find_config(cur)
 
     def project(self):
         """Return the project info as a namedtupple
