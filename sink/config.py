@@ -76,58 +76,6 @@ class dict2obj:
                 yield (k, v)
 
 
-class GlobalProjects:
-    def __init__(self):
-        projectf = Path('~/.sink-projects')
-        projectf = Path(projectf.expanduser())
-        if not projectf.exists():
-            click.echo(f'Creating {projectf}')
-            projectf.touch()
-
-        self.projects = {}
-        self.projectf = projectf
-
-        self.read_tsv()
-
-        comments = '''
-        # The format for this file should be tab seperated fields in this order:
-        # [project name] [project] [color]
-        # color can be one of: red, green, yellow, blue, magenta, cyan
-        '''
-        self.comments = '\n'.join([i.strip() for i in comments.split('\n')])
-
-    def first_match(self, root):
-        for k, p in self.projects.items():
-            if root in k:
-                return p
-
-    def add(self, project_name, project_root):
-        if project_name not in self.projects:
-            color = random.choice(list(Color)).value
-            self.projects[project_name] = [
-                project_name,
-                str(Path(project_root).absolute()),
-                color,
-            ]
-
-    def save_tsv(self):
-        """Write a tab seperated file"""
-        with self.projectf.open('w') as f:
-            f.write(self.comments)
-            writer = csv.writer(f, delimiter='\t', lineterminator='\n')
-            for name, row in self.projects.items():
-                writer.writerow(row)
-
-    def read_tsv(self):
-        """Read a tab sepertated file"""
-        with self.projectf.open() as f:
-            reader = csv.reader(f, delimiter='\t')
-            for row in reader:
-                if row:
-                    if not row[0].startswith('#'):
-                        self.projects[row[0]] = row
-
-
 class Configuration:
     config_file = 'sink.yaml'
     default_project = {
@@ -193,11 +141,6 @@ class Configuration:
         self.suppress = suppress_config_location
         self.suppress_commands = False
 
-    def save_project_name(self, name, path):
-        p = GlobalProjects()
-        p.add(name, path)
-        p.save_tsv()
-
     def load_config(self):
         if not self.find_config(os.curdir):
             ui.error('You are not in a project')
@@ -226,7 +169,6 @@ class Configuration:
 
         self.data = data
         self.o = dict2obj(**data)
-        self.save_project_name(data['project']['name'], os.path.curdir)
 
     def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
