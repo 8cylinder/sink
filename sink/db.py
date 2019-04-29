@@ -58,8 +58,8 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
-        cmd = [f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}''',
-               f'''sudo mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
+        cmd = [f'''ssh -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
+               f'''mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
                f'''| gzip -c > "{sqlfile}"'''
         ]
         if local:
@@ -114,7 +114,7 @@ class DB:
                 sql = gz.read()
                 t.write(sql)
         else:
-            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
+            cmd = f'''ssh -C -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             if result.returncode:
