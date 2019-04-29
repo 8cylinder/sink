@@ -274,10 +274,17 @@ class Configuration:
                 server['ssh'] = ssh
                 ssh_key = server['ssh']['key']
                 if ssh_key:
-                    ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
-                    if not os.path.exists(ssh_key):
+                    abs_ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
+                    prj_ssh_key = os.path.join(self.project_root, ssh_key)
+                    # try a relative or absolute path
+                    if os.path.exists(abs_ssh_key):
+                        server['ssh']['key'] = abs_ssh_key
+                    # try one relative to the project root
+                    elif os.path.exists(prj_ssh_key):
+                        server['ssh']['key'] = prj_ssh_key
+                    else:
                         ui.warn(f'ssh key does not exist: {ssh_key}')
-                    server['ssh']['key'] = ssh_key
+
         # add the server name to a 'name' field
         server['name'] = name
 
