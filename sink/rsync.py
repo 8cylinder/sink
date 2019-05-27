@@ -81,7 +81,7 @@ class Transfer:
                     flags.append('--word-diff=color --word-diff-regex=.')
                 flags = ' '.join(flags)
 
-                cmd = f'''git --no-pager diff {flags} --diff-algorithm=minimal\
+                cmd = f'''git --no-pager diff {flags} --diff-algorithm=minimal --ignore-all-space\
                           {tmp_file} {local_file}'''
             cmd = ' '.join(cmd.split())
 

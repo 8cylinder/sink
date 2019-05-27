@@ -222,7 +222,23 @@ def switch(server, real, load_db):
 @click.argument('action_name', required=False)
 @click.option('--real', '-r', is_flag=True)
 def action(server, action_name, real):
-    'Run a pre defined command on the server.'
+    '''Run a pre defined command on the server.
+
+    If a section named 'actions' is in sink.yaml, run the requested
+    action or list the available actions for that server.
+
+    For example, add the following to one of the servers.  It will
+    list all files ending in .cache on the requested server.
+
+    \b
+    actions:
+      find-cache: find -iname '*.cache'
+
+    Instead of using one of the servers, you can use the special name
+    'local' for a server.  This will use the commands in the project
+    section.
+
+    '''
     actions = Actions(server, real)
     if action_name:
         actions.run(action_name)

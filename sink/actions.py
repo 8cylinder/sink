@@ -7,12 +7,16 @@ from sink.config import Action
 from sink.ui import Color
 from sink.ui import ui
 from sink.ssh import SSH
+from sink.command import Command
 
 
 class Actions:
     def __init__(self, servername, real):
-        self.s = config.server(servername)
-        self.p = config.project()
+        self.servername = servername
+        if servername == 'local':
+            self.s = config.project()
+        else:
+            self.s = config.server(servername)
         self.dry_run = not real
 
     def list_actions(self):
@@ -30,6 +34,12 @@ class Actions:
             self.list_actions()
             exit(1)
 
-        ssh = SSH()
-        result = ssh.run(cmd, server=self.s.servername, dry_run=self.dry_run)
-        print(result)
+        if self.servername == 'local':
+            print(cmd)
+            command = Command()
+            result = command.execute(cmd)
+            print(result)
+        else:
+            ssh = SSH()
+            result = ssh.run(cmd, server=self.s.servername, dry_run=self.dry_run)
+            print(result)
