@@ -107,12 +107,6 @@ class DB:
         if local:
             if not sqlfile.exists():
                 ui.error(f'{sqlfile} does not exist')
-
-            t = tempfile.NamedTemporaryFile()
-
-            with gzip.open(str(sqlfile), 'r') as gz:
-                sql = gz.read()
-                t.write(sql)
         else:
             cmd = f'''ssh -C -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
@@ -133,9 +127,13 @@ class DB:
             skip_secure = ''
 
         if local:
-            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
-                      mysql {self.dryrun} {skip_secure} --user={db.username} --password={db.password}
-                      {db.db} < "{t.name}"'''
+            cmd = [
+                # f'''pv -f {sqlfile}''',
+                f'''cat {sqlfile}''',
+                f'''| ssh {identity} {s.ssh.username}@{s.ssh.server}''',
+                f'''gunzip -c | mysql {skip_secure} --user={db.username} --password={db.password} {db.db}''',
+            ]
+            cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
         else:
             cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
                       "zcat {sqlfile} | mysql --user={db.username} --password={db.password}
@@ -157,9 +155,10 @@ class DB:
                     doit = True
 
             if doit:
-                result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+
                 ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-                error_msg = result.stderr.decode("utf-8").replace(
+                result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1, universal_newlines=True)
+                error_msg = result.stderr.replace(
                     'Warning: Using a password on the command line interface can be insecure.\n', '').replace(
                         'mysql: [Warning] Using a password on the command line interface can be insecure.\n', '')
                 if error_msg:
