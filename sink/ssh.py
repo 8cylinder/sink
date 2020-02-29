@@ -17,8 +17,11 @@ class SSH:
         s = self.config.server(server)
 
         identity = self.get_key(s)
+        port = ''
+        if s.ssh.port:
+            port = f'-p {s.ssh.port}'
 
-        cmd = f'''ssh {identity} {s.ssh.username}@{s.ssh.server}'''
+        cmd = f'''ssh {port} {identity} {s.ssh.username}@{s.ssh.server}'''
         cmd = ' '.join(cmd.split())
 
         self.run_cmd(cmd, dry_run)
@@ -28,7 +31,11 @@ class SSH:
 
         identity = self.get_key(s)
 
-        cmd = f'''scp  -o 'ConnectTimeout 10' {identity}
+        port = ''
+        if s.ssh.port:
+            port = f'-P {s.ssh.port}'
+
+        cmd = f'''scp {port} -o 'ConnectTimeout 10' {identity}
             {localfile} {s.ssh_user}@{s.ssh_server}'''
         cmd = ' '.join(cmd.split())
 
@@ -39,7 +46,11 @@ class SSH:
 
         identity = self.get_key(s)
 
-        cmd = f'''ssh {identity} {s.ssh.username}@{s.ssh.server} {remote_cmd}'''
+        port = ''
+        if s.ssh.port:
+            port = f'-p {s.ssh.port}'
+
+        cmd = f'''ssh {port} {identity} {s.ssh.username}@{s.ssh.server} {remote_cmd}'''
         cmd = ' '.join(cmd.split())
 
         result = self.run_cmd_result(cmd, dry_run)

@@ -80,12 +80,16 @@ class TestConfig:
             good = 'ssh login good.'
             bad = f'ssh login failed for "{user}@{url}".'
 
-            if self.run_cmd_on_server(user, url, cmd, good, bad, key=key):
+            port = ''
+            if s.ssh.port:
+                port = f'-p {s.ssh.port}'
+
+            if self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key):
                 # root
                 cmd = f'cd "{s.root}"'
                 good = f'root dir exists.'
                 bad = f'root dir does not exist on server: {s.root}.'
-                self.run_cmd_on_server(user, url, cmd, good, bad, key=key)
+                self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
 
                 dbs = self.config.dbs(s.mysql)
                 for db in dbs:
@@ -95,7 +99,7 @@ class TestConfig:
                     cmd = f'mysql --user={db.username} --password={db.password} {host} {db.db} --execute="exit";'
                     good = f'DB({db.db}): mysql username, password and db are good.'
                     bad = f'DB({db.db}): mysql error.'
-                    self.run_cmd_on_server(user, url, cmd, good, bad, key=key)
+                    self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
 
             urls = self.config.urls(s.urls)
             for u in urls:
@@ -135,9 +139,9 @@ class TestConfig:
         indent = ' ' * spaces
         click.echo(f'{indent}{msg}')
 
-    def run_cmd_on_server(self, user, url, cmd, good, bad, key=''):
+    def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=''):
 
-        cmd = f'''ssh -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
+        cmd = f'''ssh {port} -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
         # print(cmd)
         # exit()
         result = self.run_cmd(cmd, good, bad)

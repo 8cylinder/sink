@@ -132,9 +132,14 @@ class Transfer:
         if self.verbose:
             verbose_flag = '--verbose'
 
+        port = ''
+        if s.ssh.port:
+            # https://stackoverflow.com/a/4630407
+            port = f'-e "ssh -p {s.ssh.port}"'
+
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f'''rsync {self.dryrun} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
+        cmd = f'''rsync {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
                   --links --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
