@@ -6,6 +6,8 @@ from pathlib import Path
 import datetime
 import tempfile
 import gzip
+import io
+import sys
 
 from sink.config import config
 from sink.config import dict2obj
@@ -128,8 +130,8 @@ class DB:
 
         if local:
             cmd = [
-                # f'''pv -f {sqlfile}''',
-                f'''cat {sqlfile}''',
+                f'''pv --numeric {sqlfile}''',
+                # f'''cat {sqlfile}''',
                 f'''| ssh {identity} {s.ssh.username}@{s.ssh.server}''',
                 f'''gunzip -c | mysql {skip_secure} --user={db.username} --password={db.password} {db.db}''',
             ]
@@ -155,16 +157,44 @@ class DB:
                     doit = True
 
             if doit:
-
                 ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-                result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1, universal_newlines=True)
-                error_msg = result.stderr.replace(
-                    'Warning: Using a password on the command line interface can be insecure.\n', '').replace(
-                        'mysql: [Warning] Using a password on the command line interface can be insecure.\n', '')
-                if error_msg:
-                    ui.error(f'\n{error_msg}')
+                p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                error_msgs = []
+                char = '\u25A0'
+                chard = click.style('|', fg='red')
+                with click.progressbar(
+                    length=100,
+                    width=0,
+                    show_eta=True,
+                    info_sep=click.style(' | ', fg='blue'),
+                    empty_char=click.style(char, fg='black'),
+                    fill_char=click.style(char, fg='blue'),
+                    bar_template=f'%(bar)s %(info)s',
+                ) as bar:
+                    last = 0
+                    for line in io.TextIOWrapper(p.stderr, encoding="utf-8"):
+                        try:
+                            percent = int(line)
+                        except ValueError:
+                            error_msgs.append(line.rstrip())
+                            continue
+                        step = percent - last
+                        bar.update(step)
+                        last = percent
+
+                is_error = False
+                for err in error_msgs:
+                    if 'Using a password on the command line' in err:
+                        ui.warn(err)
+                    else:
+                        is_error = True
+                        ui.error(err, exit=False)
+                if is_error:
+                    sys.exit(1)
                 else:
                     ui.display_success(self.real)
+
         else:
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             ui.display_success(self.real)
