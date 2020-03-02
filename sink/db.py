@@ -15,11 +15,12 @@ from sink.ui import Color
 from sink.ui import ui
 
 class DB:
-    def __init__(self, real, verbose=False):
+    def __init__(self, real, verbose=False, quiet=False):
         self.verbose = True if verbose else False
         self.real = real
         self.dryrun = '' if real else '--dry-run'
         self.config = config
+        self.quiet = quiet
 
     def dump_remote(self, dest, server):
         dest = Path(dest)
@@ -74,26 +75,28 @@ class DB:
             cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
         cmd = ' '.join(cmd.split())
 
-        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
+        sink_db_pull = 'SINK_DB_PULL'
+        os.environ[sink_db_pull] = ''
+        if not self.quiet:
+            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
         if self.real:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
 
             error_msg = result.stderr.decode("utf-8")
-            mysql_warning = 'Using a password on the command line interface can be insecure'
-            if mysql_warning in error_msg:
-                ui.warn(error_msg)
-                error_msg = None
             if error_msg:
                 click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
                 ui.error(f'\n{error_msg}')
             elif local and sqlfile.exists():
                 filename = str(sqlfile.absolute())
                 click.secho(filename, fg=Color.GREEN.value)
-                ui.display_success(self.real)
+                if not self.quiet:
+                    ui.display_success(self.real)
+                os.environ[sink_db_pull] = str(sqlfile.absolute())
             elif local:
                 click.secho('Command failed', fg=Color.RED.value)
         else:
-            ui.display_success(self.real)
+            if not self.quiet:
+                ui.display_success(self.real)
 
     def load_remote(self, source, server):
         source = Path(source)
@@ -188,14 +191,8 @@ class DB:
                         bar.update(step)
                         last = percent
 
-                is_error = False
-                for err in error_msgs:
-                    if 'Using a password on the command line' in err:
-                        ui.warn(err)
-                    else:
-                        is_error = True
-                        ui.error(err, exit=False)
-                if is_error:
+                [ui.error(i, exit=False) for i in error_msgs]
+                if error_msgs:
                     sys.exit(1)
                 else:
                     ui.display_success(self.real)
