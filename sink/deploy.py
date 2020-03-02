@@ -18,7 +18,82 @@ from sink.ssh import SSH
 from sink.db import DB
 
 
-class Deploy:
+class DeployViaRename:
+    def __init__(self, servername, real=False, quiet=False):
+        self.ssh = SSH()
+        self.p = config.project()
+        self.s = config.server(servername)
+        if not self.s.deploy_root:
+            ui.error(f'deploy_root not set in sink.yaml for {self.s.servername}')
+        self.real = real
+        self.rsync = Transfer(real)
+        self.stamp = self._server_time(self.s)
+        self.date_file = f'SINK-DATE:{self.stamp}'
+        self.quiet = quiet
+
+    def init_deploy(self, *dirs):
+        click.secho(f'\nOn remote server ({self.s.servername}) run:', bold=True)
+        deploy_dir = Path(self.s.deploy_root, self.stamp)
+        date_file = deploy_dir / self.date_file
+        if not dirs:
+            dirs = ['{{DIR}}']
+        cmds = [
+            f'mkdir -p {date_file.parent}',
+            f'touch {date_file}',
+        ]
+        for d in dirs:
+            d = Path(d)
+            deploy_sub_dir = deploy_dir / d.name
+            cmds += [
+                '',
+                f'cp -r {d} {deploy_sub_dir}',
+                f'mv {d} {d}.orig',
+                f'ln -s {deploy_sub_dir} {d}',
+            ]
+        for cmd in cmds:
+            ui.display_cmd(cmd)
+
+    def new(self):
+        """Create a new deploy dir and upload the project
+
+        It will be created in the server's deploy_root config location.
+        """
+        dry_run = True if not self.real else False
+
+        deploy_dest = os.path.join(self.s.deploy_root, self.stamp)
+        if not deploy_dest.startswith('/'):
+            ui.error('Deploy root must be an absolute path.')
+
+        ssh = self.ssh
+        # cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
+        cmd = f"'mkdir {deploy_dest}'"
+        ssh.run(cmd, dry_run=dry_run, server=self.s.servername)
+        click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
+
+        ssh.run(f'touch {self.s.deploy_root}/{self.stamp}/{self.date_file}', dry_run=dry_run, server=self.s.servername)
+
+        xfer = Transfer(self.real, quiet=self.quiet)
+        xfer.multiple = True
+        local_root = f'{self.p.root}/'
+        xfer._rsync(local_root, deploy_dest, self.s.servername, Action.PUT)
+
+    def change_current(self, load_db=False):
+        pass
+
+    def _server_time(self, server):
+        """Retrieve the remote server time"""
+        dry_run = True if not self.real else False
+        ssh = self.ssh
+        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
+                         server=self.s.servername)
+        s_time = s_time.strip()
+        # deploy_name = Path(self.s.root).parts[-1]
+        # stamp = f"{deploy_name}.{s_time}"
+        stamp = f"{s_time}"
+        return stamp
+
+
+class DeployViaSymlink:
     def __init__(self, servername, real=False, quiet=False):
         self.ssh = SSH()
         self.p = config.project()
@@ -65,7 +140,8 @@ class Deploy:
         if not deploy_dest.startswith('/'):
             ui.error('Deploy root must be an absolute path.')
         ssh = self.ssh
-        cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
+        # cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
+        cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
         ssh.run(cmd, dry_run=dry_run, server=self.s.servername)
         click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
 
@@ -106,7 +182,9 @@ class Deploy:
             indicator = ' ' * len(pointer)
             if filename == active.parts[-1]:
                 indicator = pointer_pretty
-            pretty_date = datetime.datetime.strptime(filename, 'www.%y-%m-%d_%H%M%S_%Z')
+
+            date_tail = filename.split('.')[-1]
+            pretty_date = datetime.datetime.strptime(date_tail, '%y-%m-%d_%H%M%S_%Z')
             pretty_date = pretty_date.strftime('%b %d/%Y, %I:%M%p %Z').strip()
             pretty_date = click.style(f'({pretty_date})', dim=True, fg='green')
             full_filename = click.style(full_filename, bold=True)
@@ -125,14 +203,14 @@ class Deploy:
         temp_symname = str(uuid.uuid1())
         # link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
 
-        # create a temperary symlink first then rename the temp one to
+        # create a temporary symlink first then rename the temp one to
         # the real symlink, this overwrites the previous one.  The
         # rename causes the symlink to be changed with on step, as
         # opposed to `ln -sfn ...` which deletes the symlink and then
         # creates a new one with a brief period of time with no symlink.
-        link_cmd = f"""'sudo test -h {self.s.root} &&
-                        sudo ln -s {data[choice]} {temp_symname} &&
-                        sudo mv -Tf {temp_symname} {self.s.root}'"""
+        link_cmd = f"""'test -h {self.s.root} &&
+                        ln -s {data[choice]} {temp_symname} &&
+                        mv -Tf {temp_symname} {self.s.root}'"""
         link_cmd = ' '.join(link_cmd.split())
         r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.servername)
 

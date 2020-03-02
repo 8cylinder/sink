@@ -15,7 +15,8 @@ from sink.ui import ui
 from sink.ssh import SSH
 from sink.applications import Applications
 from sink.init import Init
-from sink.deploy import Deploy
+from sink.deploy import DeployViaSymlink
+from sink.deploy import DeployViaRename
 from sink.actions import Actions
 
 
@@ -74,8 +75,8 @@ def database(action, sql_gz, server, real):
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 # @click.argument('filename', type=click.Path(exists=True), required=True)
+@click.argument('server', autocompletion=get_servers)
 @click.argument('filename', type=click.Path(), required=True)
-@click.argument('server', required=False, autocompletion=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
               help='Zero output, for use in Emacs.')
@@ -167,6 +168,8 @@ def check(required, server_names):
 
 # ------------------------------- Deploy ------------------------------
 
+DEPLOYTYPE = 'rename'
+# DEPLOYTYPE = 'symlink'
 @sink.group(context_settings=CONTEXT_SETTINGS)
 def deploy():
     """Deploy site to server with rollback.
@@ -176,7 +179,8 @@ def deploy():
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
-def init(server):
+@click.argument('dirs', nargs=-1)
+def init(server, dirs):
     """Initialize and setup a deploy.
 
     Create a dir to hold the uploaded versions, and create a symlink
@@ -185,8 +189,14 @@ def init(server):
     This command only outputs commands to be copied and pasted.
     """
 
-    deploy = Deploy(server, real=True)
-    deploy.init_deploy()
+    if DEPLOYTYPE == 'rename':
+        deploy = DeployViaRename(server, real=True)
+        deploy.init_deploy(*dirs)
+    elif DEPLOYTYPE == 'symlink':
+        deploy = DeployViaSymlink(server, real=True)
+        deploy.init_deploy()
+    else:
+        ui.error('deploy type wrong')
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -201,8 +211,14 @@ def new(server, real, quiet, dump_db):
     Upload a new version to the deploy root.  Also a snapshot of the
     db is put in the root dir."""
 
-    deploy = Deploy(server, real, quiet=quiet)
-    deploy.new(dump_db=dump_db)
+    if DEPLOYTYPE == 'rename':
+        deploy = DeployViaRename(server, real=real)
+        deploy.new()
+    elif DEPLOYTYPE == 'symlink':
+        deploy = DeployViaSymlink(server, real=real)
+        deploy.new(dump_db=dump_db)
+    else:
+        ui.error('deploy type wrong')
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -212,8 +228,13 @@ def new(server, real, quiet, dump_db):
 def switch(server, real, load_db):
     """Change the symlink to point to a different dir in the deploy root."""
 
-    deploy = Deploy(server, real)
-    deploy.change_current(load_db=load_db)
+    if DEPLOYTYPE == 'rename':
+        deploy = DeployViaRename(server, real=real)
+    elif DEPLOYTYPE == 'symlink':
+        deploy = DeployViaSymlink(server, real=real)
+        deploy.change_current(load_db=load_db)
+    else:
+        ui.error('deploy type wrong')
 
 
 # ------------------------------- Actions -------------------------------
