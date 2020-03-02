@@ -254,7 +254,9 @@ def misc():
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('keys', nargs=-1, required=True)
-def api(keys):
+@click.option('--json/--no-json', '-j/-n', default=True,
+              help='Return the data as JSON instead of the default python output.')
+def api(keys, json):
     '''Retrieve information from the config file.
 
     The data will be output as json.
@@ -286,8 +288,11 @@ def api(keys):
             ui.error(f'key "{k}" does not exist in config.')
         except IndexError as e:
             ui.error(str(e))
-    import json
-    click.echo(json.dumps(data))
+    if json:
+        import json
+        click.echo(json.dumps(data))
+    else:
+        click.echo(data)
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
