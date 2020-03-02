@@ -26,6 +26,7 @@ class Init:
             root:
             # these files will be excluded from any dir syncing:
             exclude:
+              - .DS_Store
               - .well-known
               - '*.sass'
               - '*.scss'
@@ -34,6 +35,11 @@ class Init:
               - .git
               - storage/runtime
               - __pycache__
+              - storage/logs
+              - storage/config-backups
+              - storage/composer-backups
+              - cpresources
+              - .env
 
           servers:'''
         if not self.server_names:
