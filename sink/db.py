@@ -74,9 +74,9 @@ class DB:
             cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
         cmd = ' '.join(cmd.split())
 
+        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
         if self.real:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
 
             error_msg = result.stderr.decode("utf-8")
             mysql_warning = 'Using a password on the command line interface can be insecure'
@@ -84,7 +84,6 @@ class DB:
                 ui.warn(error_msg)
                 error_msg = None
             if error_msg:
-                # click.secho('\nEmpty file created:', fg=Color.YELLOW.value, bold=True)
                 click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
                 ui.error(f'\n{error_msg}')
             elif local and sqlfile.exists():
@@ -94,7 +93,6 @@ class DB:
             elif local:
                 click.secho('Command failed', fg=Color.RED.value)
         else:
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             ui.display_success(self.real)
 
     def load_remote(self, source, server):
