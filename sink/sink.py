@@ -75,8 +75,8 @@ def database(action, sql_gz, server, real):
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 # @click.argument('filename', type=click.Path(exists=True), required=True)
+@click.argument('server', autocompletion=get_servers)
 @click.argument('filename', type=click.Path(), required=True)
-@click.argument('server', required=False, autocompletion=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
               help='Zero output, for use in Emacs.')
