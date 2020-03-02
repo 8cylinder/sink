@@ -58,7 +58,11 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
-        cmd = [f'''ssh -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
+        port = ''
+        if s.ssh.port:
+            port = f'-p {s.ssh.port}'
+
+        cmd = [f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
                f'''mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
                f'''| gzip -c > "{sqlfile}"'''
         ]
@@ -132,12 +136,16 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
+        port = ''
+        if s.ssh.port:
+            port = f'-p {s.ssh.port}'
+
         if local:
-            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
+            cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
                       mysql {self.dryrun} {skip_secure} --user={db.username} --password={db.password}
                       {db.db} < "{t.name}"'''
         else:
-            cmd = f'''ssh -T {identity} {s.ssh.username}@{s.ssh.server}
+            cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
                       "zcat {sqlfile} | mysql --user={db.username} --password={db.password}
                       {db.db}"'''
         cmd = ' '.join(cmd.split())

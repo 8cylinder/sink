@@ -243,8 +243,6 @@ class Configuration:
         try:
             server = self.data['servers'][name]
         except KeyError:
-            ui.error(f'Server: "{name}" does not exist in {self.config_file}',
-                     exit=False)
             click.echo('\nExisting servers:')
             options = {}
             for server in self.servers():
@@ -253,7 +251,7 @@ class Configuration:
                     server.ssh.server
                 )
             ui.display_options(options)
-            exit()
+            ui.error(f'Server: "{name}" does not exist in {self.config_file}')
 
         return self._server(server, name)
 
