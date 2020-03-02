@@ -65,7 +65,7 @@ class DB:
             port = f'-p {s.ssh.port}'
 
         cmd = [f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
-               f'''mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --password={db.password} --single-transaction --triggers --events --routines {db.db}''',
+               f'''export MYSQL_PWD={db.password}; mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines {db.db}''',
                f'''| gzip -c > "{sqlfile}"'''
         ]
         if local:
@@ -139,13 +139,12 @@ class DB:
                 f'''pv --numeric {sqlfile}''',
                 # f'''cat {sqlfile}''',
                 f'''| ssh {port} {identity} {s.ssh.username}@{s.ssh.server}''',
-                f'''gunzip -c | mysql {skip_secure} --user={db.username} --password={db.password} {db.db}''',
+                f'''export MYSQL_PWD={db.password}; gunzip -c | mysql {skip_secure} --user={db.username} {db.db}''',
             ]
             cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
         else:
             cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
-                      "zcat {sqlfile} | mysql --user={db.username} --password={db.password}
-                      {db.db}"'''
+                      "export MYSQL_PWD={db.password}; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
         cmd = ' '.join(cmd.split())
 
         if self.real:
