@@ -47,10 +47,12 @@ def sink(suppress_commands):
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('server', type=click.STRING, autocompletion=get_servers)
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
+@click.option('--tag', '-t', type=click.STRING,
+              help="Add a tag to the generated filename when pulling.")
 @click.option('--real', '-r', is_flag=True)
 @click.option('--quiet', '-q', is_flag=True,
               help='Return only the filename')
-def database(action, sql_gz, server, real, quiet):
+def database(action, sql_gz, server, real, quiet, tag):
     """Overwrite a db with a gzipped sql file.
 
     \b
@@ -67,7 +69,7 @@ def database(action, sql_gz, server, real, quiet):
     """
     db = DB(real=real, quiet=quiet)
     if action == Action.PULL.value:
-        db.pull(server)
+        db.pull(server, tag=tag)
     elif action == Action.PUT.value:
         if not sql_gz:
             ui.error('When action is "put", SQL-GZ is required.')

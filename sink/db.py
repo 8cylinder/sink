@@ -26,11 +26,11 @@ class DB:
         dest = Path(dest)
         self._pull(dest, server, local=False)
 
-    def pull(self, server):
+    def pull(self, server, tag=None):
         p = self.config.project()
         s = self.config.server(server)
         db = dict2obj(**s.mysql[0])
-        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name)
+        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name, tag=tag)
         self._pull(sqlfile, server, local=True)
 
     def _pull(self, sqlfile, server, local=True):
@@ -162,7 +162,7 @@ class DB:
                 # f'''cat {sqlfile}''',
                 f'''| gunzip -c | {mysql} {skip_secure} --user={db.username} --password=root {db.db}''',
             ]
-            cmd = f"""{cmd[1]} {cmd[2]}"""
+            cmd = f"""{cmd[0]} {cmd[1]} {cmd[2]}"""
         elif local:
             cmd = [
                 f'''pv --numeric {sqlfile}''',
@@ -227,9 +227,10 @@ class DB:
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             ui.display_success(self.real)
 
-    def _dest(self, project_name, dbname, dirname, id):
+    def _dest(self, project_name, dbname, dirname, id, tag):
         now = datetime.datetime.now()
         now = now.strftime('%y-%m-%d_%H-%M-%S')
-        name = f'{dbname}-{id}-{now}.sql.gz'
+        tag = f'-{tag}' if tag else ''
+        name = f'{dbname}-{id}-{now}{tag}.sql.gz'
         p = Path(dirname, name).absolute().resolve()
         return p
