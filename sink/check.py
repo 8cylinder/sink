@@ -75,7 +75,7 @@ class TestConfig:
             except AttributeError:
                 ui.error(f'ssh values are wrong in {s.servername}')
             if not s.ssh.username or not s.ssh.server:
-                ui.error('missing values for ssh.')
+                ui.warn('missing values for ssh.')
             cmd = 'exit'
             good = 'ssh login good.'
             bad = f'ssh login failed for "{user}@{url}".'

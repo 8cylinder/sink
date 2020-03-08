@@ -96,6 +96,7 @@ class Configuration:
         'warn': False,
         'default': False,
         'group': None,
+        'user': None,
         'control_panel': {
             'url': None,
             'usename': None,

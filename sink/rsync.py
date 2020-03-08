@@ -121,9 +121,15 @@ class Transfer:
             recursive = '--recursive'
 
         group = ''
-        if action == Action.PUT and s.group:
-            # --group needs to be used along with --chown to change group on the server
-            group = f'--group --chown=:{s.group}'
+        if action == Action.PUT and (s.group or s.user):
+            # To have rsync change owner or group, sudo will probably
+            # have to be used.  The '--rsync-path' needs to be set to
+            # "sudo rsync".  Also the '--group' and '--owner' flags
+            # have to be used as well, otherwise '--chown' will be
+            # ignored.
+            group_flag = '--group' if s.group else ''
+            user_flag = '--owner' if s.user else ''
+            group = f'{group_flag} {user_flag} --rsync-path="sudo rsync" --chown={s.group or ""}:{s.user or ""}'
 
         if self.silent or self.quiet:
             extra_flags += ' --quiet '

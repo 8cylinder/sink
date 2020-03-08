@@ -202,8 +202,8 @@ class DB:
                     width=0,
                     show_eta=True,
                     info_sep=click.style(' | ', fg='blue'),
-                    empty_char=click.style(char, fg='black'),
-                    fill_char=click.style(char, fg='blue'),
+                    empty_char=click.style(char, fg='blue'),
+                    fill_char=click.style(char, fg='bright_blue'),
                     bar_template=f'%(bar)s %(info)s',
                 ) as bar:
                     last = 0
