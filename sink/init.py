@@ -26,19 +26,20 @@ class Init:
             root:
             # these files will be excluded from any dir syncing:
             exclude:
+              - .git
+              - '.#*'
               - .DS_Store
               - .well-known
               - '*.sass'
               - '*.scss'
-              - '*.pyc'
               - '.sass-cache'
-              - .git
+              - '*.pyc'
               - storage/runtime
-              - __pycache__
               - storage/logs
               - storage/config-backups
               - storage/composer-backups
               - cpresources
+              - __pycache__
               - .env
 
           servers:'''
@@ -53,10 +54,11 @@ class Init:
               # deploy root must be an absolute path.
               deploy_root:
               # This will warn you when puting files or a db to this server.
-              warn: yes
+              warn: no
               # If this is set to yes, then this server will
-              # be used if no server is specified on the command line.
-              default: no
+              # will be included in the list of servers that
+              # the automatic command sends a single file to.
+              automatic: no
               # If you want the group and user to be changed when uploading
               # set group and user to the desired names.
               group:

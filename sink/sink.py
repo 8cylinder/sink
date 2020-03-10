@@ -81,7 +81,7 @@ def database(action, sql_gz, server, real, quiet):
 @click.argument('filename', type=click.Path(), required=True)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
-              help='Zero output, for use in Emacs.')
+              help='Reduced output, for use in Emacs.')
 @click.option('--extra-flags',
               help='extra flags to pass to rsync.')
 def files(action, filename, server, real, silent, extra_flags):
@@ -102,6 +102,23 @@ def files(action, filename, server, real, silent, extra_flags):
         xfer.pull(f, server, extra_flags)
     elif action == Action.PUT.value:
         xfer.put(f, server, extra_flags)
+
+@sink.command('single', context_settings=CONTEXT_SETTINGS)
+@click.argument('filename', type=click.Path(), required=True)
+@click.option('--real', '-r', is_flag=True)
+@click.option('--silent', '-s', is_flag=True,
+              help='Reduced output, for use in Emacs.')
+def automatic(filename, real, silent):
+    """Send a single file to any server marked as automatic.
+
+    Send a single file to any server that has been designated as
+    automatic.  This is primarily designed for scripting from a text
+    editor."""
+
+    f = Path(os.path.abspath(filename))
+    for_real = True
+    xfer = Transfer(real, silent=silent)
+    xfer.single(f)
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
