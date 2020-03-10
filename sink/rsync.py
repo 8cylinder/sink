@@ -145,7 +145,7 @@ class Transfer:
 
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f'''rsync {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
+        cmd = f'''/usr/local/bin/rsync {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
                   --links --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
