@@ -61,15 +61,26 @@ class DB:
         except AttributeError:
             skip_secure = ''
 
+        mysqldump = 'mysqldump'
+        try:
+            mamp_path = s.mamp
+            mysqldump = os.path.join(mamp_path, mysqldump)
+        except AttributeError:
+            mamp_path = ''
+
         port = ''
         if s.ssh.port:
             port = f'-p {s.ssh.port}'
 
-        cmd = [f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
-               f'''export MYSQL_PWD={db.password}; mysqldump {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines {db.db}''',
-               f'''| gzip -c > "{sqlfile}"'''
+        cmd = [
+            f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
+            f'''export MYSQL_PWD={db.password}; {mysqldump} {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines {db.db}''',
+            f'''| gzip -c > "{sqlfile}"'''
         ]
-        if local:
+
+        if mamp_path:
+            cmd = f"""{cmd[1]} {cmd[2]}"""
+        elif local:
             cmd = f"""{cmd[0]} '{cmd[1]}' {cmd[2]}"""
         else:
             cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
@@ -137,12 +148,27 @@ class DB:
         if s.ssh.port:
             port = f'-p {s.ssh.port}'
 
-        if local:
+        mysql = 'mysql'
+        try:
+            mamp_path = s.mamp  # mamp: '/Applications/MAMP/Library/bin'
+            mysql = os.path.join(mamp_path, mysql)
+        except AttributeError:
+            mamp_path = ''
+
+        if mamp_path:
+            cmd = [
+                f'''export MYSQL_PWD={db.password};''',
+                f'''pv --numeric {sqlfile}''',
+                # f'''cat {sqlfile}''',
+                f'''| gunzip -c | {mysql} {skip_secure} --user={db.username} --password=root {db.db}''',
+            ]
+            cmd = f"""{cmd[1]} {cmd[2]}"""
+        elif local:
             cmd = [
                 f'''pv --numeric {sqlfile}''',
                 # f'''cat {sqlfile}''',
                 f'''| ssh {port} {identity} {s.ssh.username}@{s.ssh.server}''',
-                f'''export MYSQL_PWD={db.password}; gunzip -c | mysql {skip_secure} --user={db.username} {db.db}''',
+                f'''export MYSQL_PWD={db.password}; gunzip -c | {mysql} {skip_secure} --user={db.username} {db.db}''',
             ]
             cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
         else:
