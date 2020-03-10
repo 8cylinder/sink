@@ -39,6 +39,16 @@ class Transfer:
         self.silent = silent
         self.multiple = False
 
+    def single(self, filename):
+        server_name = ''
+        for server in self.config.servers():
+            locations = self.locations(server.name, filename)
+            local = locations['local']
+            remote = locations['remote']
+            if server.automatic:
+                # print(local, remote, server.name, Action.PUT)
+                self._rsync(local, remote, server.name, Action.PUT)
+
     def put(self, filename, server, extra_flags):
         locations = self.locations(server, filename)
         local = locations['local']
