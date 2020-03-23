@@ -85,6 +85,7 @@ class Configuration:
         'pulls_dir': None,
         'cache_dir': None,
         'log_dir': None,
+        'rsync_binary': None,
         'note': None,
         'exclude': [],
     }

@@ -153,9 +153,13 @@ class Transfer:
             # https://stackoverflow.com/a/4630407
             port = f'-e "ssh -p {s.ssh.port}"'
 
+        rsyncb = self.config.project().rsync_binary
+        if not rsyncb:
+            rsyncb = 'rsync'
+
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f'''/usr/local/bin/rsync {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
+        cmd = f'''{rsyncb} {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
                   --links --compress --checksum {recursive} {excluded}'''
 
         if action == Action.PUT:
