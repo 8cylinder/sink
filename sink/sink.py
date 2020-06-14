@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import click
+# noinspection PyUnresolvedReferences
 from pprint import pprint as pp
 from pathlib import Path
 import datetime
@@ -28,19 +29,25 @@ def get_servers(ctx, args, incomplete):
     servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
     return servers
 
+
 __version__ = '0.1.0'
 
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help'],
     # 'token_normalize_func': lambda x: x.lower(),
 }
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
 def sink(suppress_commands):
-    """🐙 Tools to manage projects."""
+    """🐙 Tools to manage projects.
+
+    Use `sink COMMAND -h` for help on specific commands.
+    """
     config.suppress_commands = suppress_commands
-    config.load_config()
+
 
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
@@ -52,15 +59,15 @@ def sink(suppress_commands):
 @click.option('--real', '-r', is_flag=True)
 @click.option('--quiet', '-q', is_flag=True,
               help='Return only the filename')
-def database(action, sql_gz, server, real, quiet, tag):
+def database(db_action, sql_gz, server, real, quiet, tag):
     """Overwrite a db with a gzipped sql file.
 
     \b
     ACTION: pull or put.
     SERVER: server name (defined in util.yaml).
-    SQL-GZ: gziped sql file to upload.  Required if action is "put".
+    SQL-GZ: gzipped sql file to upload.  Required if action is "put".
 
-    When pulling, a gziped file name is created using the project
+    When pulling, a gzipped file name is created using the project
     name, the server name, the date and time.  It is created in the
     pulls_dir.  eg:
 
@@ -68,12 +75,13 @@ def database(action, sql_gz, server, real, quiet, tag):
     pulls_dir/projectname-servername-20-01-01_01-01-01.sql.gz
     """
     db = DB(real=real, quiet=quiet)
-    if action == Action.PULL.value:
+    if db_action == Action.PULL.value:
         db.pull(server, tag=tag)
-    elif action == Action.PUT.value:
+    elif db_action == Action.PUT.value:
         if not sql_gz:
             ui.error('When action is "put", SQL-GZ is required.')
         db.put(server, sql_gz)
+
 
 # ------------------------------- Files -------------------------------
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
@@ -105,6 +113,7 @@ def files(action, filename, server, real, silent, extra_flags):
     elif action == Action.PUT.value:
         xfer.put(f, server, extra_flags)
 
+
 @sink.command('single', context_settings=CONTEXT_SETTINGS)
 @click.argument('filename', type=click.Path(), required=True)
 @click.option('--real', '-r', is_flag=True)
@@ -118,9 +127,9 @@ def automatic(filename, real, silent):
     editor."""
 
     f = Path(os.path.abspath(filename))
-    for_real = True
     xfer = Transfer(real, silent=silent)
     xfer.single(f)
+
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -131,9 +140,10 @@ def ssh(server, dry_run):
     ssh = SSH()
     ssh.ssh(server=server, dry_run=dry_run)
 
+
 @sink.command('diff', context_settings=CONTEXT_SETTINGS)
-@click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', autocompletion=get_servers)
+@click.argument('filename', type=click.Path(exists=True), required=True)
 @click.option('--ignore-whitespace', '-i', is_flag=True,
               help='Ignore whitespace in diff.')
 @click.option('--difftool', '-d', is_flag=True,
@@ -144,13 +154,14 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
     """Diff a local and remote file.
 
     \b
-    FILENAME: file to be transfered
+    FILENAME: file to be transferred
     SERVER: server name (defined in sink.yaml)."""
 
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace,
               word_diff=word_diff, difftool=difftool)
+
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--view/--edit', '-v/-e', default=True,
@@ -174,6 +185,7 @@ def info(view):
     else:
         click.edit(filename=config.config_file)
 
+
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server-names', nargs=-1)
 @click.option('--required', '-r', is_flag=True)
@@ -187,16 +199,20 @@ def check(required, server_names):
     else:
         tc.test_servers(server_names)
 
+
 # ------------------------------- Deploy ------------------------------
 
 DEPLOYTYPE = 'rename'
 # DEPLOYTYPE = 'symlink'
+
+
 @sink.group(context_settings=CONTEXT_SETTINGS)
 def deploy():
     """Deploy site to server with rollback.
 
     Each deploy after init will be hard-linked to the previous deploy.
     Each deploy's dir will be have the format YY-MM-DD-HH-MM-SS."""
+
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -210,14 +226,16 @@ def init(server, dirs):
     This command only outputs commands to be copied and pasted.
     """
 
+    config.load_config()
     if DEPLOYTYPE == 'rename':
-        deploy = DeployViaRename(server, real=True)
-        deploy.init_deploy(*dirs)
+        init_deploy = DeployViaRename(server, real=True)
+        init_deploy.init_deploy(*dirs)
     elif DEPLOYTYPE == 'symlink':
-        deploy = DeployViaSymlink(server, real=True)
-        deploy.init_deploy()
+        init_deploy = DeployViaSymlink(server, real=True)
+        init_deploy.init_deploy()
     else:
         ui.error('deploy type wrong')
+
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -232,14 +250,16 @@ def new(server, real, quiet, dump_db):
     Upload a new version to the deploy root.  Also a snapshot of the
     db is put in the root dir."""
 
+    config.load_config()
     if DEPLOYTYPE == 'rename':
-        deploy = DeployViaRename(server, real=real)
-        deploy.new()
+        new_deploy = DeployViaRename(server, real=real)
+        new_deploy.new()
     elif DEPLOYTYPE == 'symlink':
-        deploy = DeployViaSymlink(server, real=real)
-        deploy.new(dump_db=dump_db)
+        new_deploy = DeployViaSymlink(server, real=real)
+        new_deploy.new(dump_db=dump_db)
     else:
         ui.error('deploy type wrong')
+
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
@@ -249,6 +269,7 @@ def new(server, real, quiet, dump_db):
 def switch(server, real, load_db):
     """Change the symlink to point to a different dir in the deploy root."""
 
+    config.load_config()
     if DEPLOYTYPE == 'rename':
         deploy = DeployViaRename(server, real=real)
     elif DEPLOYTYPE == 'symlink':
@@ -264,7 +285,7 @@ def switch(server, real, load_db):
 @click.argument('action_name', required=False)
 @click.option('--real', '-r', is_flag=True)
 def action(server, action_name, real):
-    '''Run a pre defined command on the server.
+    """Run a pre defined command on the server.
 
     If a section named 'actions' is in sink.yaml, run the requested
     action or list the available actions for that server.
@@ -280,12 +301,16 @@ def action(server, action_name, real):
     'local' for a server.  This will use the commands in the project
     section.
 
-    '''
+    If no action is specified, all actions available to that server
+    will be listed.
+    """
+    config.load_config()
     actions = Actions(server, real)
     if action_name:
         actions.run(action_name)
     else:
         actions.list_actions()
+
 
 # ------------------------------- Misc --------------------------------
 
@@ -299,7 +324,7 @@ def misc():
 @click.option('--json/--no-json', '-j/-n', default=True,
               help='Return the data as JSON instead of the default python output.')
 def api(keys, json):
-    '''Retrieve information from the config file.
+    """Retrieve information from the config file.
 
     The data will be output as json.
 
@@ -316,7 +341,8 @@ def api(keys, json):
     \b
     To get the dev servers user name:
       sink misc api servers dev user
-    '''
+    """
+    config.load_config()
     data = config.data
     for k in keys:
         try:
@@ -339,7 +365,8 @@ def api(keys, json):
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
 def pack():
-    """Display a command to gzip uncommited files."""
+    """Display a command to gzip uncommitted files."""
+    config.load_config()
     now = datetime.datetime.now()
     now = now.strftime('%y-%m-%d-%H-%M-%S')
 
@@ -362,9 +389,9 @@ def init_config(servers):
     `sink misc init > sink.yaml`
     `sink misc init dev stag prod > sink.yaml`
     """
-    init = Init()
-    init.servers(servers)
-    click.echo(init.create())
+    init_file = Init()
+    init_file.servers(servers)
+    click.echo(init_file.create())
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
@@ -375,7 +402,7 @@ def settings(application):
     For the requested application, output settings in a format thats
     easy to copy & paste.
     """
-
+    config.load_config()
     app = Applications()
     if not app.name(application):
         click.echo(f'Unknown application: {application}')
