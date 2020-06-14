@@ -62,18 +62,18 @@ class Spinner:
         time.sleep(self.delay)
 
 
-class dict2obj:
+class Dict2obj:
     def __init__(self, **level):
         for k, v in level.items():
             if isinstance(v, dict):
-                self.__dict__[k] = dict2obj(**v)
+                self.__dict__[k] = Dict2obj(**v)
             else:
                 self.__dict__[k] = v
 
     def __iter__(self):
         for k, v in self.__dict__.items():
             if not k.startswith("__"):
-                yield (k, v)
+                yield k, v
 
 
 class Configuration:
