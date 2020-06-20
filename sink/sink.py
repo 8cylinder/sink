@@ -31,6 +31,14 @@ def get_servers(ctx, args, incomplete):
     return servers
 
 
+# def get_server_choices():
+#     try:
+#         config.load_config(raise_err=True)
+#     except FileNotFoundError:
+#         return ["SERVER"]
+#     return [i.name for i in config.servers()]
+
+
 class NaturalOrderGroup(click.Group):
     """Display commands sorted by order in file
 
@@ -64,7 +72,8 @@ def sink(suppress_commands):
 
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
-@click.argument('action', type=click.Choice([i.value for i in Action]))
+@click.argument('db-action', type=click.Choice([i.value for i in Action]))
+# @click.argument('server', type=click.Choice(get_server_choices()), autocompletion=get_servers)
 @click.argument('server', type=click.STRING, autocompletion=get_servers)
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
 @click.option('--tag', '-t', type=click.STRING,
@@ -87,6 +96,7 @@ def database(db_action, sql_gz, server, real, quiet, tag):
     \b
     pulls_dir/projectname-servername-20-01-01_01-01-01.sql.gz
     """
+    config.load_config()
     db = DB(real=real, quiet=quiet)
     if db_action == Action.PULL.value:
         db.pull(server, tag=tag)
@@ -117,6 +127,7 @@ def files(action, filename, server, real, silent, extra_flags):
     FILENAME: file/dir to be transfered.
     SERVER: server name, if not specified sink will use the default server."""
 
+    config.load_config()
     f = Path(os.path.abspath(filename))
     xfer = Transfer(real, silent=silent)
     extra_flags = '' if not extra_flags else extra_flags
@@ -139,6 +150,7 @@ def automatic(filename, real, silent):
     automatic.  This is primarily designed for scripting from a text
     editor."""
 
+    config.load_config()
     f = Path(os.path.abspath(filename))
     xfer = Transfer(real, silent=silent)
     xfer.single(f)
@@ -150,6 +162,7 @@ def automatic(filename, real, silent):
               help='Do nothing, show the command only.')
 def ssh(server, dry_run):
     """SSH into a server."""
+    config.load_config()
     ssh = SSH()
     ssh.ssh(server=server, dry_run=dry_run)
 
@@ -170,6 +183,7 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
     FILENAME: file to be transferred
     SERVER: server name (defined in sink.yaml)."""
 
+    config.load_config()
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace,
@@ -191,6 +205,7 @@ def info(view):
     export EDITOR='program'
     export VISUAL='program'
     """
+    config.load_config()
     if view:
         with open(config.config_file) as f:
             contents = f.read()
@@ -204,6 +219,7 @@ def info(view):
 @click.option('--required', '-r', is_flag=True)
 def check(required, server_names):
     """Test server settings in config."""
+    config.load_config()
     if server_names:
         server_names = [i.lower() for i in server_names]
     tc = TestConfig()

@@ -10,6 +10,7 @@ from pathlib import Path
 from collections import namedtuple
 from enum import Enum
 import random
+import traceback
 
 from sink.ui import ui
 from sink.ui import Color
@@ -30,8 +31,8 @@ class Spinner:
             '|/-\\',
             '_.oO||Oo._',
             '⎺⎻⎼⎽__⎽⎼⎻⎺',
-            # '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
-            # ' ░▒▓██▓▒░ ',
+            '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
+            ' ░▒▓██▓▒░ ',
         ]
         cursors = random.choice(cursors)
         while True:
@@ -146,8 +147,11 @@ class Configuration:
         self.suppress = suppress_config_location
         self.suppress_commands = False
 
-    def load_config(self):
+    def load_config(self, raise_err=False):
         if not self.find_config(os.curdir):
+            if raise_err:
+                # throw an error instead so that it can be trapped elsewhere.
+                raise FileNotFoundError()
             ui.error('You are not in a project', exit=False)
             click.echo('A sink.yaml file was not found in this or '
                        'any directory above.')
