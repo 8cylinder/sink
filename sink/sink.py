@@ -5,6 +5,7 @@ import click
 from pprint import pprint as pp
 from pathlib import Path
 import datetime
+from collections import OrderedDict
 
 from sink.config import config
 from sink.config import Color
@@ -30,6 +31,18 @@ def get_servers(ctx, args, incomplete):
     return servers
 
 
+class NaturalOrderGroup(click.Group):
+    """Display commands sorted by order in file
+
+    When using -h, display the commands in the order
+    they are in the file where they are defined.
+
+    https://github.com/pallets/click/issues/513
+    """
+    def list_commands(self, ctx):
+        return self.commands.keys()
+
+
 __version__ = '0.1.0'
 
 CONTEXT_SETTINGS = {
@@ -38,7 +51,7 @@ CONTEXT_SETTINGS = {
 }
 
 
-@click.group(context_settings=CONTEXT_SETTINGS)
+@click.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
 def sink(suppress_commands):
@@ -200,15 +213,48 @@ def check(required, server_names):
         tc.test_servers(server_names)
 
 
+# ------------------------------- Actions -------------------------------
+@sink.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server', autocompletion=get_servers)
+@click.argument('action_name', required=False)
+@click.option('--real', '-r', is_flag=True)
+def action(server, action_name, real):
+    """Run a pre defined command on the server.
+
+    If a section named 'actions' is in sink.yaml, run the requested
+    action or list the available actions for that server.
+
+    For example, add the following to one of the servers.  It will
+    list all files ending in .cache on the requested server.
+
+    \b
+    actions:
+      find-cache: find -iname '*.cache'
+
+    Instead of using one of the servers, you can use the special name
+    'local' for a server.  This will use the commands in the project
+    section.
+
+    If no action is specified, all actions available to that server
+    will be listed.
+    """
+    config.load_config()
+    actions = Actions(server, real)
+    if action_name:
+        actions.run(action_name)
+    else:
+        actions.list_actions()
+
+
 # ------------------------------- Deploy ------------------------------
 
 DEPLOYTYPE = 'rename'
 # DEPLOYTYPE = 'symlink'
 
 
-@sink.group(context_settings=CONTEXT_SETTINGS)
+@sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 def deploy():
-    """Deploy site to server with rollback.
+    """[Group] Deploy site to server with rollback.
 
     Each deploy after init will be hard-linked to the previous deploy.
     Each deploy's dir will be have the format YY-MM-DD-HH-MM-SS."""
@@ -279,44 +325,11 @@ def switch(server, real, load_db):
         ui.error('deploy type wrong')
 
 
-# ------------------------------- Actions -------------------------------
-@sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
-@click.argument('action_name', required=False)
-@click.option('--real', '-r', is_flag=True)
-def action(server, action_name, real):
-    """Run a pre defined command on the server.
-
-    If a section named 'actions' is in sink.yaml, run the requested
-    action or list the available actions for that server.
-
-    For example, add the following to one of the servers.  It will
-    list all files ending in .cache on the requested server.
-
-    \b
-    actions:
-      find-cache: find -iname '*.cache'
-
-    Instead of using one of the servers, you can use the special name
-    'local' for a server.  This will use the commands in the project
-    section.
-
-    If no action is specified, all actions available to that server
-    will be listed.
-    """
-    config.load_config()
-    actions = Actions(server, real)
-    if action_name:
-        actions.run(action_name)
-    else:
-        actions.list_actions()
-
-
 # ------------------------------- Misc --------------------------------
 
-@sink.group(context_settings=CONTEXT_SETTINGS)
+@sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 def misc():
-    """Misc stuff."""
+    """[Group] Misc stuff."""
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
