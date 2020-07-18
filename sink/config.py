@@ -98,6 +98,7 @@ class Configuration:
         'default': False,
         'group': None,
         'user': None,
+        'automatic': False,
         'control_panel': {
             'url': None,
             'usename': None,
