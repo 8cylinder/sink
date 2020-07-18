@@ -10,13 +10,16 @@ from pathlib import Path
 from collections import namedtuple
 from enum import Enum
 import random
+import traceback
 
 from sink.ui import ui
 from sink.ui import Color
 
+
 class Action(Enum):
     PUT = 'put'
     PULL = 'pull'
+
 
 class Spinner:
     busy = False
@@ -28,8 +31,8 @@ class Spinner:
             '|/-\\',
             '_.oO||Oo._',
             '⎺⎻⎼⎽__⎽⎼⎻⎺',
-            # '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
-            # ' ░▒▓██▓▒░ ',
+            '█▉▊▋▌▍▎▏▏▎▍▌▋▊▉█',
+            ' ░▒▓██▓▒░ ',
         ]
         cursors = random.choice(cursors)
         while True:
@@ -62,18 +65,18 @@ class Spinner:
         time.sleep(self.delay)
 
 
-class dict2obj:
+class Dict2obj:
     def __init__(self, **level):
         for k, v in level.items():
             if isinstance(v, dict):
-                self.__dict__[k] = dict2obj(**v)
+                self.__dict__[k] = Dict2obj(**v)
             else:
                 self.__dict__[k] = v
 
     def __iter__(self):
         for k, v in self.__dict__.items():
             if not k.startswith("__"):
-                yield (k, v)
+                yield k, v
 
 
 class Configuration:
@@ -144,9 +147,15 @@ class Configuration:
         self.suppress = suppress_config_location
         self.suppress_commands = False
 
-    def load_config(self):
+    def load_config(self, raise_err=False):
         if not self.find_config(os.curdir):
-            ui.error('You are not in a project')
+            if raise_err:
+                # throw an error instead so that it can be trapped elsewhere.
+                raise FileNotFoundError()
+            ui.error('You are not in a project', exit=False)
+            click.echo('A sink.yaml file was not found in this or '
+                       'any directory above.')
+            sys.exit(1)
 
         try:
             with open(self.config_file) as f:
@@ -171,7 +180,7 @@ class Configuration:
             pass  # no servers defined
 
         self.data = data
-        self.o = dict2obj(**data)
+        self.o = Dict2obj(**data)
 
     def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
@@ -190,6 +199,8 @@ class Configuration:
 
         Convert the project dict to a namedtuple and convert the paths
         to pathlib paths."""
+
+        project = None
         try:
             project = self.data['project']
         except KeyError:
@@ -220,7 +231,7 @@ class Configuration:
                 ui.error(f'DB pull dir does not exist: {pulls_dir}')
         p['pulls_dir'] = pulls_dir
 
-        p = dict2obj(**p)
+        p = Dict2obj(**p)
         return p
 
     def server(self, name):
@@ -243,6 +254,7 @@ class Configuration:
             elif not name:
                 ui.error('No server was specified and no server is set to default.')
 
+        server = None
         try:
             server = self.data['servers'][name]
         except KeyError:
@@ -291,7 +303,7 @@ class Configuration:
 
         s = self.default_server.copy()
         s.update(server)
-        return dict2obj(**s)
+        return Dict2obj(**s)
 
     def servers(self):
         all_servers = []
@@ -311,7 +323,7 @@ class Configuration:
         for database in dbs:
             db = self.default_mysql.copy()
             db.update(database)
-            all_dbs.append(dict2obj(**db))
+            all_dbs.append(Dict2obj(**db))
         return all_dbs
 
     def urls(self, urls):
@@ -321,7 +333,7 @@ class Configuration:
             for url in urls:
                 u = self.default_url.copy()
                 u.update(url)
-                all_urls.append(dict2obj(**u))
+                all_urls.append(Dict2obj(**u))
         except AttributeError:
             return False
         return all_urls

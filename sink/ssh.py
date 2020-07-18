@@ -21,7 +21,11 @@ class SSH:
         if s.ssh.port:
             port = f'-p {s.ssh.port}'
 
-        cmd = f'''ssh {port} {identity} {s.ssh.username}@{s.ssh.server}'''
+        cd_cmd = ''
+        if s.root:
+            cd_cmd = f'"cd {s.root}; bash"'
+
+        cmd = f'''ssh -t {port} {identity} {s.ssh.username}@{s.ssh.server} {cd_cmd}'''
         cmd = ' '.join(cmd.split())
 
         self.run_cmd(cmd, dry_run)

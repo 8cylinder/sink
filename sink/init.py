@@ -1,13 +1,9 @@
-import click
-from sink.config import config
-from pprint import pprint as pp
-
 
 class Init:
     def __init__(self):
-        pass
+        self.server_names = None
 
-    def servers(self, names):
+    def servers(self, names: tuple):
         self.server_names = names
 
     def create(self):
@@ -16,7 +12,7 @@ class Init:
 
           project:
             # used for db pull file name (as well as the server id).
-            name:
+            name: 'project-name-here'
             # dir to put pulled db's in.
             pulls_dir:
             # dir to the common root.  Everything below this point must be
@@ -53,20 +49,20 @@ class Init:
               root:
               # deploy root must be an absolute path.
               deploy_root:
-              # This will warn you when puting files or a db to this server.
+              # This will warn you when putting files or a db to this server.
               warn: no
               # If this is set to yes, then this server will
               # will be included in the list of servers that
               # the automatic command sends a single file to.
               automatic: no
               # If you want the group and user to be changed when uploading
-              # set group and user to the desired names.
+              # set group and user to the desired names.  This assumes you have
+              # permission to run chown.
               group:
               user:
               note: |
-                Notes are written like this and can be
-                on multiple lines.  They cannot start on the same
-                line as the vertical bar.
+                Notes are written like this and can be on multiple lines.  
+                They cannot start on the same line as the vertical bar.
               control_panel:
                 url:
                 username:
@@ -110,7 +106,7 @@ class Init:
                   password:
                   note: |
               # Actions are any command that can be run on the server. Each command
-              # must start with a dash, the command name, and the command itself.
+              # must start with the command name and the command itself.
               actions:
                 clearcache: 'sudo -u www-data php /var/www/craft/craft clear-caches/all'
                 restartapache: sudo service apache2 restart

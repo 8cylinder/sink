@@ -10,7 +10,7 @@ import io
 import sys
 
 from sink.config import config
-from sink.config import dict2obj
+from sink.config import Dict2obj
 from sink.ui import Color
 from sink.ui import ui
 
@@ -29,14 +29,14 @@ class DB:
     def pull(self, server, tag=None):
         p = self.config.project()
         s = self.config.server(server)
-        db = dict2obj(**s.mysql[0])
+        db = Dict2obj(**s.mysql[0])
         sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name, tag=tag)
         self._pull(sqlfile, server, local=True)
 
     def _pull(self, sqlfile, server, local=True):
         p = self.config.project()
         s = self.config.server(server)
-        db = dict2obj(**s.mysql[0])
+        db = Dict2obj(**s.mysql[0])
 
         if p.pulls_dir is None or not p.pulls_dir.exists():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
@@ -115,13 +115,13 @@ class DB:
 
     def put(self, server, sqlfile):
         s = self.config.server(server)
-        db = dict2obj(**s.mysql[0])
+        db = Dict2obj(**s.mysql[0])
         sql = Path(sqlfile)
         self._put(server, sql)
 
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
-        db = dict2obj(**s.mysql[0])
+        db = Dict2obj(**s.mysql[0])
         if local:
             if not sqlfile.exists():
                 ui.error(f'{sqlfile} does not exist')
