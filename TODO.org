@@ -1,0 +1,130 @@
+
+#+TITLE: Sink Todo
+#+TODO: TODO MAYBE | DONT-DO DONE
+
+
+* todo
+
+** Bugs
+
+*** TODO check file path validity before passing to rsync so rsync doesn't complain
+
+*** TODO Multiple args
+
+**** TODO allow multiple files for file uploads. Multiple files as last arg.
+
+**** TODO Ability to send db or files to multiple servers at same time?
+: sink db put stag:prod:dev <file>
+: sink file put stag:prod:dev <path>
+
+*** TODO sink view -e should validate
+    When editing config, make temp version of config and validate
+    yaml after saving.
+
+*** DONE when ssh, cd to server root
+
+*** TODO Single
+
+**** TODO With 'single' make sure the correct rsync is being used
+- sink info -e cannot find emacs on osx
+
+**** TODO When using =single= ignore the "ask overwrite" yaml settings.
+
+**** TODO Quiet/silent flags
+- quiet: output "Succcess", server and base filename
+  - eg: Success, prod, index.twig
+  - eg: [Success] prod:.../dir/dir/index.twig
+  - eg: [Success] username@servername:/dir/dir/index.twig
+  - eg: [Success] PROD username@servername:/dir/dir/index.twig
+- silent: no output at all.
+- or use -q and -qq for quiet and silent.
+
+** New Features
+
+*** MAYBE DB download details
+Save extended info about a db download in a text file with same name
+as gziped file.
+: sink db pull --extended-info="Long descriptive text"
+: sink db info [GZ-FILE]
+
+*** TODO DB put, use tab completion for filename
+
+*** MAYBE use click contrib: help-colors
+
+*** MAYBE use click contrib: click-option-group?
+
+*** MAYBE use click contrib: click-plugin for laraval forge support?
+
+*** diff
+
+**** TODO One file/all servers:
+sink diff 'all' path...= compare one file on all servers at one time?
+or download all and group by differences:
+[A] LOCAL, dev, vagrant
+[B] stag
+[C] prod, mamp
+Compare LOCAL to [B, C]: ?
+
+**** MAYBE Some kind of diff report for all files that are different.
+Using info from rsync's itemize-changes?
+
+**** TODO Sink difftool setting in sink.yaml.  Allow different settings for different platforms.
+difftool:
+- osx: <path>
+- linux: <path>
+
+**** DONT-DO sink diff multiple files?
+
+*** Exclusions
+
+**** TODO Allow server specific exclusions
+
+**** TODO Allow use of exclusion files via rsync's =--exclude-from=FILE=
+- Generate on the fly from a exclusions stored in a single yaml
+  file?  hierarchical?
+- Store in separate files using a naming convention?
+  sink-prod.exclude, sink-stag.exclude?
+
+*** TODO flags to hide command & command output
+-q --no-command, -qq --no-output, -qqq both?
+--silent -s, for both?
+
+*** progress bar
+
+**** TODO Add flag for pv in sink.yaml so it can be used from the server
+Try =mysqlpump= if it's on the server.  It has =--watch-progress=
+
+**** TODO Check for pv locally before using
+
+*** MAYBE Option to upload a bashrc file and execute it when sshing.
+For locked down servers that don't allow editing .bashrc.
+
+*** MAYBE Custom db pull filename
+Allow a custom name.
+| short | field       |
+|-------+-------------|
+| %u    | user        |
+| %n    | db name     |
+| %s    | server name |
+| %d    | short date  |
+| %D    | long date   |
+| %t    | tag         |
+Adding :u to tag will uppercase it and the extentions will be added by sink.
+- "%n-%s-%d" :: dbname-servername-20-01-30.sql.gz
+- "%n__%s:u__%d" :: dbname__SERVERNAME__20-01-30.sql.gz
+- "%n--%s:u--%D" :: dbname--SERVERNAME--20-01-30-10:30:15.sql.gz
+
+Optionally for the date, expose full python date string options..?
+
+*** TODO When downloading db don't overwrite existing file.
+If the user is using a short date name for the db pull, and they pull
+more than once in one day, the filename will be the same.
+
+*** TODO Enable tab complete on osx.  Part of setup.py?
+
+*** TODO Test/run setup.py
+
+*** MAYBE If no files to transfer
+If there are no files to transfer, give an explicit notice to the user in the success notice.
+eg: =[Success (no files to transfer)]=
+Maybe there is a return code from rsync to determine this.
