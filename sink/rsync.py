@@ -47,6 +47,7 @@ class Transfer:
             remote = locations['remote']
             if server.automatic:
                 # print(local, remote, server.name, Action.PUT)
+                server.warn = False
                 self._rsync(local, remote, server.name, Action.PUT)
 
     def put(self, filename, server, extra_flags):
@@ -154,8 +155,6 @@ class Transfer:
             port = f'-e "ssh -p {s.ssh.port}"'
 
         rsyncb = self.config.project().rsync_binary
-        if not rsyncb:
-            rsyncb = 'rsync'
 
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']

@@ -20,6 +20,11 @@ class Init:
             # absolute path or a relative path.  A relative path will be
             # relative to the location of this file.
             root:
+            # specify the rsync binary for each platform.  If not specified it
+            # will use the default rsync.
+            rsync_binary:
+              osx:
+              linux:
             # these files will be excluded from any dir syncing:
             exclude:
               - .git
