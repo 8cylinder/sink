@@ -109,7 +109,6 @@ def database(db_action, sql_gz, server, real, quiet, tag):
 # ------------------------------- Files -------------------------------
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
-# @click.argument('filename', type=click.Path(exists=True), required=True)
 @click.argument('server', autocompletion=get_servers)
 @click.argument('filename', type=click.Path(), required=True)
 @click.option('--real', '-r', is_flag=True)
@@ -126,6 +125,9 @@ def files(action, filename, server, real, silent, extra_flags):
     ACTION: pull or put
     FILENAME: file/dir to be transfered.
     SERVER: server name, if not specified sink will use the default server."""
+
+    if action == Action.PUT.value and not os.path.exists(filename):
+        ui.error(f'Path does not exist: {filename}')
 
     config.load_config()
     f = Path(os.path.abspath(filename))

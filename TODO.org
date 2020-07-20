@@ -1,21 +1,19 @@
 
 #+TITLE: Sink Todo
 
+
 * todo
 
-** Bugs [1/6]
+** Bugs
 
-*** TO-DO check file path validity before passing to rsync so rsync doesn't complain
+*** COMPLETE check file path validity before passing to rsync so rsync doesn't complain
+CLOSED: [2020-07-19 Sun 20:10]
 
-*** TO-DO When downloading db don't overwrite existing file.
-If the user is using a short date name for the db pull, and they pull
-more than once in one day, the filename will be the same.
+*** TO-DO Multiple args
 
-*** TO-DO Multiple args [0/2]
+**** TO-DO allow multiple files for file uploads. Multiple files as last arg. :big:
 
-**** TO-DO allow multiple files for file uploads. Multiple files as last arg.
-
-**** TO-DO Ability to send db or files to multiple servers at same time?
+**** TO-DO Ability to send db or files to multiple servers at same time? :big:
 : sink db put stag:prod:dev <file>
 : sink file put stag:prod:dev <path>
 
@@ -23,9 +21,10 @@ more than once in one day, the filename will be the same.
     When editing config, make temp version of config and validate
     yaml after saving.
 
-*** DONE when ssh, cd to server root
+*** COMPLETE when ssh, cd to server root
+CLOSED: [2020-07-19 Sun 20:10]
 
-*** TO-DO Single [0/3]
+*** TO-DO Single
 
 **** TO-DO With 'single' make sure the correct rsync is being used
 - sink info -e cannot find emacs on osx
@@ -41,8 +40,7 @@ more than once in one day, the filename will be the same.
 - silent: no output at all.
 - or use -q and -qq for quiet and silent.
 
-
-** New Features [1/14]
+** New Features
 
 *** MAYBE DB download details
 Save extended info about a db download in a text file with same name
@@ -58,7 +56,7 @@ as gziped file.
 
 *** MAYBE use click contrib: click-plugin for laraval forge support?
 
-*** TO-DO diff
+*** diff
 
 **** TO-DO One file/all servers:
 sink diff 'all' path...= compare one file on all servers at one time?
@@ -77,7 +75,8 @@ difftool:
 - linux: <path>
 
 **** DONT-DO sink diff multiple files?
-*** TO-DO Exclusions
+
+*** Exclusions
 
 **** TO-DO Allow server specific exclusions
 
@@ -86,17 +85,19 @@ difftool:
   file?  hierarchical?
 - Store in separate files using a naming convention?
   sink-prod.exclude, sink-stag.exclude?
+
 *** TO-DO flags to hide command & command output
 -q --no-command, -qq --no-output, -qqq both?
 --silent -s, for both?
 
-*** TO-DO progress bar [0/2]
+*** progress bar
 
 **** TO-DO Add flag for pv in sink.yaml so it can be used from the server
 Try =mysqlpump= if it's on the server.  It has =--watch-progress=
 
 **** TO-DO Check for pv locally before using
-*** DONT-DO Option to upload a bashrc file and execute it when sshing.
+
+*** MAYBE Option to upload a bashrc file and execute it when sshing.
 For locked down servers that don't allow editing .bashrc.
 
 *** MAYBE Custom db pull filename
@@ -115,6 +116,10 @@ Adding :u to tag will uppercase it and the extentions will be added by sink.
 - "%n--%s:u--%D" :: dbname--SERVERNAME--20-01-30-10:30:15.sql.gz
 
 Optionally for the date, expose full python date string options..?
+
+*** TO-DO When downloading db don't overwrite existing file.
+If the user is using a short date name for the db pull, and they pull
+more than once in one day, the filename will be the same.
 
 *** TO-DO Enable tab complete on osx.  Part of setup.py?
 
