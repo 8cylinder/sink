@@ -7,13 +7,19 @@
 
 ** Bugs
 
-*** TODO check file path validity before passing to rsync so rsync doesn't complain
+*** DONE check file path validity before passing to rsync so rsync doesn't complain
+CLOSED: [2020-07-19 Sun 18:11]
 
+*** DONE allow platform specific rsync location
+CLOSED: [2020-07-19 Sun 17:56]
+rsync_binary:
+  - osx: /usr/local/bin/rsync
+  - linux:
 *** TODO Multiple args
 
-**** TODO allow multiple files for file uploads. Multiple files as last arg.
+**** TODO allow multiple files for file uploads. Multiple files as last arg. :big:
 
-**** TODO Ability to send db or files to multiple servers at same time?
+**** TODO Ability to send db or files to multiple servers at same time? :big:
 : sink db put stag:prod:dev <file>
 : sink file put stag:prod:dev <path>
 
