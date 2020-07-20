@@ -6,9 +6,6 @@
 
 ** Bugs
 
-*** COMPLETE check file path validity before passing to rsync so rsync doesn't complain
-CLOSED: [2020-07-19 Sun 20:10]
-
 *** TO-DO Multiple args
 
 **** TO-DO allow multiple files for file uploads. Multiple files as last arg. :big:
@@ -20,9 +17,6 @@ CLOSED: [2020-07-19 Sun 20:10]
 *** TO-DO sink view -e should validate
     When editing config, make temp version of config and validate
     yaml after saving.
-
-*** COMPLETE when ssh, cd to server root
-CLOSED: [2020-07-19 Sun 20:10]
 
 *** TO-DO Single
 
@@ -39,6 +33,15 @@ CLOSED: [2020-07-19 Sun 20:10]
   - eg: [Success] PROD username@servername:/dir/dir/index.twig
 - silent: no output at all.
 - or use -q and -qq for quiet and silent.
+
+*** COMPLETE check file path validity before passing to rsync so rsync doesn't complain
+CLOSED: [2020-07-19 Sun 20:10]
+
+*** COMPLETE platform specific rsync binary
+CLOSED: [2020-07-19 Sun 20:19]
+
+*** COMPLETE when ssh, cd to server root
+CLOSED: [2020-07-19 Sun 20:10]
 
 ** New Features
 
