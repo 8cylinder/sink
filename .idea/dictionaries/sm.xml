@@ -7,8 +7,11 @@
       <w>deploytype</w>
       <w>difftool</w>
       <w>iname</w>
+      <w>localf</w>
       <w>projectname</w>
       <w>pycache</w>
+      <w>remotef</w>
+      <w>rsyncb</w>
       <w>servername</w>
       <w>syncpoint</w>
       <w>tarname</w>
