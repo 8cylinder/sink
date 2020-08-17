@@ -2,16 +2,18 @@
 #+TITLE: Sink Todo
 
 
-* todo
+* Todo
 
-** Now [3/9]
+** Now [4/12]
 *** TO-DO Allow server specific exclusions
 
-*** TO-DO Multiple args
+*** TO-DO allow multiple files for file uploads
+Allow multiple args for file arg in file put/pull.
 
-**** TO-DO allow multiple files for file uploads. Multiple files as last arg. :big:
-
-**** TO-DO Ability to send db or files to multiple servers at same time? :big:
+*** DONT-DO Ability to send db or files to multiple servers at same time
+CLOSED: [2020-07-24 Fri 13:27]
+Don't do, limited use case for a lot of work, and a potentially
+destructive command.
 : sink db put stag:prod:dev <file>
 : sink file put stag:prod:dev <path>
 
@@ -21,7 +23,7 @@
 
 *** TO-DO With 'single' make sure the correct rsync is being used
 
-*** TO-DO When using =single= ignore the "ask overwrite" yaml settings.
+*** TO-DO When using =single= ignore the "ask overwrite" yaml settings
 
 *** TO-DO Quiet/silent flags
 - quiet: output "Succcess", server and base filename
@@ -35,7 +37,7 @@
 -q --no-command, -qq --no-output, -qqq both?
 --silent -s, for both?
 
-*** COMPLETE check file path validity before passing to rsync so rsync doesn't complain
+*** COMPLETE check file path validity before passing to rsync
 CLOSED: [2020-07-19 Sun 20:10]
 
 *** COMPLETE platform specific rsync binary
@@ -44,8 +46,41 @@ CLOSED: [2020-07-19 Sun 20:19]
 *** COMPLETE when ssh, cd to server root
 CLOSED: [2020-07-19 Sun 20:10]
 
+*** TODO Success messages
+- file upload/download :: [Success] SERVER: upload complete
+- db put/pull :: [Success] SERVER: sql upload complete
+- single :: [Success] SERVER: <file path>
+- action ?
 
-** Then [3/17]
+*** TO-DO error with sink info -e:
+#+begin_src bash
+sink info -e
+Traceback (most recent call last):
+  File "/home/sm/.local/bin/sink", line 11, in <module>
+    load_entry_point('sink', 'console_scripts', 'sink')()
+  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 829, in __call__
+    return self.main(*args, **kwargs)
+  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 782, in main
+    rv = self.invoke(ctx)
+  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 1259, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 1066, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 610, in invoke
+    return callback(*args, **kwargs)
+  File "/home/sm/projects/sink/sink/sink/sink.py", line 216, in info
+    click.edit(filename=config.config_file)
+  File "/home/sm/.local/lib/python3.8/site-packages/click/termui.py", line 588, in edit
+    editor.edit_file(filename)
+  File "/home/sm/.local/lib/python3.8/site-packages/click/_termui_impl.py", line 466, in edit_file
+    "{} {}".format(shlex_quote(editor), shlex_quote(filename)),
+  File "/usr/lib/python3.8/shlex.py", line 325, in quote
+    if _find_unsafe(s) is None:
+TypeError: expected string or bytes-like object
+#+end_src
+
+
+** Then [3/18]
 *** TO-DO Diff one file/all servers
 sink diff 'all' path...= compare one file on all servers at one time?
 or download all and group by differences:
@@ -67,11 +102,11 @@ Try =mysqlpump= if it's on the server.  It has =--watch-progress=
 
 **** TO-DO Check for pv locally before using
 
-*** TO-DO When downloading db don't overwrite existing file.
+*** TO-DO When downloading db don't overwrite existing file
 If the user is using a short date name for the db pull, and they pull
 more than once in one day, the filename will be the same.
 
-*** TO-DO Enable tab complete on osx.
+*** TO-DO Enable tab complete on osx
 Part of setup.py?
 Directions on how to setup .bashrc?
 
@@ -91,11 +126,11 @@ as gziped file.
 
 *** MAYBE use click contrib: help-colors
 
-*** MAYBE use click contrib: click-option-group?
+*** MAYBE use click contrib: click-option-group
 
-*** MAYBE use click contrib: click-plugin for laraval forge support?
+*** MAYBE use click contrib: click-plugin for laraval forge support
 
-*** MAYBE Option to upload a bashrc file and execute it when sshing.
+*** MAYBE Option to upload a bashrc file and execute it when sshing
 For locked down servers that don't allow editing .bashrc.
 
 *** MAYBE Custom db pull filename
@@ -122,10 +157,21 @@ in the success notice.
 eg: =[Success (no files to transfer)]=
 Maybe there is a return code from rsync to determine this.
 
-*** DONT-DO Some kind of diff report for all files that are different.
+*** DONT-DO Some kind of diff report for all files that are different
 CLOSED: [2020-07-20 Mon 20:45]
 Using info from rsync's itemize-changes?
 
-*** DONT-DO sink diff multiple files?
+*** DONT-DO sink diff multiple files
 
 *** TO-DO Test/run setup.py
+
+*** MAYBE Pre pull before put
+A list of files to to pull before putting files.  The usecase is for
+something like craft's project config (project.yaml), where you want
+to keep it from getting overwritten from your local file since it's a
+definition of the database.
+
+*** MAYBE Add actions to project
+Add the ability to run local actions as well as remote ones.  Would be
+best if yaml values could be used in the command.  If not, probably
+not worth it.
