@@ -48,7 +48,7 @@ class Transfer:
             if server.automatic:
                 # print(local, remote, server.name, Action.PUT)
                 server.warn = False
-                self._rsync(local, remote, server.name, Action.PUT)
+                self._rsync(local, remote, server.name, Action.PUT, single=True)
 
     def put(self, filename, server, extra_flags):
         locations = self.locations(server, filename)
@@ -119,7 +119,7 @@ class Transfer:
         }
         return file_locations
 
-    def _rsync(self, localf, remotef, server, action, extra_flags=''):
+    def _rsync(self, localf, remotef, server, action, extra_flags='', single=False):
         s = self.config.server(server)
         identity = ''
         if s.ssh.key:
@@ -190,7 +190,10 @@ class Transfer:
             else:
                 if not self.silent:
                     ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-                ui.display_success(self.real)
+                if single:
+                    ui.display_success(self.real, f'[{server}] {localf}')
+                else:
+                    ui.display_success(self.real)
 
     def error_code(self, code):
         code = str(code)

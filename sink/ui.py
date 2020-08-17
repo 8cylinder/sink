@@ -63,11 +63,17 @@ class ui:
         click.secho(f'{para}', fg=Color.YELLOW.value, dim=True)
 
     @staticmethod
-    def display_success(real):
+    def display_success(real, extra=None):
+        nl = True
+        if extra:
+            nl = False
+            extra = f' {extra}'
         if real:
-            click.secho('Success', bg=Color.GREEN.value, fg=Color.WHITE.value, bold=True)
+            click.secho('Success', nl=nl, bg=Color.GREEN.value, fg=Color.WHITE.value, bold=True)
         else:
-            click.secho('Success (DRY RUN)', bg=Color.BLUE.value, fg=Color.WHITE.value, bold=True)
+            click.secho('Success (DRY RUN)', nl=nl, bg=Color.BLUE.value, fg=Color.WHITE.value, bold=True)
+        if extra:
+            click.secho(extra)
 
     @staticmethod
     def display_options(data):
