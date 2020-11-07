@@ -40,7 +40,6 @@ class Transfer:
         self.multiple = False
 
     def single(self, filename):
-        server_name = ''
         for server in self.config.servers():
             locations = self.locations(server.name, filename)
             local = locations['local']
@@ -128,7 +127,7 @@ class Transfer:
         excluded = ''
         recursive = ''
         if self.multiple:
-            excluded = self.config.excluded()
+            excluded = self.config.excluded(server)
             recursive = '--recursive'
 
         group = ''

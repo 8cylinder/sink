@@ -65,8 +65,11 @@ class Init:
               # permission to run chown.
               group:
               user:
+              # server level exclude.  These will be combined with the
+              # project excludes.
+              exclude:
               note: |
-                Notes are written like this and can be on multiple lines.  
+                Notes are written like this and can be on multiple lines.
                 They cannot start on the same line as the vertical bar.
               control_panel:
                 url:

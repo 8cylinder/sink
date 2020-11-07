@@ -368,10 +368,26 @@ class Configuration:
             **self.data['sync points'])
         return s
 
-    def excluded(self):
-        ex = self.data['project']['exclude']
-        ex = ' '.join([f'--exclude="{i}"' for i in ex])
-        return ex
+    def excluded(self, server):
+        project_ex = []
+        try:
+            project_ex = self.data['project']['exclude']
+            project_ex = [i for i in project_ex if i] if project_ex else []
+        except KeyError:
+            pass
+
+        server_ex = []
+        try:
+            server_ex = self.data['servers'][server]['exclude']
+            server_ex = [i for i in server_ex if i] if server_ex else []
+        except KeyError:
+            pass
+
+        all = project_ex + server_ex
+        all = set(all)
+        all = sorted(all)
+        all = ' '.join([f'--exclude="{i}"' for i in all])
+        return all
 
 
 config = Configuration()
