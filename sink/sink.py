@@ -6,6 +6,7 @@ from pprint import pprint as pp
 from pathlib import Path
 import datetime
 from collections import OrderedDict
+import yaml
 
 from sink.config import config
 from sink.config import Color
@@ -123,8 +124,8 @@ def files(action, filename, server, real, silent, extra_flags):
 
     \b
     ACTION: pull or put
-    FILENAME: file/dir to be transfered.
-    SERVER: server name, if not specified sink will use the default server."""
+    SERVER: server name, if not specified sink will use the default server.
+    FILENAME: file/dir to be transfered."""
 
     if action == Action.PUT.value and not os.path.exists(filename):
         ui.error(f'Path does not exist: {filename}')
@@ -192,6 +193,33 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
               word_diff=word_diff, difftool=difftool)
 
 
+def edit_config():
+    click.edit(filename=config.config_file)
+    try:
+        with open(config.config_file) as f:
+            yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        if hasattr(e, 'problem_mark'):
+            msg = 'There was an error while parsing the config file'
+            if e.context is not None:
+                ui.error(
+                    f'{msg}:\n{e.problem_mark}\n{e.problem} {e.context}.',
+                    exit=False)
+            else:
+                ui.error(
+                    f'{msg}:\n{e.problem_mark} {e.problem}.', exit=False)
+        else:
+            ui.error(
+                "Something went wrong while parsing the yaml file.",
+                exit=False)
+
+        re_edit = click.confirm(
+            '\nDo you want to edit the file again?', default=True)
+
+        if re_edit:
+            edit_config()
+
+
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--view/--edit', '-v/-e', default=True,
               help='View or edit config file.')
@@ -213,7 +241,7 @@ def info(view):
             contents = f.read()
             click.echo_via_pager(contents)
     else:
-        click.edit(filename=config.config_file)
+        edit_config()
 
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
