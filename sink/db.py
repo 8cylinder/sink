@@ -122,6 +122,12 @@ class DB:
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
         db = Dict2obj(**s.mysql[0])
+
+        if s.ssh.key:
+            identity = f'-i "{s.ssh.key}"'
+        else:
+            identity = ''
+
         if local:
             if not sqlfile.exists():
                 ui.error(f'{sqlfile} does not exist')
@@ -130,12 +136,7 @@ class DB:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             if result.returncode:
-                error(f'{sqlfile} does not exist')
-
-        if s.ssh.key:
-            identity = f'-i "{s.ssh.key}"'
-        else:
-            identity = ''
+                ui.error(f'{sqlfile} does not exist')
 
         skip_secure = ''
         try:

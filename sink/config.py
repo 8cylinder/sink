@@ -238,22 +238,19 @@ class Configuration:
         except TypeError:
             rsync_bin = self.get_rsync_name(p['rsync_binary'])
         except KeyError:
-            rsync_bin = 'rsync'
-        # else:
-        #     rsync_bin = self.get_rsync_name(p['rsync_binary'][sys.platform])
+            rsync_bin = self.RSYNC
         p['rsync_binary'] = rsync_bin
 
         p = Dict2obj(**p)
         return p
 
     def get_rsync_name(self, rsync_bin: str) -> str:
-        # print(f'>{rsync_bin}<')
         if not rsync_bin:
             return self.RSYNC
         elif rsync_bin == self.RSYNC:
             return self.RSYNC
         elif rsync_bin and os.path.exists(rsync_bin):
-            return self.RSYNC
+            return rsync_bin
         elif rsync_bin and not os.path.exists(rsync_bin):
             raise FileNotFoundError(f'rsync binary does not exist: {rsync_bin}')
         else:

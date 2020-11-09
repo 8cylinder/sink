@@ -1,16 +1,7 @@
-import os
-import sys
-import re
 import subprocess
 import click
 from pprint import pprint as pp
-import yaml
 from pathlib import Path
-import datetime
-from collections import namedtuple
-import tempfile
-import gzip
-from enum import Enum
 import tempfile
 
 from sink.config import config
@@ -168,17 +159,18 @@ class Transfer:
 
         doit = True
         # if the server has warn = True, then pause here to query the user.
-        if action == Action.PUT and s.warn and self.real:
-            doit = False
-            warn = click.style(
-                ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
-                bold=True, dim=True)
-            msg = click.style(
-                f': You are about to overwrite the {s.servername} "{remotef}" files, continue?',
-                fg=Color.YELLOW.value)
-            msg = warn + msg
-            if click.confirm(msg):
-                doit = True
+        if not single:
+            if action == Action.PUT and s.warn and self.real:
+                doit = False
+                warn = click.style(
+                    ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
+                    bold=True, dim=True)
+                msg = click.style(
+                    f': You are about to overwrite the {s.servername} "{remotef}" files, continue?',
+                    fg=Color.YELLOW.value)
+                msg = warn + msg
+                if click.confirm(msg):
+                    doit = True
 
         if doit:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
