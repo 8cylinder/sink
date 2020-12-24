@@ -40,7 +40,7 @@ class Transfer:
                 server.warn = False
                 self._rsync(local, remote, server.name, Action.PUT, single=True)
 
-    def put(self, filename, server, extra_flags):
+    def put(self, filename, server, extra_flags, dest_override=None):
         locations = self.locations(server, filename)
         local = locations['local']
         # append a / to the remote path if its a dir so rsync will
@@ -82,9 +82,11 @@ class Transfer:
                     flags.append('--word-diff=color --word-diff-regex=.')
                 flags = ' '.join(flags)
 
-                cmd = f'''git --no-pager diff {flags} --diff-algorithm=minimal --ignore-all-space\
-                          {tmp_file} {local_file}'''
-            cmd = ' '.join(cmd.split())
+                cmd = f'''git --no-pager diff --color=always {flags} --diff-algorithm=minimal --ignore-all-space\
+                          '{tmp_file_fixed}' '{local_file}' | less'''
+
+            # cmd = f'vimdiff -R {tmp_file_fixed} {local_file}'
+            # cmd = ' '.join(cmd.split())
 
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             result = subprocess.run(cmd, shell=True)
@@ -109,7 +111,7 @@ class Transfer:
         }
         return file_locations
 
-    def _rsync(self, localf, remotef, server, action, extra_flags='', single=False):
+    def _rsync(self, localf, remotef, server, action, extra_flags='', single=False, compare_to=None):
         s = self.config.server(server)
         identity = ''
         if s.ssh.key:
@@ -155,18 +157,26 @@ class Transfer:
             cmd = f'''{cmd} '{localf}' {s.ssh.username}@{s.ssh.server}:{remotef}'''
         elif action == Action.PULL:
             cmd = f'''{cmd} '{s.ssh.username}@{s.ssh.server}:{remotef}' '{localf}' '''
-        cmd = ' '.join(cmd.split())  # remove extra spaces
+        elif action == Action.DIFF:
+            if self.multiple:
+                remotef = str(remotef) + '/'
+            cmd = f'''{cmd} --compare-dest='{compare_to}' '{s.ssh.username}@{s.ssh.server}:{remotef}' '{localf}' '''
 
+        cmd = ' '.join(cmd.split())  # remove extra spaces
+        # print(cmd);exit()
+        self.run(cmd, single, action, s, remotef, localf)
+
+    def run(self, cmd, single, action, server, remotef, localf):
         doit = True
         # if the server has warn = True, then pause here to query the user.
         if not single:
-            if action == Action.PUT and s.warn and self.real:
+            if action == Action.PUT and server.warn and self.real:
                 doit = False
                 warn = click.style(
                     ' WARNING: ', bg=Color.YELLOW.value, fg=Color.RED.value,
                     bold=True, dim=True)
                 msg = click.style(
-                    f': You are about to overwrite the {s.servername} "{remotef}" files, continue?',
+                    f': You are about to overwrite the {server.servername} "{remotef}" files, continue?',
                     fg=Color.YELLOW.value)
                 msg = warn + msg
                 if click.confirm(msg):

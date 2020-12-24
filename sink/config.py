@@ -19,6 +19,7 @@ from sink.ui import Color
 class Action(Enum):
     PUT = 'put'
     PULL = 'pull'
+    DIFF = 'diff'
 
 
 class Spinner:
