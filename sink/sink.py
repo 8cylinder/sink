@@ -7,6 +7,7 @@ from pathlib import Path
 import datetime
 from collections import OrderedDict
 import yaml
+from enum import Enum
 
 from sink.config import config
 from sink.config import Color
@@ -20,6 +21,7 @@ from sink.applications import Applications
 from sink.init import Init
 from sink.deploy import DeployViaSymlink
 from sink.deploy import DeployViaRename
+from sink.deploy import DeployViaLocal
 from sink.actions import Actions
 
 
@@ -187,6 +189,7 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
     SERVER: server name (defined in sink.yaml)."""
 
     config.load_config()
+
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace,
@@ -294,37 +297,44 @@ def action(server, action_name, real):
 
 # ------------------------------- Deploy ------------------------------
 
-DEPLOYTYPE = 'rename'
-# DEPLOYTYPE = 'symlink'
+class DeployType(Enum):
+    RENAME = 'rename'
+    SYMLINK = 'symlink'
+    LOCAL = 'local'
 
 
 @sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
-def deploy():
-    """[Group] Deploy site to server with rollback.
-
-    Each deploy after init will be hard-linked to the previous deploy.
-    Each deploy's dir will be have the format YY-MM-DD-HH-MM-SS."""
+@click.option('-m', '--method', default=DeployType.LOCAL.value,
+              type=click.Choice([i.value for i in DeployType]),
+              help=f"Deploy method, default {DeployType.LOCAL.value}")
+@click.pass_context
+def deploy(ctx, method):
+    """[Group] Deploy site to server with rollback."""
+    ctx.obj = DeployType(method)
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
 @click.argument('dirs', nargs=-1)
-def init(server, dirs):
+@click.pass_context
+def init(ctx, server, dirs):
     """Initialize and setup a deploy.
 
-    Create a dir to hold the uploaded versions, and create a symlink
-    to it.
+    Create a dir localy or on the remote server to hold the versions.
+    The exact method depends of the deploy method used."""
 
-    This command only outputs commands to be copied and pasted.
-    """
+    deploytype = DeployType(ctx.obj)
 
     config.load_config()
-    if DEPLOYTYPE == 'rename':
+    if deploytype == DeployType.RENAME:
         init_deploy = DeployViaRename(server, real=True)
         init_deploy.init_deploy(*dirs)
-    elif DEPLOYTYPE == 'symlink':
+    elif deploytype == DeployType.SYMLINK:
         init_deploy = DeployViaSymlink(server, real=True)
         init_deploy.init_deploy()
+    elif deploytype == DeployType.LOCAL:
+        deploy = DeployViaLocal()
+        deploy.init_deploy()
     else:
         ui.error('deploy type wrong')
 
@@ -336,19 +346,25 @@ def init(server, dirs):
               help='No itemized output from rsync.')
 @click.option('-d', '--dump-db', is_flag=True,
               help='Take a snapshot of the db.')
-def new(server, real, quiet, dump_db):
+@click.option('-n', '--note', help="Add a note to DEPLOY_INFO.yaml.")
+@click.pass_context
+def new(ctx, server, real, quiet, dump_db, note):
     """Upload a new version of the site.
 
-    Upload a new version to the deploy root.  Also a snapshot of the
-    db is put in the root dir."""
+    Upload a new version to the deploy root."""
+
+    deploytype = DeployType(ctx.obj)
 
     config.load_config()
-    if DEPLOYTYPE == 'rename':
+    if deploytype == DeployType.RENAME:
         new_deploy = DeployViaRename(server, real=real)
         new_deploy.new()
-    elif DEPLOYTYPE == 'symlink':
+    elif deploytype == DeployType.SYMLINK:
         new_deploy = DeployViaSymlink(server, real=real)
         new_deploy.new(dump_db=dump_db)
+    elif deploytype == DeployType.LOCAL:
+        deploy = DeployViaLocal()
+        deploy.new(server, real=real, note=note)
     else:
         ui.error('deploy type wrong')
 
@@ -358,15 +374,23 @@ def new(server, real, quiet, dump_db):
 @click.option('--real', '-r', is_flag=True)
 @click.option('-l', '--load-db', is_flag=True,
               help='Take a snapshot of the db.')
-def switch(server, real, load_db):
+@click.option('--delete', is_flag=True,
+              help='Delete any files on remote server that are not part of the upload.')
+@click.pass_context
+def switch(ctx, server, real, load_db, delete):
     """Change the symlink to point to a different dir in the deploy root."""
 
+    deploytype = DeployType(ctx.obj)
+
     config.load_config()
-    if DEPLOYTYPE == 'rename':
+    if deploytype == DeployType.RENAME:
         deploy = DeployViaRename(server, real=real)
-    elif DEPLOYTYPE == 'symlink':
+    elif deploytype == DeployType.SYMLINK:
         deploy = DeployViaSymlink(server, real=real)
         deploy.change_current(load_db=load_db)
+    elif deploytype == DeployType.LOCAL:
+        deploy = DeployViaLocal()
+        deploy.change_current(server, real=real, delete=delete)
     else:
         ui.error('deploy type wrong')
 

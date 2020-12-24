@@ -20,9 +20,15 @@ class Color(Enum):
 
 class ui:
     @staticmethod
+    def notice(msg):
+        w = click.style('Notice:', bold=True, fg=Color.BLUE.value)
+        m = click.style(msg, fg=Color.BLUE.value, reset=True)
+        click.echo(f'{w} {m}', err=True)
+
+    @staticmethod
     def warn(msg):
         w = click.style('Warning:', bold=True, fg=Color.YELLOW.value)
-        m = click.style(msg, fg='yellow', reset=True)
+        m = click.style(msg, fg=Color.YELLOW.value, reset=True)
         click.echo(f'{w} {m}', err=True)
 
     @staticmethod
@@ -73,7 +79,8 @@ class ui:
         else:
             click.secho('Success (DRY RUN)', nl=nl, bg=Color.BLUE.value, fg=Color.WHITE.value, bold=True)
         if extra:
-            click.secho(extra)
+            # click.secho(extra)
+            print(extra)
 
     @staticmethod
     def display_options(data):

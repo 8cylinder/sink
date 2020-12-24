@@ -8,6 +8,10 @@ import string
 import uuid
 from pathlib import Path
 from pprint import pprint as pp
+import yaml
+import tempfile
+import coolname
+import glob
 
 from sink.config import config
 from sink.config import Action
@@ -16,6 +20,7 @@ from sink.ui import ui
 from sink.rsync import Transfer
 from sink.ssh import SSH
 from sink.db import DB
+from sink.rsync import Transfer
 
 
 class DeployViaRename:
@@ -104,7 +109,6 @@ class DeployViaSymlink:
         self.rsync = Transfer(real)
         self.stamp = self.server_time(self.s)
         self.quiet = quiet
-
 
     def init_deploy(self):
         """Display bash commands to set up for deploy
@@ -227,3 +231,215 @@ class DeployViaSymlink:
         deploy_name = Path(self.s.root).parts[-1]
         stamp = f"{deploy_name}.{s_time}"
         return stamp
+
+
+class DeployViaLocal:
+    """
+    sink deploy init
+    sink deploy new
+    sink deploy switch
+    """
+
+    DIST_HOME = 'dist'
+    DIST_DIR_BASENAME = 'deploy'
+    INFO_FILE = 'DEPLOY-INFO.yaml'
+    header = '\n'.join(
+        ('# Fields should not be removed from this file, they are',
+         '# used to determine which deploy this is, but, fields can',
+         '# be added if you want to store extra information here.',
+         '#',
+         '# server:       the name of the server this deploy is for',
+         '# created date: the date the deploy was created localy',
+         '# deploy date:  the date this deploy was pushed to the server',
+         '# deploy name:  the fancypants name',
+         '# note:         a short note that will display when selecting a deploy',
+         ))
+
+    def __init__(self):
+        pass
+
+    def get_dist(self) -> Path:
+        project_home = config.project_root
+        dist = Path(project_home, self.DIST_HOME)
+        return dist
+
+    def init_deploy(self):
+        """Build dist dir
+
+        If dist doesn't exist, build it.
+        Entry for `sink deploy init`"""
+
+        dist = self.get_dist()
+        if not dist.exists():
+            ui.warn(f'DIST ({dist}) dir does not exist, creating it.')
+            try:
+                dist.mkdir()
+            except FileNotFoundError:
+                ui.error(f'Cannot create {dist}')
+        else:
+            ui.warn(f'"{dist}" already exists')
+
+    def new(self, server, real=False, note=None):
+        """Create a new deploy
+
+        Create a new dir in the dist dir of all the files that should
+        be on the server.  These are ready to be pushed to the server
+        with change_current().
+
+        Entry for `sink deploy new`"""
+
+        now = datetime.datetime.now().isoformat(timespec='seconds')
+        fancy = coolname.generate_slug(2)
+        deploy = f'{server}--{now}--{fancy}'
+        deploy = self.get_dist() / deploy
+        source = config.project().root
+
+        xfer = Transfer(real)
+        xfer.local(server, source, deploy)
+
+        if real:
+            info_file = deploy / self.INFO_FILE
+            yaml_content = yaml.dump({
+                'server': server,
+                'created date': now,
+                'deploy date': None,
+                'deploy name': fancy,
+                'note': note,
+            })
+            with info_file.open(mode='w') as f:
+                f.write(self.header)
+                f.write('\n\n')
+                f.write(yaml_content)
+                print()
+                ui.notice(f'{info_file} created')
+
+    def update_deploy_date(self, yaml_file):
+        with yaml_file.open() as f:
+            data = yaml.load(f.read(), Loader=yaml.SafeLoader)
+        now = datetime.datetime.now().isoformat(timespec='seconds')
+        data['deploy date'] = now
+        with yaml_file.open('w') as f:
+            f.write(self.header)
+            f.write('\n\n')
+            f.write(yaml.dump(data))
+
+    def change_current(self, server, real=False, delete=False):
+        """Change the current deploy to another
+
+        Entry for `sink deploy switch`
+        """
+        s = config.server(server)
+        current = self.get_current_deploy(server, real)
+        dist = self.get_dist()
+        available = os.listdir(dist.absolute())
+        deploy = self.display_choices(available, current, server)
+
+        yaml_file = Path(deploy['deploy dir'], self.INFO_FILE)
+        if real:
+            self.update_deploy_date(yaml_file)
+        xfer = Transfer(real=real, silent=False)
+
+        extra_flags = ''
+        if delete:
+            msg = 'This will delete files on the remote server, continue? [y/n]'
+            msg = click.style(msg, fg='red', bold=True)
+            choice = click.prompt(f'\n{msg}')
+            if choice.lower() == 'y':
+                extra_flags = '--delete'
+                click.echo()
+            else:
+                return
+
+        source = Path(deploy['deploy dir'])
+        xfer.put(source, server, extra_flags, dest_override=s.root)
+
+    def get_current_deploy(self, server_name, real):
+        s = config.server(server_name)
+        ssh = SSH()
+        remote_path = Path(s.root, self.INFO_FILE)
+        data = {}
+        with tempfile.TemporaryDirectory() as yaml_dir:
+            ssh.scp_pull(remote_path, yaml_dir, server_name, dry_run=False)
+            yaml_file = Path(yaml_dir, self.INFO_FILE)
+            # from IPython import embed; embed()
+            try:
+                with yaml_file.open('r') as f:
+                    data = yaml.load(f.read(), Loader=yaml.SafeLoader)
+            except FileNotFoundError:
+                data = {}
+        return data
+
+    def display_choices(self, dirs, current, server_name):
+        pointer = '->'
+        # pointer = '▶ '
+        pointer_pretty = click.style(pointer, fg='green', bold=True)
+
+        try:
+            deployed_date = current['created date']
+        except KeyError:
+            deployed_date = ''
+
+        dirs = sorted(dirs)
+        choices = {}
+        counter = 0
+        for d in dirs:
+            d = Path(self.DIST_HOME, d)
+            deploy_yaml = d / self.INFO_FILE
+            data = None
+            try:
+                with open(deploy_yaml) as y:
+                    data = yaml.load(y.read(), Loader=yaml.SafeLoader)
+            except FileNotFoundError:
+                data = None
+            if not data:
+                continue
+            if data['server'] != server_name:
+                continue
+            data['deploy dir'] = str(d.absolute())
+            letter = string.ascii_lowercase[counter]
+            counter += 1
+            choices[letter] = data
+
+        if not choices:
+            ui.error(f'No valid deploys for this server: {server_name}')
+
+        click.echo()
+        click.echo(f'The {pointer_pretty} indicates the currently deployed version.')
+        click.echo()
+
+        for letter, data in choices.items():
+            try:
+                current_date = data['created date']
+            except KeyError:
+                ui.warn(f'Incorrect yaml file for {d}')
+                continue
+            active = '  '
+            if current_date == deployed_date:
+                active = pointer_pretty
+
+            name = data.get('deploy name', '')
+            name = click.style(name, fg='bright_blue')
+
+            current_date = current_date.split('T')
+            current_date = click.style(current_date[0], fg='green') + ' ' + click.style(current_date[1], fg='green')
+            line = f"{active} {letter}) {current_date} {name}"
+            click.echo(line)
+            note = data.get('note', None)
+            if note:
+                click.secho(f'      {note}', fg='yellow')
+
+        click.echo()
+        return self.choose_letter(choices)
+
+    def choose_letter(self, choices):
+        msg = click.style(
+            'Select a deploy to upload (ctrl-c to abort)',
+            fg='white')
+        choice = click.prompt(msg)
+        try:
+            selected = choices[choice]
+        except KeyError:
+            click.echo()
+            ui.warn('Invaid choice')
+            selected = self.choose_letter(choices)
+        return selected

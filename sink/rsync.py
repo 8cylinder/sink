@@ -3,6 +3,8 @@ import click
 from pprint import pprint as pp
 from pathlib import Path
 import tempfile
+import os
+import glob
 
 from sink.config import config
 from sink.ui import Color
@@ -49,6 +51,8 @@ class Transfer:
             local = '{}/'.format(local)
             self.multiple = True
         remote = locations['remote']
+        if dest_override:
+            remote = dest_override
         self._rsync(local, remote, server, Action.PUT, extra_flags)
 
     def pull(self, filename, server, extra_flags):
@@ -62,16 +66,55 @@ class Transfer:
             self.multiple = True
         self._rsync(local, remote, server, Action.PULL, extra_flags)
 
+    def hard_link_flag(self, dest, server_name):
+        parent = dest.parent
+        # dirs = os.listdir(parent)
+        # from IPython import embed; embed()
+        dirs = glob.glob(f'{parent.absolute()}/{server_name}*')
+        flag = ''
+        if dirs:
+            last = list(reversed(sorted(dirs)))[0]
+            last = parent / last
+            flag = f'--link-dest={last.absolute()}'
+        return flag
+
+    def local(self, server_name, source, dest):
+        p = self.config.project()
+        server = self.config.server(server_name)
+        rsyncb = p.rsync_binary
+        excluded = self.config.excluded(server_name)
+
+        hard_link_flag = self.hard_link_flag(dest, server_name)
+
+        cmd = f'{rsyncb} --archive --verbose {hard_link_flag} {self.dryrun} {excluded} {source}/ {dest}'
+
+        self.run(cmd, single=False, action=Action.PUT, server=server, remotef=dest, localf=source)
+
+    def diff_multiple_servers(self, local_file, servers):
+        # for server in servers:
+        #   create a dir
+        #   download file
+        # vimdiff all
+        # remove temp dirs
+        ...
+
     def diff(self, local_file, server, ignore=False, word_diff=None, difftool=False):
-        with tempfile.TemporaryDirectory() as diffdir:
+        local_file = Path(local_file)
+        if(local_file.is_dir()):
+            self.multiple = True
+        with tempfile.TemporaryDirectory(suffix=f' [{server}]') as diffdir:
             tmp_file = f'{diffdir}/{local_file.name}'
             locations = self.locations(server, local_file)
             remotef = locations['remote']
 
-            self._rsync(tmp_file, remotef, server, Action.PULL)
+            self._rsync(diffdir, remotef, server, Action.DIFF, compare_to=local_file)
+
+            tmp_file_fixed = tmp_file
+            if self.multiple:
+                tmp_file_fixed = diffdir
 
             if difftool:
-                cmd = f'''meld {tmp_file} {local_file}'''
+                cmd = f"meld '{tmp_file_fixed}' '{local_file}'"
             else:
                 flags = []
                 if ignore:
@@ -192,7 +235,7 @@ class Transfer:
                 if not self.silent:
                     ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
                 if single:
-                    ui.display_success(self.real, f'[{server}] {localf}')
+                    ui.display_success(self.real, f'[{server.servername}] {localf}')
                 else:
                     ui.display_success(self.real)
 

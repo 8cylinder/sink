@@ -30,7 +30,7 @@ class SSH:
 
         self.run_cmd(cmd, dry_run)
 
-    def scp(self, localfile, server=False, dry_run=False):
+    def scp_put(self, localfile, server=False, dry_run=False):
         s = self.config.server(server)
 
         identity = self.get_key(s)
@@ -43,6 +43,18 @@ class SSH:
             {localfile} {s.ssh_user}@{s.ssh_server}'''
         cmd = ' '.join(cmd.split())
 
+        self.run_cmd(cmd, dry_run)
+
+    def scp_pull(self, remotefile, dest, server, dry_run=False):
+        s = self.config.server(server)
+        identity = self.get_key(s)
+        port = ''
+        if s.ssh.port:
+            port = f'-P {s.ssh.port}'
+
+        cmd = f'''scp {port} -o 'ConnectTimeout 10' {identity}
+            {s.ssh.username}@{s.ssh.server}:{remotefile} {dest}'''
+        cmd = ' '.join(cmd.split())
         self.run_cmd(cmd, dry_run)
 
     def run(self, remote_cmd, server=False, dry_run=False):
