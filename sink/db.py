@@ -30,8 +30,17 @@ class DB:
         p = self.config.project()
         s = self.config.server(server)
         db = Dict2obj(**s.mysql[0])
-        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name, tag=tag)
-        self._pull(sqlfile, server, local=True)
+        sqlfile = self._dest(p.name, db.db, p.pulls_dir_original, s.name, tag=tag)
+
+        if s.type == 'lando':
+            sqlfile = Path(str(sqlfile)[:-3])
+            self._pull_lando(sqlfile)
+        else:
+            self._pull(sqlfile, server, local=True)
+
+    def _pull_lando(self, sqlfile):
+        cmd = f'''lando db-export {sqlfile}'''
+        self.run_pull_cmd(cmd, sqlfile, True)
 
     def _pull(self, sqlfile, server, local=True):
         p = self.config.project()
@@ -85,7 +94,9 @@ class DB:
         else:
             cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
         cmd = ' '.join(cmd.split())
+        self.run_pull_cmd(cmd, sqlfile, local)
 
+    def run_pull_cmd(self, cmd, sqlfile, local):
         sink_db_pull = 'SINK_DB_PULL'
         os.environ[sink_db_pull] = ''
         if not self.quiet:
@@ -93,11 +104,12 @@ class DB:
         if self.real:
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
 
+            lando_file = Path(f'{sqlfile}.gz')
             error_msg = result.stderr.decode("utf-8")
             if error_msg:
                 click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
                 ui.error(f'\n{error_msg}')
-            elif local and sqlfile.exists():
+            elif local and (sqlfile.exists() or lando_file.exists()):
                 filename = str(sqlfile.absolute())
                 click.secho(filename, fg=Color.GREEN.value)
                 if not self.quiet:
@@ -233,5 +245,5 @@ class DB:
         now = now.strftime('%y-%m-%d_%H-%M-%S')
         tag = f'-{tag}' if tag else ''
         name = f'{dbname}-{id}-{now}{tag}.sql.gz'
-        p = Path(dirname, name).absolute().resolve()
+        p = Path(dirname, name)#.absolute().resolve()
         return p

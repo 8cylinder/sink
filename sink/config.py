@@ -95,6 +95,7 @@ class Configuration:
         'exclude': [],
     }
     default_server = {
+        'type': None,
         'name': None,
         'note': None,
         'root': None,
@@ -224,6 +225,7 @@ class Configuration:
             ui.error('Root is a required setting in project')
 
         # db pulls dir
+        p['pulls_dir_original'] = p['pulls_dir']
         pulls_dir = p['pulls_dir']
         if pulls_dir:
             pulls_dir = Path(self.project_root, pulls_dir)
