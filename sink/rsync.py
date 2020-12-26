@@ -28,6 +28,7 @@ class Transfer:
         self.dryrun = '' if real else '--dry-run'
         # self.config = Config(suppress_config_location=quiet)  # fixme
         self.config = config
+        self.prj = config.project()
         self.quiet = quiet
         self.silent = silent
         self.multiple = False
@@ -114,7 +115,11 @@ class Transfer:
                 tmp_file_fixed = diffdir
 
             if difftool:
-                cmd = f"meld '{tmp_file_fixed}' '{local_file}'"
+                gui = self.prj.difftool
+                if gui:
+                    cmd = gui.format(remote=f'"{tmp_file_fixed}"', local=f'"{local_file}"')
+                else:
+                    ui.error('No difftool program defined in sink.yaml')
             else:
                 flags = []
                 if ignore:

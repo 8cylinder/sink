@@ -79,6 +79,13 @@ class Dict2obj:
             if not k.startswith("__"):
                 yield k, v
 
+    def __repr__(self):
+        return 'Dict2obj()'
+
+    def __str__(self):
+        from pprint import pprint
+        pprint(self.__dict__)
+
 
 class Configuration:
     config_file = 'sink.yaml'
@@ -92,6 +99,7 @@ class Configuration:
         'log_dir': None,
         'rsync_binary': None,
         'note': None,
+        'difftool': None,
         'exclude': [],
     }
     default_server = {

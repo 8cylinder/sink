@@ -25,6 +25,9 @@ class Init:
             rsync_binary:
               osx:
               linux:
+            # specify a gui diff tool to use.  Use {local} and {remote} for the arguments.
+            # eg: meld {local} {remote}
+            difftool: meld {local} {remote}
             # these files will be excluded from any dir syncing:
             exclude:
               - .git
