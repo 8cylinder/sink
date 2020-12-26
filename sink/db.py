@@ -157,9 +157,18 @@ class DB:
 
     def put(self, server, sqlfile):
         s = self.config.server(server)
+        self.server = s
         db = Dict2obj(**s.mysql[0])
         sql = Path(sqlfile)
-        self._put(server, sql)
+        if s.type == 'lando':
+            self._put_lando(sql)
+        else:
+            self._put(server, sql)
+
+    def _put_lando(self, sql):
+        cmd = f'''lando db-import {sql}'''
+        # print(cmd);exit()
+        self.run_put_cmd(cmd)
 
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
@@ -217,8 +226,11 @@ class DB:
         else:
             cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
                       "export MYSQL_PWD={db.password}; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
-        cmd = ' '.join(cmd.split())
+            cmd = ' '.join(cmd.split())
+        self.run_put_cmd(cmd)
 
+    def run_put_cmd(self, cmd):
+        s = self.server
         if self.real:
             doit = True
             if s.warn:
