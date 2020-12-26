@@ -3,6 +3,7 @@ import click
 import subprocess
 from pprint import pprint as pp
 from pathlib import Path
+from contextlib import contextmanager
 import datetime
 import tempfile
 import gzip
@@ -15,17 +16,14 @@ from sink.ui import Color
 from sink.ui import ui
 
 
-class cd:
-    """Context manager for changing the current working directory"""
-    def __init__(self, newPath):
-        self.newPath = os.path.expanduser(newPath)
-
-    def __enter__(self):
-        self.savedPath = os.getcwd()
-        os.chdir(self.newPath)
-
-    def __exit__(self, etype, value, traceback):
-        os.chdir(self.savedPath)
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
 
 
 class DB:
