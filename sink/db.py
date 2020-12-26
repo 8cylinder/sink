@@ -14,6 +14,20 @@ from sink.config import Dict2obj
 from sink.ui import Color
 from sink.ui import ui
 
+
+class cd:
+    """Context manager for changing the current working directory"""
+    def __init__(self, newPath):
+        self.newPath = os.path.expanduser(newPath)
+
+    def __enter__(self):
+        self.savedPath = os.getcwd()
+        os.chdir(self.newPath)
+
+    def __exit__(self, etype, value, traceback):
+        os.chdir(self.savedPath)
+
+
 class DB:
     def __init__(self, real, verbose=False, quiet=False):
         self.verbose = True if verbose else False
@@ -29,6 +43,7 @@ class DB:
     def pull(self, server, tag=None):
         p = self.config.project()
         s = self.config.server(server)
+        self.server = s
         db = Dict2obj(**s.mysql[0])
         sqlfile = self._dest(p.name, db.db, p.pulls_dir_original, s.name, tag=tag)
 
@@ -120,6 +135,21 @@ class DB:
         else:
             if not self.quiet:
                 ui.display_success(self.real)
+
+        if not self.dryrun:
+            if sqlfile.exists():
+                self.make_symlink(sqlfile)
+            elif lando_file.exists():
+                self.make_symlink(lando_file)
+
+    def make_symlink(self, sqlfile):
+        link_name = Path(f'LATEST-{self.server.name}.sql.gz')
+        with cd(sqlfile.parent):
+            try:
+                link_name.unlink()
+            except FileNotFoundError:
+                pass  # its ok, the latest file is not there.
+            link_name.symlink_to(f'./{sqlfile.name}')
 
     def load_remote(self, source, server):
         source = Path(source)
