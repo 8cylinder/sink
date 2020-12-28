@@ -31,6 +31,8 @@ from sink.actions import Actions
 def get_servers(ctx, args, incomplete):
     config.load_config()
     servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
+    if not servers:
+        ui.error('no servers defined (you are probably not in a project)')
     return servers
 
 

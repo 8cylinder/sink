@@ -284,6 +284,6 @@ class DB:
         now = datetime.datetime.now()
         now = now.strftime('%y-%m-%d_%H-%M-%S')
         tag = f'-{tag}' if tag else ''
-        name = f'{dbname}-{id}-{now}{tag}.sql.gz'
+        name = f'{project_name}-{id}-{now}{tag}.sql.gz'
         p = Path(dirname, name)#.absolute().resolve()
         return p
