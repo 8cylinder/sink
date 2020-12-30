@@ -4,26 +4,12 @@
 
 * Todo
 
-** Now [4/12]
-*** TO-DO Allow server specific exclusions
+** Now [10/16]
+*** COMPLETE With 'single' make sure the correct rsync is being used
+CLOSED: [2020-11-08 Sun 18:56]
 
-*** TO-DO allow multiple files for file uploads
-Allow multiple args for file arg in file put/pull.
-
-*** DONT-DO Ability to send db or files to multiple servers at same time
-CLOSED: [2020-07-24 Fri 13:27]
-Don't do, limited use case for a lot of work, and a potentially
-destructive command.
-: sink db put stag:prod:dev <file>
-: sink file put stag:prod:dev <path>
-
-*** TO-DO sink view -e should validate
-    When editing config, make temp version of config and validate
-    yaml after saving.
-
-*** TO-DO With 'single' make sure the correct rsync is being used
-
-*** TO-DO When using =single= ignore the "ask overwrite" yaml settings
+*** COMPLETE When using =single= ignore the "ask overwrite" yaml settings
+CLOSED: [2020-11-08 Sun 18:56]
 
 *** TO-DO Quiet/silent flags
 - quiet: output "Succcess", server and base filename
@@ -37,6 +23,41 @@ destructive command.
 -q --no-command, -qq --no-output, -qqq both?
 --silent -s, for both?
 
+*** TO-DO Success messages
+- file upload/download :: [Success] SERVER: upload complete
+- db put/pull :: [Success] SERVER: sql upload complete
+- single :: [Success] SERVER: <file path>
+- action ?
+
+*** DONT-DO allow multiple files for file uploads
+CLOSED: [2020-11-07 Sat 12:28]
+Allow multiple args for file arg in file put/pull.
+
+Rsync doesn't allow multiple files to be sent to multiple
+destinations, which is what would be needed for this to work with a
+single instance of rsync.
+
+Instead use the shell for this:
+#+BEGIN_SRC bash
+for f in $(find -path '*some*criteria*php'); do
+    sink file put vagrant $f;
+done
+#+END_SRC
+
+*** COMPLETE Allow server specific exclusions
+CLOSED: [2020-11-07 Sat 11:51]
+*** DONT-DO Ability to send db or files to multiple servers at same time
+CLOSED: [2020-07-24 Fri 13:27]
+Don't do, limited use case for a lot of work, and a potentially
+destructive command.
+: sink db put stag:prod:dev <file>
+: sink file put stag:prod:dev <path>
+
+*** COMPLETE sink view -e should validate
+CLOSED: [2020-11-08 Sun 13:00]
+    When editing config, make temp version of config and validate
+    yaml after saving.
+
 *** COMPLETE check file path validity before passing to rsync
 CLOSED: [2020-07-19 Sun 20:10]
 
@@ -46,13 +67,8 @@ CLOSED: [2020-07-19 Sun 20:19]
 *** COMPLETE when ssh, cd to server root
 CLOSED: [2020-07-19 Sun 20:10]
 
-*** TODO Success messages
-- file upload/download :: [Success] SERVER: upload complete
-- db put/pull :: [Success] SERVER: sql upload complete
-- single :: [Success] SERVER: <file path>
-- action ?
-
-*** TO-DO error with sink info -e:
+*** COMPLETE error with sink info -e:
+CLOSED: [2020-11-08 Sun 13:02]
 #+begin_src bash
 sink info -e
 Traceback (most recent call last):
@@ -79,8 +95,21 @@ Traceback (most recent call last):
 TypeError: expected string or bytes-like object
 #+end_src
 
+*** TO-DO Put DEPLOY-INFO.yaml in site root
+We don't always have permisssion to put it the parent dir
 
-** Then [3/18]
+*** TO-DO Exclude DEPLOY-INFO.yaml when using normal file transfers
+
+*** TO-DO Deploy warnings unnecessarily occur multiple times
+For sites that have =warn: true=
+
+*** TO-DO Check more values
+- rsync_binary
+- pulls_dir
+- show warn & automatic status for each server
+
+
+** Then [7/22]
 *** TO-DO Diff one file/all servers
 sink diff 'all' path...= compare one file on all servers at one time?
 or download all and group by differences:
@@ -89,22 +118,32 @@ or download all and group by differences:
 [C] prod, mamp
 Compare LOCAL to [B, C]: ?
 
-*** TO-DO Use git diff & difftool settings
-1. =git diff --no-index <path> <path>=
-2. =git difftool --no-index <path> <path>=
+**** vimdiff
+#+BEGIN_SRC bash
+vimdiff fileA fileB ... -c TOhtml -c 'w! diff.html|qa!'
+#+END_SRC
 
-*** TO-DO DB put, use tab completion for filename
+*** COMPLETE Diff name temp dir with server name if possible
+CLOSED: [2020-12-26 Sat 12:20]
+*** COMPLETE Use git diff & difftool settings
+CLOSED: [2020-12-26 Sat 12:22]
+Define difftool in sink.yaml
 
 *** TO-DO progress bar
-
 **** TO-DO Add flag for pv in sink.yaml so it can be used from the server
 Try =mysqlpump= if it's on the server.  It has =--watch-progress=
 
 **** TO-DO Check for pv locally before using
 
-*** TO-DO When downloading db don't overwrite existing file
+*** DONT-DO When downloading db don't overwrite existing file
+CLOSED: [2020-12-26 Sat 12:27]
+
+_Not nessesary, the time is part if the filename._
+
 If the user is using a short date name for the db pull, and they pull
 more than once in one day, the filename will be the same.
+
+add time if file exists
 
 *** TO-DO Enable tab complete on osx
 Part of setup.py?
@@ -161,10 +200,17 @@ Maybe there is a return code from rsync to determine this.
 CLOSED: [2020-07-20 Mon 20:45]
 Using info from rsync's itemize-changes?
 
-*** DONT-DO sink diff multiple files
+*** COMPLETE sink diff multiple files
+CLOSED: [2020-12-26 Sat 12:24]
+
+*** DONT-DO DB put, use tab completion for filename
+CLOSED: [2020-11-21 Sat 14:35]
++Get list of files in the db dir+
+
+The command line completion is fine.
 
 *** TO-DO Test/run setup.py
-
+- investigate flit :: https://flit.readthedocs.io/en/latest/index.html
 *** MAYBE Pre pull before put
 A list of files to to pull before putting files.  The usecase is for
 something like craft's project config (project.yaml), where you want
@@ -175,3 +221,35 @@ definition of the database.
 Add the ability to run local actions as well as remote ones.  Would be
 best if yaml values could be used in the command.  If not, probably
 not worth it.
+
+*** MAYBE Local deploy
+Do a local deploy to a dist dir with rsync --link-dest to create a dir
+with numbered/dated hardlinked dirs.
+
+Settings:
+- dist dir
+- deploy dir
+
+Steps:
+1. dist dir
+   A dist dir is a clean deployable version of the working tree. Use
+   some script with npm/webpack/bash to create it
+2. =rsync --link-dest dist/ deploy/deploy-2020-10-15=
+3. Add a tag to the file name?
+   =deploy/deploy-2020-10-15--BUG-FIX-FOR-A-THING=
+4. Add a tag/info/description file?
+   Get the tag info from git's tags?
+   Require dist to come from a git commit that is tagged?
+5. DB snapshot
+   Automaticaly take snapshot of the server's db?
+   Ask user if they have taken a snapshot?
+
+#+BEGIN_SRC bash
+sink deploy  # use most recent?
+sink deploy rollback  # second last?
+sink deploy 2020-10-15
+sink deploy clean  # rsync --delete?
+#+END_SRC
+
+*** TO-DO Allow multiple ssh accounts
+Make the same as db, check each one, but only use the first one for actions
