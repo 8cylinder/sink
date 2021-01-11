@@ -138,7 +138,7 @@ class Transfer:
 
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             result = subprocess.run(cmd, shell=True)
-            if result.returncode == 0:
+            if not difftool and result.returncode == 0:
                 click.echo('Files are the same.')
 
     def locations(self, server, filename, ignore=False, difftool=False):

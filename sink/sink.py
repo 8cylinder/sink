@@ -115,7 +115,7 @@ def database(db_action, sql_gz, server, real, quiet, tag):
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
 @click.argument('server', autocompletion=get_servers)
-@click.argument('filename', type=click.Path(), required=True)
+@click.argument('filename', type=click.Path(), required=False)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
               help='Reduced output, for use in Emacs.')
@@ -131,11 +131,16 @@ def files(action, filename, server, real, silent, extra_flags):
     SERVER: server name, if not specified sink will use the default server.
     FILENAME: file/dir to be transfered."""
 
-    if action == Action.PUT.value and not os.path.exists(filename):
+    if filename and action == Action.PUT.value and not os.path.exists(filename):
         ui.error(f'Path does not exist: {filename}')
 
     config.load_config()
-    f = Path(os.path.abspath(filename))
+    if filename:
+        f = Path(os.path.abspath(filename))
+    else:
+        prj = config.project()
+        f = Path(prj.root)
+
     xfer = Transfer(real, silent=silent)
     extra_flags = '' if not extra_flags else extra_flags
 
