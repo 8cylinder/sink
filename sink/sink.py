@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import click
 # noinspection PyUnresolvedReferences
 from pprint import pprint as pp
 from pathlib import Path
@@ -8,6 +7,7 @@ import datetime
 from collections import OrderedDict
 import yaml
 from enum import Enum
+import click
 
 from sink.config import config
 from sink.config import Color
@@ -31,8 +31,8 @@ from sink.actions import Actions
 def get_servers(ctx, args, incomplete):
     config.load_config()
     servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
-    if not servers:
-        ui.error('no servers defined (you are probably not in a project)')
+    # if not servers:
+    #     ui.error('no servers defined (you are probably not in a project)')
     return servers
 
 
@@ -181,7 +181,7 @@ def ssh(server, dry_run):
 
 @sink.command('diff', context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
-@click.argument('filename', type=click.Path(exists=True), required=True)
+@click.argument('filename', type=click.Path(exists=True), required=False)
 @click.option('--ignore-whitespace', '-i', is_flag=True,
               help='Ignore whitespace in diff.')
 @click.option('--difftool', '-d', is_flag=True,
@@ -197,6 +197,9 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
 
     config.load_config()
 
+    if not filename:
+        prj = config.project()
+        filename = Path(prj.root)
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(True)
     xfer.diff(fx, server, ignore=ignore_whitespace,

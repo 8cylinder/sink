@@ -101,8 +101,9 @@ class Transfer:
 
     def diff(self, local_file, server, ignore=False, word_diff=None, difftool=False):
         local_file = Path(local_file)
-        if(local_file.is_dir()):
+        if local_file.is_dir():
             self.multiple = True
+            # difftool = True
         with tempfile.TemporaryDirectory(suffix=f' [{server}]') as diffdir:
             tmp_file = f'{diffdir}/{local_file.name}'
             locations = self.locations(server, local_file)
@@ -165,6 +166,8 @@ class Transfer:
         if s.ssh.key:
             identity = f'--rsh="ssh -i {s.ssh.key}"'
 
+        included = f'--include=".env.{s.name}"'
+
         excluded = ''
         recursive = ''
         if self.multiple:
@@ -199,7 +202,7 @@ class Transfer:
         # --no-perms --no-owner --no-group --no-times --ignore-times
         # flags = ['--verbose', '--compress', '--checksum', '--recursive']
         cmd = f'''{rsyncb} {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
-                  --links --compress --checksum {recursive} {excluded}'''
+                  --links --compress --checksum {recursive} {included} {excluded}'''
 
         if action == Action.PUT:
             cmd = f'''{cmd} '{localf}' {s.ssh.username}@{s.ssh.server}:{remotef}'''
