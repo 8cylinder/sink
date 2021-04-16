@@ -52,7 +52,8 @@ class DB:
             self._pull(sqlfile, server, local=True)
 
     def _pull_lando(self, sqlfile):
-        cmd = f'''lando db-export {sqlfile}'''
+        # suppress sterr since lando outputs update messages there
+        cmd = f'''lando db-export {sqlfile} 2>/dev/null'''
         self.run_pull_cmd(cmd, sqlfile, True)
 
     def _pull(self, sqlfile, server, local=True):
@@ -164,7 +165,7 @@ class DB:
             self._put(server, sql)
 
     def _put_lando(self, sql):
-        cmd = f'''lando db-import {sql}'''
+        cmd = f'''lando db-import {sql} 2>/dev/null'''
         # print(cmd);exit()
         self.run_put_cmd(cmd)
 

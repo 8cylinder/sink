@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import os
 import glob
+import re
 
 from sink.config import config
 from sink.ui import Color
@@ -79,17 +80,40 @@ class Transfer:
             flag = f'--link-dest={last.absolute()}'
         return flag
 
+    def find(self, name, path):
+        for root, dirs, files in os.walk(path):
+            if name in files:
+                return Path(root, name)
+                # return os.path.join(root, name)
+
     def local(self, server_name, source, dest):
         p = self.config.project()
         server = self.config.server(server_name)
         rsyncb = p.rsync_binary
         excluded = self.config.excluded(server_name)
 
+        included_list = [
+            f'.env.{server.name}',
+            f'robots.txt.{server.name}',
+            f'.htaccess.{server.name}',
+        ]
+        included = ' '.join([f'--include="{i}"' for i in included_list])
+
         hard_link_flag = self.hard_link_flag(dest, server_name)
 
-        cmd = f'{rsyncb} --archive --verbose {hard_link_flag} {self.dryrun} {excluded} {source}/ {dest}'
+        cmd = f'{rsyncb} --archive --verbose {hard_link_flag} {self.dryrun} {included} {excluded} {source}/ {dest}'
 
         self.run(cmd, single=False, action=Action.PUT, server=server, remotef=dest, localf=source)
+
+        # make symlinks to included files or rename them by droping the .server
+        if not self.dryrun:
+            for f in included_list:
+                conf_file = self.find(f, dest)
+                base_name = re.sub(f'\.{server.name}$', '', str(conf_file))
+                base_name = Path(base_name)
+                base_name.symlink_to(conf_file.name)
+                print(f'Symlink created to {conf_file.name} from {base_name}')
+
 
     def diff_multiple_servers(self, local_file, servers):
         # for server in servers:
@@ -166,7 +190,12 @@ class Transfer:
         if s.ssh.key:
             identity = f'--rsh="ssh -i {s.ssh.key}"'
 
-        included = f'--include=".env.{s.name}"'
+        included = [
+            f'.env.{s.name}',
+            f'robots.txt.{s.name}',
+            f'.htaccess.{s.name}',
+        ]
+        included = ' '.join([f'--include="{i}"' for i in included])
 
         excluded = ''
         recursive = ''

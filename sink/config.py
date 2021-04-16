@@ -241,6 +241,8 @@ class Configuration:
             # pulls_dir = pulls_dir
             if not pulls_dir.exists():
                 ui.error(f'DB pull dir does not exist: {pulls_dir}')
+        else:
+            ui.warn('pulls dir not set')
         p['pulls_dir'] = pulls_dir
 
         # rsync binary

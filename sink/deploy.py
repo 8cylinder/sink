@@ -401,7 +401,9 @@ class DeployViaLocal:
             choices[letter] = data
 
         if not choices:
-            ui.error(f'No valid deploys for this server: {server_name}')
+            ui.error(f'No valid deploys created yet for this server ({server_name}). Run `sink deploy new server`')
+        if not current:
+            ui.warn(f'No deploys on the server ({server_name}). This is OK if it\'s the first deploy.')
 
         click.echo()
         click.echo(f'The {pointer_pretty} indicates the currently deployed version.')
