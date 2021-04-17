@@ -97,7 +97,7 @@ class DB:
 
         cmd = [
             f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
-            f'''export MYSQL_PWD={db.password}; {mysqldump} {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines {db.db}''',
+            f'''export MYSQL_PWD={db.password}; {mysqldump} {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines --no-tablespaces {db.db}''',
             f'''| gzip -c > "{sqlfile}"'''
         ]
 
