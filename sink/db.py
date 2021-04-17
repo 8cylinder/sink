@@ -43,7 +43,12 @@ class DB:
         s = self.config.server(server)
         self.server = s
         db = Dict2obj(**s.mysql[0])
-        sqlfile = self._dest(p.name, db.db, p.pulls_dir_original, s.name, tag=tag)
+
+        here = os.path.abspath(os.path.curdir)
+        there = config.project_root
+        relative = os.path.relpath(there, here)
+        dest_dir = os.path.join(relative, p.pulls_dir_original)
+        sqlfile = self._dest(p.name, db.db, dest_dir, s.name, tag=tag)
 
         if s.type == 'lando':
             sqlfile = Path(str(sqlfile)[:-3])
