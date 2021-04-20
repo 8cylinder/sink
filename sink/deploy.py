@@ -276,6 +276,10 @@ class DeployViaLocal:
                 dist.mkdir()
             except FileNotFoundError:
                 ui.error(f'Cannot create {dist}')
+
+            rclone = dist / 'IGNORE-RCLONE'
+            open(rclone, 'a').close()
+
         else:
             ui.warn(f'"{dist}" already exists')
 
