@@ -109,10 +109,11 @@ class Transfer:
         if not self.dryrun:
             for f in included_list:
                 conf_file = self.find(f, dest)
-                base_name = re.sub(f'\.{server.name}$', '', str(conf_file))
-                base_name = Path(base_name)
-                base_name.symlink_to(conf_file.name)
-                print(f'Symlink created to {conf_file.name} from {base_name}')
+                if conf_file:
+                    base_name = re.sub(f'\.{server.name}$', '', str(conf_file))
+                    base_name = Path(base_name)
+                    base_name.symlink_to(conf_file.name)
+                    print(f'Symlink created to {conf_file.name} from {base_name}')
 
 
     def diff_multiple_servers(self, local_file, servers):
