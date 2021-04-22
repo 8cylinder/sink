@@ -388,6 +388,8 @@ class DeployViaLocal:
         counter = 0
         for d in dirs:
             d = Path(self.DIST_HOME, d)
+            if not d.is_dir():
+                continue
             deploy_yaml = d / self.INFO_FILE
             data = None
             try:
