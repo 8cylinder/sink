@@ -10,6 +10,7 @@ class Applications:
             'mysql': self._mysql,
             'filezilla': self._filezilla,
             'nautilus': self._nautilus,
+            'dbeaver': self._dbeaver,
         }
         self.app = None
 
@@ -86,3 +87,29 @@ class Applications:
             connection = f'sftp://{s.ssh.username}@{s.ssh.server}/{s.root}'
             out.append(connection)
         return '\n'.join(out)
+
+    def _dbeaver(self):
+        out = []
+        p = self.config.project()
+        for s in self.config.servers():
+            for db in self.config.dbs(s.mysql):
+                connection = []
+                title = '--'.join([i for i in [p.name, s.servername, db.db] if i])
+                'Server Host'
+                'Database'
+                'Username'
+                'Password'
+                connection.append(['Connection Name', f'{title}'])
+                connection.append([click.style('Main tab', fg='yellow', bold=True, underline=True), ''])
+                connection.append(['Server Host', db.hostname])
+                connection.append(['Port', db.port])
+                connection.append(['Database', db.db])
+                connection.append(['Username', db.username])
+                connection.append(['Password', db.password])
+                connection.append([click.style('SSH tab', fg='yellow', bold=True, underline=True), ''])
+                connection.append(['Host/IP', s.ssh.server])
+                connection.append(['User Name', s.ssh.username])
+                connection.append(['Password', s.ssh.password])
+                connection.append(['Private Key', s.ssh.key])
+                out.append(connection)
+        return self.pretify(out)
