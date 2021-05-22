@@ -1,10 +1,12 @@
 
 #+TITLE: Sink Todo
 
+the show about the show
+line of duty
 
 * Todo
 
-** Now [10/16]
+** Now [10/17]
 *** COMPLETE With 'single' make sure the correct rsync is being used
 CLOSED: [2020-11-08 Sun 18:56]
 
@@ -107,9 +109,30 @@ For sites that have =warn: true=
 - rsync_binary
 - pulls_dir
 - show warn & automatic status for each server
+*** TO-DO New command: build-vm
+Build a vagrant vm to get a project running quickly.
+: sink build-vm
+- download boss
+- download Vagrantfile
+- Customize Vagrantfile variables
 
 
-** Then [7/22]
+- Info needed
+  - Vagrantfile
+    - title - tcrc
+    - ip address - 192.168.56.184
+    - host name - tcrc.local
+    - mount point - ./server
+  - Boss
+
+
+** Then [7/24]
+*** TO-DO [#A] Use plumbum for shell commands
+https://github.com/tomerfiliba/plumbum
+*** TO-DO [#A] Set up virtualenv
+
+*** TO-DO [#A] Test/run setup.py
+- investigate flit :: https://flit.readthedocs.io/en/latest/index.html
 *** TO-DO Diff one file/all servers
 sink diff 'all' path...= compare one file on all servers at one time?
 or download all and group by differences:
@@ -208,9 +231,6 @@ CLOSED: [2020-11-21 Sat 14:35]
 +Get list of files in the db dir+
 
 The command line completion is fine.
-
-*** TO-DO Test/run setup.py
-- investigate flit :: https://flit.readthedocs.io/en/latest/index.html
 *** MAYBE Pre pull before put
 A list of files to to pull before putting files.  The usecase is for
 something like craft's project config (project.yaml), where you want

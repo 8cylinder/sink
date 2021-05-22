@@ -34,6 +34,7 @@ class Vagrant:
           1. configure .env, .htaccess
           2. vagrant up
           3. sink db put {server.name} <path/to/file.sql.gz>
+          4. npm install, grunt, webpack etc...
         ''')
 
     def vagrantfile(self, server, hostname, ip):
