@@ -18,7 +18,7 @@ if sys.version_info.major == 2 or (sys.version_info.major == 3 and sys.version_i
 long_description = """Sink is a command line tool that helps with common tasks for websites."""
 
 setup(
-    name='sink',
+    name='sink-dev-tool',
     packages=[
         'sink'
     ],
@@ -30,7 +30,7 @@ setup(
         sink=sink.sink:sink
     ''',
     install_requires=[
-        'click', 'PyYAML'
+        'click', 'PyYAML', 'coolname',
     ],
     version=version,
     description=long_description,
