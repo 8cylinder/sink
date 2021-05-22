@@ -20,6 +20,11 @@ class Color(Enum):
 
 class ui:
     @staticmethod
+    def msg(msg):
+        msg = [i.strip() for i in msg.split('\n')]
+        click.echo('\n'.join(msg))
+
+    @staticmethod
     def notice(msg):
         w = click.style('Notice:', bold=True, fg=Color.BLUE.value)
         m = click.style(msg, fg=Color.BLUE.value, reset=True)

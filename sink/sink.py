@@ -23,6 +23,7 @@ from sink.deploy import DeployViaSymlink
 from sink.deploy import DeployViaRename
 from sink.deploy import DeployViaLocal
 from sink.actions import Actions
+from sink.vm import Vagrant
 
 
 # from IPython import embed
@@ -304,6 +305,23 @@ def action(server, action_name, real):
     else:
         actions.list_actions()
 
+
+# --------------------------------- VM --------------------------------
+@sink.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server', autocompletion=get_servers)
+@click.argument('hostname')
+@click.argument('ip')
+def vm(server, hostname, ip):
+    """Initialize a vagrant vm.
+
+    The SERVER is the server in sink.yaml you want the vm for.
+
+    Add a HOSTNAME and IP in /etc/hosts and specify the same here.
+    """
+    config.load_config()
+    print('doing vm stuff')
+    vm = Vagrant()
+    vm.create(server, hostname, ip)
 
 # ------------------------------- Deploy ------------------------------
 
