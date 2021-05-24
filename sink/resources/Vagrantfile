@@ -17,21 +17,21 @@ Vagrant.configure("2") do |config|
   config.disksize.size = '50GB'
 
   config.vm.provision :shell,
-                      path: "./boss",
-                      args: [
-                        "install",
-                        project_hostname,
-                        "phpmyadmin",
-                        "cert",
-                        "lamp",
-                        "composer",
-                        "virtualhost",
-                        "craft3",
-                        "fakesmtp",
-                        "--db-name=#{project_dbname}",
-                        "--db-root-pass=#{project_dbpass}",
-                        "--site-name-and-root=#{project_hostname},public_html,n",
-                      ]
+    path: "./boss",
+    args: [
+      "install",
+      project_hostname,
+      "phpmyadmin",
+      "cert",
+      "lamp",
+      "composer",
+      "virtualhost",
+      "craft3",
+      "fakesmtp",
+      "--db-name=" + project_dbname,
+      "--db-root-pass=" + project_dbpass,
+      "--site-name-and-root=" + project_hostname + ",public_html,n",
+    ]
 
   config.vm.define project_title do |sink| end
 

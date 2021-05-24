@@ -48,13 +48,27 @@ class Vagrant:
         except FileNotFoundError:
             ui.error(f'Vagrantfile template not found: {template}')
 
+        if not self.project.name:
+            ui.error('Project has no name')
+
+        try:
+            dbuser = server.mysql[0]['username']
+            dbpass = server.mysql[0]['password']
+        except IndexError:
+            ui.error('Mysql settings do not exist')
+        except KeyError:
+            ui.error('Mysql username or password key does not exist')
+
+        if not dbuser or not dbpass:
+            ui.error('Site db username or password is not set')
+
         vagrantfile = vagrantfile.format(
             project_title=self.project.name,
             project_ip=ip,
             project_hostname=hostname,
             project_mountpoint=self.project.root,
-            project_dbname=server.mysql[0]['username'],
-            project_dbpass=server.mysql[0]['password'],
+            project_dbname=dbuser,
+            project_dbpass=dbpass,
         )
 
         try:
