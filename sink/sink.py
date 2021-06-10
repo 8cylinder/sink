@@ -317,6 +317,18 @@ def vm(server, hostname, ip):
     The SERVER is the server in sink.yaml you want the vm for.
 
     Add a HOSTNAME and IP in /etc/hosts and specify the same here.
+
+    \b
+    Checklist:
+      - Create sink.yaml
+      - Add ip & domain name to /etc/hosts
+      - Add boss to project root
+      - Create .env
+      - Create .htaccess
+      - Run `sink vm <server> <hostname> <ip>`
+      - Run `vagrant up`
+      - Run `sink db put <sqlfile.sql.gz>`
+      - In vagrant vm, remove 000-default.conf & delete /var/www/html
     """
     config.load_config()
     print('doing vm stuff')

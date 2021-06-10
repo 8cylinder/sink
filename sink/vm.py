@@ -78,3 +78,19 @@ class Vagrant:
             ui.error(f'could not write Vagrantfile')
 
         ui.notice(f'Vagrantfile created: {dest}')
+
+    def build_boss(self):
+        """
+        1. make temp dir
+        2. checkout boss there
+        3. run build
+        4. copy boss to project root
+        """
+        pass
+
+    def run_init_setup(self, file):
+        """
+        1. find script
+        2. run it
+        """
+        pass
