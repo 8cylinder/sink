@@ -53,7 +53,7 @@ class Vagrant:
             project_ip=ip,
             project_hostname=hostname,
             project_mountpoint=self.project.root,
-            project_dbname=server.mysql[0]['username'],
+            project_dbname=server.mysql[0]['db'],
             project_dbpass=server.mysql[0]['password'],
         )
 
