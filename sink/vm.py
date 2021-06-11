@@ -48,13 +48,28 @@ class Vagrant:
         except FileNotFoundError:
             ui.error(f'Vagrantfile template not found: {template}')
 
+        if not self.project.name:
+            ui.error('Project has no name')
+
+        try:
+            dbuser = server.mysql[0]['username']
+            dbpass = server.mysql[0]['password']
+            dbname = server.mysql[0]['db']
+        except IndexError:
+            ui.error('Mysql settings do not exist')
+        except KeyError:
+            ui.error('Mysql username or password key does not exist')
+
+        if not dbuser or not dbpass:
+            ui.error('Site db username or password is not set')
+
         vagrantfile = vagrantfile.format(
             project_title=self.project.name,
             project_ip=ip,
             project_hostname=hostname,
             project_mountpoint=self.project.root,
-            project_dbname=server.mysql[0]['db'],
-            project_dbpass=server.mysql[0]['password'],
+            project_dbname=dbname,
+            project_dbpass=dbpass,
         )
 
         try:
@@ -64,3 +79,19 @@ class Vagrant:
             ui.error(f'could not write Vagrantfile')
 
         ui.notice(f'Vagrantfile created: {dest}')
+
+    def build_boss(self):
+        """
+        1. make temp dir
+        2. checkout boss there
+        3. run build
+        4. copy boss to project root
+        """
+        pass
+
+    def run_init_setup(self, file):
+        """
+        1. find script
+        2. run it
+        """
+        pass
