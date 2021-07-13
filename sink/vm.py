@@ -95,3 +95,20 @@ class Vagrant:
         2. run it
         """
         pass
+
+    def checklist(self):
+
+        # look for ip in /etc/hosts
+        self.check_hosts()
+
+        # look for boss
+        self.find_boss()
+
+        # look for .env .htaccess
+        self.find_configs()
+
+        # look for ssh, db info
+        self.check_sink_conf(server)
+
+        # vagrantfile
+        self.check_vagrantfile()
