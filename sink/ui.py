@@ -31,10 +31,10 @@ class ui:
         click.echo(f'{w} {m}', err=True)
 
     @staticmethod
-    def warn(msg):
+    def warn(msg, indent=''):
         w = click.style('Warning:', bold=True, fg=Color.YELLOW.value)
         m = click.style(msg, fg=Color.YELLOW.value, reset=True)
-        click.echo(f'{w} {m}', err=True)
+        click.echo(f'{indent}{w} {m}', err=True)
 
     @staticmethod
     def error(msg, exit=True, indent=0):

@@ -17,7 +17,7 @@ from sink.ui import ui
 class TestConfig:
     good = click.style('[\u2713]', fg=Color.GREEN.value)
     bad = click.style('[X]', fg=Color.RED.value)
-    timeout = 20
+    timeout = 100
 
     def __init__(self):
         self.config = config
@@ -56,7 +56,8 @@ class TestConfig:
                 if s.servername not in server_names:
                     continue
             try:
-                click.secho(f'{s.servername}', fg=Color.GREEN.value)
+                click.echo()
+                click.secho(f'{s.servername}', fg=Color.GREEN.value, bold=True, underline=True)
             except AttributeError:
                 pass
 
@@ -66,7 +67,6 @@ class TestConfig:
             key = ''
             if s.ssh.key:
                 key = f' -i "{s.ssh.key}"'
-
             # ssh login
             try:
                 s.ssh.username
@@ -75,7 +75,9 @@ class TestConfig:
             except AttributeError:
                 ui.error(f'ssh values are wrong in {s.servername}')
             if not s.ssh.username or not s.ssh.server:
-                ui.warn('missing values for ssh.')
+                ui.warn('missing values for ssh.', indent='  ')
+                continue
+
             cmd = 'exit'
             good = 'ssh login good.'
             bad = f'ssh login failed for "{user}@{url}".'
@@ -141,10 +143,12 @@ class TestConfig:
 
     def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=''):
 
-        cmd = f'''ssh {port} -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
+        cmd = f'''ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
         # print(cmd)
         # exit()
         result = self.run_cmd(cmd, good, bad)
+        if not result:
+            print('        You might need to run ssh command outside of sink to add to known_hosts: sink ssh <server> -d')
         return result
 
     def run_cmd(self, cmd, good, bad):
