@@ -10,7 +10,7 @@ project_dbpass = "{project_dbpass}"
 
 Vagrant.configure("2") do |config|
 
-  config.vm.box = "ubuntu/bionic64"
+  config.vm.box = "ubuntu/focal64"
 
   # install plugin to set disk size on build
   # vagrant plugin install vagrant-disksize
@@ -32,6 +32,9 @@ Vagrant.configure("2") do |config|
       "--db-root-pass=" + project_dbpass,
       "--site-name-and-root=" + project_hostname + ",public_html,n",
     ]
+  # If you don't want to use the provisioner, run this command inside the vm instead.
+  #
+  # /project/boss install {project_hostname} phpmyadmin cert lamp composer virtualhost craft3 fakesmtp --db-name={project_dbname} --site-name-and-root={project_hostname},public_html,n -d
 
   config.vm.define project_title do |sink| end
 
