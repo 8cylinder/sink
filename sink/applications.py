@@ -1,6 +1,7 @@
 
 import click
 from sink.config import config
+# noinspection PyUnresolvedReferences
 from pprint import pprint as pp
 
 class Applications:

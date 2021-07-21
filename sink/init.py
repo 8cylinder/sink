@@ -7,7 +7,7 @@ class Init:
         self.server_names = names
 
     def create(self):
-        blank_config = '''
+        blank_config = f'''
           # -*- make-backup-files: nil; -*-
 
           project:
@@ -19,15 +19,15 @@ class Init:
             # the same structure on all the servers.  This can be an
             # absolute path or a relative path.  A relative path will be
             # relative to the location of this file.
-            root:
+            root: .
             # specify the rsync binary for each platform.  If not specified it
             # will use the default rsync.
             rsync_binary:
               osx:
               linux:
-            # specify a gui diff tool to use.  Use {local} and {remote} for the arguments.
-            # eg: meld {local} {remote}
-            difftool: meld {local} {remote}
+            # specify a gui diff tool to use.  Use {{local}} and {{remote}} for the arguments.
+            # eg: meld {{local}} {{remote}}
+            difftool: meld {{local}} {{remote}}
             # these files will be excluded from any dir syncing:
             exclude:
               - .git

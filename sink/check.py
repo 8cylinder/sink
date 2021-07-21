@@ -12,6 +12,7 @@ from sink.config import config
 from sink.config import Spinner
 from sink.ui import Color
 from sink.ui import ui
+from pathlib import Path
 
 
 class TestConfig:

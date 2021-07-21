@@ -14,6 +14,8 @@ import traceback
 
 from sink.ui import ui
 from sink.ui import Color
+# from sink.command import Command
+from sink.init import Init
 
 
 class Action(Enum):
@@ -159,14 +161,16 @@ class Configuration:
         self.suppress_commands = False
 
     def load_config(self, raise_err=False):
-        if not self.find_config(os.curdir):
+        config_exists = self.find_config(os.curdir)
+        if not config_exists:
             if raise_err:
                 # throw an error instead so that it can be trapped elsewhere.
                 raise FileNotFoundError()
-            ui.error('You are not in a project', exit=False)
-            click.echo('A sink.yaml file was not found in this or '
-                       'any directory above.')
-            sys.exit(1)
+            else:
+                ui.error('You are not in a project', exit=False)
+                click.echo('A sink.yaml file was not found in this or '
+                           'any directory above.')
+                sys.exit(1)
 
         try:
             with open(self.config_file) as f:
@@ -188,16 +192,22 @@ class Configuration:
             for servername in data['servers']:
                 data['servers'][servername]['servername'] = servername
         except KeyError:
-            pass  # no servers defined
+            ui.warn(f'Server not found: {servername}')
+            # pass  # no servers defined
+        except TypeError:
+            ui.warn('No servers defined in sink.yaml')
 
         self.data = data
-        self.o = Dict2obj(**data)
+        if data:
+            self.o = Dict2obj(**data)
+        else:
+            ui.error('sink.yaml appears to have no data')
 
     def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
         if cur == '/':
             return False
-        elif self.config_file in os.listdir(cur):
+        elif str(self.config_file) in os.listdir(cur):
             self.config_file = Path(cur, self.config_file)
             self.project_root = Path(cur)
             return True
@@ -241,8 +251,8 @@ class Configuration:
             # pulls_dir = pulls_dir
             if not pulls_dir.exists():
                 ui.error(f'DB pull dir does not exist: {pulls_dir}')
-        else:
-            ui.warn('pulls dir not set')
+        # else:
+        #     ui.warn('pulls dir not set')
         p['pulls_dir'] = pulls_dir
 
         # rsync binary

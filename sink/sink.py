@@ -307,11 +307,16 @@ def action(server, action_name, real):
 
 
 # --------------------------------- VM --------------------------------
-@sink.command(context_settings=CONTEXT_SETTINGS)
+@sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
+def vm():
+    """[Group] Setup a vm."""
+
+
+@vm.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
 @click.argument('hostname')
 @click.argument('ip')
-def vm(server, hostname, ip):
+def build(server, hostname, ip):
     """Initialize a vagrant vm.
 
     The SERVER is the server in sink.yaml you want the vm for.
@@ -331,9 +336,23 @@ def vm(server, hostname, ip):
       - In vagrant vm, remove 000-default.conf & delete /var/www/html
     """
     config.load_config()
-    print('doing vm stuff')
-    vm = Vagrant()
-    vm.create(server, hostname, ip)
+    vvm = Vagrant()
+    vvm.create(server, hostname, ip)
+
+
+@vm.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server', autocompletion=get_servers)
+@click.argument('hostname')
+@click.argument('ip')
+def check(server, hostname, ip):
+    """Check for requirments to create a vm.
+
+    Note that this will create a sink.yaml file in the current
+    dir if it doesn't exitst.
+    """
+    vvm = Vagrant()
+    vvm.check(server, hostname, ip)
+
 
 # ------------------------------- Deploy ------------------------------
 

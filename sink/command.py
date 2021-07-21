@@ -1,7 +1,11 @@
 import os
 import sys
 import subprocess
+# noinspection PyUnresolvedReferences
 from pprint import pprint as pp
+import plumbum
+from plumbum import local
+import shlex
 
 
 class Command:
@@ -14,6 +18,25 @@ class Command:
             cmd, shell=True,
             stderr=subprocess.PIPE)
         return result.decode('utf-8')
+
+    def runp(self, cmd):
+        cmd = shlex.split(cmd)
+        command = local[cmd[0]][cmd[1:]]
+        success = True
+        results = None
+
+        try:
+            results = command.run()
+        except plumbum.ProcessExecutionError:
+            success = False
+
+        try:
+            if not results[1]:
+                success = False
+        except TypeError:
+            success = False
+
+        return success
 
 
 class SSHCommand(Command):
