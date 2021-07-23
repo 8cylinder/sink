@@ -314,14 +314,14 @@ def vm():
 
 @vm.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
-@click.argument('hostname')
 @click.argument('ip')
+@click.argument('hostname')
 def build(server, hostname, ip):
     """Initialize a vagrant vm.
 
-    The SERVER is the server in sink.yaml you want the vm for.
+    The SERVER is the server defined in sink.yaml you want the vm for.
 
-    Add a HOSTNAME and IP in /etc/hosts and specify the same here.
+    Add an IP and HOSTNAME in /etc/hosts and specify the same here.
 
     \b
     Checklist:
@@ -337,21 +337,22 @@ def build(server, hostname, ip):
     """
     config.load_config()
     vvm = Vagrant()
-    vvm.create(server, hostname, ip)
+    vvm.create(server, ip, hostname)
 
 
 @vm.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
-@click.argument('hostname')
 @click.argument('ip')
+@click.argument('hostname')
 def check(server, hostname, ip):
     """Check for requirments to create a vm.
 
-    Note that this will create a sink.yaml file in the current
-    dir if it doesn't exitst.
+    The SERVER is the server defined in sink.yaml you want the vm for.
+
+    Add an IP and HOSTNAME in /etc/hosts and specify the same here.
     """
     vvm = Vagrant()
-    vvm.check(server, hostname, ip)
+    vvm.check(server, ip, hostname)
 
 
 # ------------------------------- Deploy ------------------------------

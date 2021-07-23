@@ -49,6 +49,9 @@ class Vagrant:
         template = f'{sink_dir}/resources/Vagrantfile'
         dest: str = os.path.join(os.path.abspath(os.path.curdir), 'Vagrantfile')
 
+        if not self.check_sink_yaml(server):
+            ui.error('There are problems with sink.yaml.  Run sink vm check for details.')
+
         try:
             with open(template, 'r') as f:
                 vagrantfile = f.read()
@@ -119,7 +122,7 @@ class Vagrant:
         # self.find_configs()
 
         # look for ssh, db info
-        self.check_sink_conf(servername)
+        self.check_sink_yaml(servername)
 
         self.render_messages(self.messages)
 
@@ -130,14 +133,15 @@ class Vagrant:
             msg = message['msg']
             success = message['success']
             note = message['note'] if 'note' in message else None
+            indent = message.get('indent', '')
             if success:
                 print(
-                    click.style('[✓]', bold=True, fg='green'),
+                    click.style(f'{indent}[✓]', bold=True, fg='green'),
                     click.style(msg, fg='green'),
                 )
             else:
                 print(
-                    click.style('[x]', bold=True, fg='red'),
+                    click.style(f'{indent}[x]', bold=True, fg='red'),
                     click.style(msg, fg='red'),
                 )
                 if note:
@@ -175,14 +179,14 @@ class Vagrant:
             self.messages.append({
                 'msg': 'boss not found',
                 'success': False,
-                'note': 'curl -s https://api.github.com/repos/8cylinder/boss/releases/latest | jq ".assets[0].browser_download_url" | xargs curl --output boss'
+                'note': f'curl -s {url} | jq ".assets[0].browser_download_url" | xargs curl -L --output boss && chmod +x boss',
             })
         return success
 
     def find_configs(self):
         pass
 
-    def check_sink_conf(self, servername):
+    def check_sink_yaml(self, servername):
         sink_yaml = self.config.find_config(os.curdir)
         success = True
         if not sink_yaml:
@@ -204,14 +208,16 @@ class Vagrant:
             for field in fields:
                 if db[field]:
                     self.messages.append({
-                        'msg': f'sink.yaml: mysql {field} found',
+                        'msg': f'mysql {field} found',
                         'success': True,
+                        'indent': '    ',
                     })
                 else:
                     success = False
                     self.messages.append({
-                        'msg': f'sync.yaml: mysql {field} not found',
+                        'msg': f'mysql {field} not found',
                         'success': False,
+                        'indent': '    ',
                     })
         return success
 
