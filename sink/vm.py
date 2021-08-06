@@ -28,8 +28,6 @@ class Vagrant:
 
         if not os.path.exists('boss'):
             ui.error('boss not found')
-        else:
-            ui.notice('boss found')
 
         if not os.path.exists('Vagrantfile'):
             self.vagrantfile(server, hostname, ip)
@@ -49,7 +47,7 @@ class Vagrant:
         template = f'{sink_dir}/resources/Vagrantfile'
         dest: str = os.path.join(os.path.abspath(os.path.curdir), 'Vagrantfile')
 
-        if not self.check_sink_yaml(server):
+        if not self.check_sink_yaml(server.name):
             ui.error('There are problems with sink.yaml.  Run sink vm check for details.')
 
         try:
