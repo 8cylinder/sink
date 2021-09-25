@@ -110,11 +110,15 @@ class Init:
                   admin_url:
                   username:
                   password:
+                  htusername:
+                  htpassword:
                   note: |
                 - url:
                   admin_url:
                   username:
                   password:
+                  htusername:
+                  htpassword:
                   note: |
               # Actions are any command that can be run on the server. Each command
               # must start with the command name and the command itself.
