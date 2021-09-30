@@ -99,7 +99,7 @@ class TestConfig:
                     host = ''
                     if db.hostname:
                         host = f'--host={db.hostname}'
-                    cmd = f'mysql --user={db.username} --password={db.password} {host} {db.db} --execute="exit";'
+                    cmd = f'mysql --user={db.username} --password="{db.password}" {host} {db.db} --execute="exit";'
                     good = f'DB({db.db}): mysql username, password and db are good.'
                     bad = f'DB({db.db}): mysql error.'
                     self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
@@ -144,7 +144,7 @@ class TestConfig:
 
     def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=''):
 
-        cmd = f'''ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} {cmd}'''
+        cmd = f'''ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} '{cmd}' '''
         # print(cmd)
         # exit()
         result = self.run_cmd(cmd, good, bad)
