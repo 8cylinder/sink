@@ -51,14 +51,22 @@ class DB:
         sqlfile = self._dest(p.name, db.db, dest_dir, s.name, tag=tag)
 
         if s.type == 'lando':
+            # lando adds the gz extension itself so we remove here
             sqlfile = Path(str(sqlfile)[:-3])
             self._pull_lando(sqlfile)
+        elif s.type == 'ddev':
+            # sqlfile = Path(str(sqlfile)[:-3])
+            self._pull_ddev(sqlfile)
         else:
             self._pull(sqlfile, server, local=True)
 
     def _pull_lando(self, sqlfile):
         # suppress sterr since lando outputs update messages there
         cmd = f'''lando db-export {sqlfile} 2>/dev/null'''
+        self.run_pull_cmd(cmd, sqlfile, True)
+
+    def _pull_ddev(self, sqlfile):
+        cmd = f'''ddev export-db --gzip --file={sqlfile}'''
         self.run_pull_cmd(cmd, sqlfile, True)
 
     def _pull(self, sqlfile, server, local=True):
@@ -166,13 +174,20 @@ class DB:
         sql = Path(sqlfile)
         if s.type == 'lando':
             self._put_lando(sql)
+        elif s.type == 'ddev':
+            self._put_ddev(sql)
         else:
             self._put(server, sql)
 
     def _put_lando(self, sql):
         cmd = f'''lando db-import {sql} 2>/dev/null'''
+        self.run_put_cmd(cmd, progress=False)
+
+    def _put_ddev(self, sql):
+        # cmd = f'''lando db-import {sql} 2>/dev/null'''
+        cmd = f'''ddev import-db --progress --src={sql}'''
         # print(cmd);exit()
-        self.run_put_cmd(cmd)
+        self.run_put_cmd(cmd, progress=False)
 
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
@@ -213,7 +228,7 @@ class DB:
 
         if mamp_path:
             cmd = [
-                f'''export MYSQL_PWD={db.password};''',
+                f'''export MYSQL_PWD="{db.password}";''',
                 f'''pv --numeric {sqlfile}''',
                 # f'''cat {sqlfile}''',
                 f'''| gunzip -c | {mysql} {skip_secure} --user={db.username} --password=root {db.db}''',
@@ -224,16 +239,16 @@ class DB:
                 f'''pv --numeric {sqlfile}''',
                 # f'''cat {sqlfile}''',
                 f'''| ssh {port} {identity} {s.ssh.username}@{s.ssh.server}''',
-                f'''export MYSQL_PWD={db.password}; gunzip -c | {mysql} {skip_secure} --user={db.username} {db.db}''',
+                f'''export MYSQL_PWD="{db.password}"; gunzip -c | {mysql} {skip_secure} --user={db.username} {db.db}''',
             ]
             cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
         else:
             cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
-                      "export MYSQL_PWD={db.password}; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
+                      "export MYSQL_PWD="{db.password}"; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
             cmd = ' '.join(cmd.split())
         self.run_put_cmd(cmd)
 
-    def run_put_cmd(self, cmd):
+    def run_put_cmd(self, cmd, progress=True):
         s = self.server
         if self.real:
             doit = True
@@ -251,33 +266,37 @@ class DB:
 
             if doit:
                 ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-                p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
                 error_msgs = []
-                char = '\u25A0'
-                chard = click.style('|', fg='red')
-                with click.progressbar(
-                    length=100,
-                    width=0,
-                    show_eta=True,
-                    info_sep=click.style(' | ', fg='blue'),
-                    empty_char=click.style(char, fg='blue'),
-                    fill_char=click.style(char, fg='bright_blue'),
-                    bar_template=f'%(bar)s %(info)s',
-                ) as bar:
-                    last = 0
-                    for line in io.TextIOWrapper(p.stderr, encoding="utf-8"):
-                        try:
-                            percent = int(line)
-                        except ValueError:
-                            error_msgs.append(line.rstrip())
-                            continue
-                        step = percent - last
-                        bar.update(step)
-                        last = percent
+                if progress:
+                    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                [ui.error(i, exit=False) for i in error_msgs]
+                    char = '\u25A0'
+                    chard = click.style('|', fg='red')
+                    with click.progressbar(
+                        length=100,
+                        width=0,
+                        show_eta=True,
+                        info_sep=click.style(' | ', fg='blue'),
+                        empty_char=click.style(char, fg='blue'),
+                        fill_char=click.style(char, fg='bright_blue'),
+                        bar_template=f'%(bar)s %(info)s',
+                    ) as bar:
+                        last = 0
+                        for line in io.TextIOWrapper(p.stderr, encoding="utf-8"):
+                            try:
+                                percent = int(line)
+                            except ValueError:
+                                error_msgs.append(line.rstrip())
+                                continue
+                            step = percent - last
+                            bar.update(step)
+                            last = percent
+
+                else:
+                    result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
+                    error_msgs.append(result.stderr.decode("utf-8"))
                 if error_msgs:
+                    [ui.error(i, exit=False) for i in error_msgs]
                     sys.exit(1)
                 else:
                     ui.display_success(self.real)
