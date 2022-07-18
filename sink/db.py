@@ -55,7 +55,6 @@ class DB:
             sqlfile = Path(str(sqlfile)[:-3])
             self._pull_lando(sqlfile)
         elif s.type == 'ddev':
-            # sqlfile = Path(str(sqlfile)[:-3])
             self._pull_ddev(sqlfile)
         else:
             self._pull(sqlfile, server, local=True)
@@ -66,7 +65,10 @@ class DB:
         self.run_pull_cmd(cmd, sqlfile, True)
 
     def _pull_ddev(self, sqlfile):
-        cmd = f'''ddev export-db --gzip --file={sqlfile}'''
+        # ddev outputs informational output on stderr.  This causes
+        # the command to look like it has failed.  So we discard
+        # stderr, this will ofcourse hide usefull error messages.
+        cmd = f'''ddev export-db --gzip --file={sqlfile} 2>/dev/null'''
         self.run_pull_cmd(cmd, sqlfile, True)
 
     def _pull(self, sqlfile, server, local=True):
