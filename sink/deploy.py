@@ -25,7 +25,6 @@ from sink.rsync import Transfer
 
 class DeployViaRename:
     def __init__(self, servername, real=False, quiet=False):
-        self.ssh = SSH()
         self.p = config.project()
         self.s = config.server(servername)
         if not self.s.deploy_root:
@@ -35,6 +34,8 @@ class DeployViaRename:
         self.stamp = self._server_time(self.s)
         self.date_file = f'SINK-DATE:{self.stamp}'
         self.quiet = quiet
+        dry_run = True if not self.real else False
+        self.ssh = SSH(dry_run=dry_run, server=self.s.servername)
 
     def init_deploy(self, *dirs):
         click.secho(f'\nOn remote server ({self.s.servername}) run:', bold=True)
@@ -63,7 +64,6 @@ class DeployViaRename:
 
         It will be created in the server's deploy_root config location.
         """
-        dry_run = True if not self.real else False
 
         deploy_dest = os.path.join(self.s.deploy_root, self.stamp)
         if not deploy_dest.startswith('/'):
@@ -72,10 +72,10 @@ class DeployViaRename:
         ssh = self.ssh
         # cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
         cmd = f"'mkdir {deploy_dest}'"
-        ssh.run(cmd, dry_run=dry_run, server=self.s.servername)
+        ssh.run(cmd)
         click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
 
-        ssh.run(f'touch {self.s.deploy_root}/{self.stamp}/{self.date_file}', dry_run=dry_run, server=self.s.servername)
+        ssh.run(f'touch {self.s.deploy_root}/{self.stamp}/{self.date_file}')
 
         xfer = Transfer(self.real, quiet=self.quiet)
         xfer.multiple = True
@@ -87,10 +87,8 @@ class DeployViaRename:
 
     def _server_time(self, server):
         """Retrieve the remote server time"""
-        dry_run = True if not self.real else False
         ssh = self.ssh
-        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
-                         server=self.s.servername)
+        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
         s_time = s_time.strip()
         # deploy_name = Path(self.s.root).parts[-1]
         # stamp = f"{deploy_name}.{s_time}"
@@ -100,7 +98,6 @@ class DeployViaRename:
 
 class DeployViaSymlink:
     def __init__(self, servername, real=False, quiet=False):
-        self.ssh = SSH()
         self.p = config.project()
         self.s = config.server(servername)
         if not self.s.deploy_root:
@@ -109,6 +106,8 @@ class DeployViaSymlink:
         self.rsync = Transfer(real)
         self.stamp = self.server_time(self.s)
         self.quiet = quiet
+        dry_run = True if not self.real else False
+        self.ssh = SSH(dry_run=dry_run, server=self.s.servername)
 
     def init_deploy(self):
         """Display bash commands to set up for deploy
@@ -129,7 +128,7 @@ class DeployViaSymlink:
 
     def _get_active(self):
         active_cmd = f'readlink --verbose {self.s.root}'
-        active = self.ssh.run(active_cmd, server=self.s.servername).strip()
+        active = self.ssh.run(active_cmd).strip()
         active = Path(active)
         return active
 
@@ -146,7 +145,7 @@ class DeployViaSymlink:
         ssh = self.ssh
         # cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
         cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
-        ssh.run(cmd, dry_run=dry_run, server=self.s.servername)
+        ssh.run(cmd)
         click.echo('\nNew dir created: {}'.format(click.style(deploy_dest, fg='green')))
 
         previous_dest = self._get_active()
@@ -167,7 +166,7 @@ class DeployViaSymlink:
         dry_run = True if not self.real else False
         deploy_base = Path(self.s.root).parts[-1]
         cmd = f"'find {self.s.deploy_root}/{deploy_base}* -maxdepth 0'"
-        result = ssh.run(cmd, server=self.s.servername).strip()
+        result = ssh.run(cmd).strip()
         active = self._get_active()
 
         data = {}
@@ -216,17 +215,15 @@ class DeployViaSymlink:
                         ln -s {data[choice]} {temp_symname} &&
                         mv -Tf {temp_symname} {self.s.root}'"""
         link_cmd = ' '.join(link_cmd.split())
-        r = ssh.run(link_cmd, dry_run=dry_run, server=self.s.servername)
+        r = ssh.run(link_cmd)
 
         click.echo()
         ui.display_success(self.real)
 
     def server_time(self, server):
         """Retrieve the remote server time"""
-        dry_run = True if not self.real else False
         ssh = self.ssh
-        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"', dry_run=False,
-                         server=self.s.servername)
+        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
         s_time = s_time.strip()
         deploy_name = Path(self.s.root).parts[-1]
         stamp = f"{deploy_name}.{s_time}"
@@ -359,11 +356,11 @@ class DeployViaLocal:
 
     def get_current_deploy(self, server_name, real):
         s = config.server(server_name)
-        ssh = SSH()
+        ssh = SSH(server_name, dry_run=False)
         remote_path = Path(s.root, self.INFO_FILE)
         data = {}
         with tempfile.TemporaryDirectory() as yaml_dir:
-            ssh.scp_pull(remote_path, yaml_dir, server_name, dry_run=False)
+            ssh.scp_pull(remote_path, yaml_dir)
             yaml_file = Path(yaml_dir, self.INFO_FILE)
             # from IPython import embed; embed()
             try:

@@ -9,77 +9,82 @@ from sink.ui import ui
 
 
 class SSH:
-    def __init__(self):
+    def __init__(self, server=False, user=None, dry_run=False):
+        self.dry_run = dry_run
         self.config = config
-        pass
+        self.server = self.config.server(server)
+        if user:
+            for ssh in self.server.ssh:
+                if ssh.name == user:
+                    self.ssh = ssh
+                    break
+            else:
+                ui.error(f'Invalid ssh user: {user}')
+        else:
+            self.ssh = self.server.ssh[0]
 
-    def ssh(self, server=False, dry_run=False):
-        s = self.config.server(server)
-
-        identity = self.get_key(s)
+    def visit_ssh(self):
+        identity = self.get_key()
         port = ''
-        if s.ssh.port:
-            port = f'-p {s.ssh.port}'
+        if self.ssh.port:
+            port = f'-p {self.ssh.port}'
 
         cd_cmd = ''
-        if s.root:
-            cd_cmd = f'"cd {s.root}; bash"'
+        if self.server.root:
+            cd_cmd = f'"cd {self.server.root}; bash"'
 
-        cmd = f'''ssh -t {port} {identity} {s.ssh.username}@{s.ssh.server} {cd_cmd}'''
+        cmd = f'''ssh -t {port} {identity} {self.ssh.username}@{self.ssh.server} {cd_cmd}'''
         cmd = ' '.join(cmd.split())
 
-        self.run_cmd(cmd, dry_run)
+        self.run_cmd(cmd, self.dry_run)
 
-    def scp_put(self, localfile, server=False, dry_run=False):
-        s = self.config.server(server)
+    def scp_put(self, localfile):
+        # s = self.config.server(server)
 
-        identity = self.get_key(s)
+        identity = self.get_key()
 
         port = ''
-        if s.ssh.port:
-            port = f'-P {s.ssh.port}'
+        if self.ssh.port:
+            port = f'-P {self.ssh.port}'
 
         cmd = f'''scp {port} -o 'ConnectTimeout 10' {identity}
-            {localfile} {s.ssh_user}@{s.ssh_server}'''
+            {localfile} {self.ssh.username}@{self.ssh.server}'''
         cmd = ' '.join(cmd.split())
 
-        self.run_cmd(cmd, dry_run)
+        self.run_cmd(cmd, self.dry_run)
 
-    def scp_pull(self, remotefile, dest, server, dry_run=False):
-        s = self.config.server(server)
-        identity = self.get_key(s)
+    def scp_pull(self, remotefile, dest):
+        identity = self.get_key()
         port = ''
-        if s.ssh.port:
-            port = f'-P {s.ssh.port}'
+        if self.ssh.port:
+            port = f'-P {self.ssh.port}'
 
         cmd = f'''scp {port} -o 'ConnectTimeout 10' {identity}
-            {s.ssh.username}@{s.ssh.server}:{remotefile} {dest}'''
+            {self.ssh.username}@{self.ssh.server}:{remotefile} {dest}'''
         cmd = ' '.join(cmd.split())
-        self.run_cmd(cmd, dry_run)
+        self.run_cmd(cmd, self.dry_run)
 
-    def run(self, remote_cmd, server=False, dry_run=False):
-        s = self.config.server(server)
-
-        identity = self.get_key(s)
+    def run(self, remote_cmd):
+        identity = self.get_key()
 
         port = ''
-        if s.ssh.port:
-            port = f'-p {s.ssh.port}'
+        if self.ssh.port:
+            port = f'-p {self.ssh.port}'
 
-        cmd = f'''ssh {port} {identity} {s.ssh.username}@{s.ssh.server} {remote_cmd}'''
+        cmd = f'''ssh {port} {identity} {self.ssh.username}@{self.ssh.server} {remote_cmd}'''
         cmd = ' '.join(cmd.split())
 
-        result = self.run_cmd_result(cmd, dry_run)
+        result = self.run_cmd_result(cmd, self.dry_run)
         return result
 
-    def get_key(self, server):
-        if not server.ssh.key:
+    def get_key(self):
+        if not self.ssh.key:
             identity = ''
-        elif os.path.exists(server.ssh.key):
-            identity = f'-i "{server.ssh.key}"'
+        elif os.path.exists(self.ssh.key):
+            identity = f'-i "{self.ssh.key}"'
             # click.echo(f'Using identity: "{server.ssh.key}"')
         else:
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), server.ssh.key)
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), self.ssh.key)
             # ui.error(f'ssh key does no exist: {server.ssh.key}')
         return identity
 

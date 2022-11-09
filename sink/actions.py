@@ -40,6 +40,6 @@ class Actions:
             result = command.execute(cmd)
             print(result)
         else:
-            ssh = SSH()
-            result = ssh.run(cmd, server=self.s.servername, dry_run=self.dry_run)
+            ssh = SSH(server=self.s.servername, dry_run=self.dry_run)
+            result = ssh.run(cmd)
             print(result)

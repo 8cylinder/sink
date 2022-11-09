@@ -80,12 +80,16 @@ class Init:
                 password:
                 note: |
               ssh:
-                username:
-                password:
-                server:
-                key:
-                port:
-                note: |
+                # Multiple ssh configs can be defined and given a name.  These 
+                # can be specified when sshing into a server, but rsync 
+                # commands will only use the first one.  
+                - name:
+                  username:
+                  password:
+                  server:
+                  key:
+                  port:
+                  note: |
               hosting:
                 name:
                 url:

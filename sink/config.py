@@ -85,8 +85,9 @@ class Dict2obj:
         return 'Dict2obj()'
 
     def __str__(self):
-        from pprint import pprint
-        pprint(self.__dict__)
+        from pprint import pformat
+        return pformat(self.__dict__)
+
 
 
 class Configuration:
@@ -127,17 +128,27 @@ class Configuration:
             'url': None,
             'username': None
         },
-        'ssh': {
-            'key': None,
-            'note': None,
-            'password': None,
-            'server': None,
-            'username': None,
-            'port': None,
-        },
+        # 'ssh': {
+        #     'key': None,
+        #     'note': None,
+        #     'password': None,
+        #     'server': None,
+        #     'username': None,
+        #     'port': None,
+        # },
+        'ssh': [],
         'mysql': [],
         'urls': [],
         'actions': [],
+    }
+    default_ssh = {
+        'key': None,
+        'name': None,
+        'note': None,
+        'password': None,
+        'server': None,
+        'username': None,
+        'port': None,
     }
     default_mysql = {
         'db': None,
@@ -327,28 +338,37 @@ class Configuration:
                 cp.update(v)
                 server['control_panel'] = cp
             elif k == 'ssh':
-                ssh = self.default_server['ssh'].copy()
-                ssh.update(v)
-                server['ssh'] = ssh
-                ssh_key = server['ssh']['key']
-                if ssh_key:
-                    abs_ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
-                    prj_ssh_key = os.path.join(self.project_root, ssh_key)
-                    # try a relative or absolute path
-                    if os.path.exists(abs_ssh_key):
-                        server['ssh']['key'] = abs_ssh_key
-                    # try one relative to the project root
-                    elif os.path.exists(prj_ssh_key):
-                        server['ssh']['key'] = prj_ssh_key
-                    else:
-                        ui.warn(f'ssh key does not exist: {ssh_key}')
+                ssh_holder = []
+                for ssh_user in v:
+                    ssh_template = self.default_ssh.copy()
+                    try:
+                        ssh_template.update(ssh_user)
+                    except ValueError:
+                        ui.error(f'SSH settings are not an array, update sink.yaml to new format.')
+                    ssh_key = ssh_user['key']
+                    if ssh_key:
+                        abs_ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
+                        prj_ssh_key = os.path.join(self.project_root, ssh_key)
+                        # try a relative or absolute path
+                        if os.path.exists(abs_ssh_key):
+                            ssh_template['key'] = abs_ssh_key
+                        # try one relative to the project root
+                        elif os.path.exists(prj_ssh_key):
+                            ssh_template['key'] = prj_ssh_key
+                        else:
+                            ui.warn(f'ssh key does not exist: {ssh_key}')
+
+                    ssh_holder.append(Dict2obj(**ssh_template))
+
+                server['ssh'] = ssh_holder
 
         # add the server name to a 'name' field
         server['name'] = name
 
         s = self.default_server.copy()
         s.update(server)
-        return Dict2obj(**s)
+        server_obj = Dict2obj(**s)
+        return server_obj
 
     def servers(self):
         all_servers = []
@@ -383,6 +403,18 @@ class Configuration:
             return False
         return all_urls
 
+    def sshs(self, sshs):
+        """Convert a list of dicts to a list of objects"""
+        all_sshs = []
+        try:
+            for ssh in sshs:
+                s = self.default_ssh.copy()
+                s.update(ssh)
+                all_sshs.append(Dict2obj(**s))
+        except AttributeError:
+            return False
+        return all_sshs
+
     def syncpoint(self):
         s = namedtuple('syncpoint', self.data['sync points'].keys())(
             **self.data['sync points'])
@@ -407,6 +439,8 @@ class Configuration:
         all = set(all)
         all = sorted(all)
         all = ' '.join([f'--exclude="{i}"' for i in all])
+        # all = ','.join([f"'{i}'" for i in all])
+        # all = f'--exclude={{{all}}}'
         return all
 
 

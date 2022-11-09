@@ -142,13 +142,13 @@ def files(action, filename, server, real, silent, extra_flags):
         prj = config.project()
         f = Path(prj.root)
 
-    xfer = Transfer(real, silent=silent)
+    xfer = Transfer(real, server_name=server, silent=silent)
     extra_flags = '' if not extra_flags else extra_flags
 
     if action == Action.PULL.value:
-        xfer.pull(f, server, extra_flags)
+        xfer.pull(f, extra_flags)
     elif action == Action.PUT.value:
-        xfer.put(f, server, extra_flags)
+        xfer.put(f, extra_flags)
 
 
 @sink.command('single', context_settings=CONTEXT_SETTINGS)
@@ -171,13 +171,14 @@ def automatic(filename, real, silent):
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument('server', autocompletion=get_servers)
+@click.argument('user', required=False)
 @click.option('--dry-run', '-d', is_flag=True,
               help='Do nothing, show the command only.')
-def ssh(server, dry_run):
+def ssh(server, user, dry_run):
     """SSH into a server."""
     config.load_config()
-    ssh = SSH()
-    ssh.ssh(server=server, dry_run=dry_run)
+    ssh = SSH(server=server, user=user, dry_run=dry_run)
+    ssh.visit_ssh()
 
 
 @sink.command('diff', context_settings=CONTEXT_SETTINGS)
@@ -202,8 +203,8 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
         prj = config.project()
         filename = Path(prj.root)
     fx = Path(os.path.abspath(filename))
-    xfer = Transfer(True)
-    xfer.diff(fx, server, ignore=ignore_whitespace,
+    xfer = Transfer(real=True, server_name=server)
+    xfer.diff(fx, ignore=ignore_whitespace,
               word_diff=word_diff, difftool=difftool)
 
 
