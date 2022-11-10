@@ -79,8 +79,8 @@ def sink(suppress_commands):
 # --------------------------------- DB ---------------------------------
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
 @click.argument('db-action', type=click.Choice([i.value for i in Action]))
-# @click.argument('server', type=click.Choice(get_server_choices()), autocompletion=get_servers)
-@click.argument('server', type=click.STRING, autocompletion=get_servers)
+# @click.argument('server', type=click.Choice(get_server_choices()), shell_complete=get_servers)
+@click.argument('server', type=click.STRING, shell_complete=get_servers)
 @click.argument('sql-gz', type=click.Path(exists=True), required=False)
 @click.option('--tag', '-t', type=click.STRING,
               help="Add a tag to the generated filename when pulling.")
@@ -115,7 +115,7 @@ def database(db_action, sql_gz, server, real, quiet, tag):
 # ------------------------------- Files -------------------------------
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
 @click.argument('action', type=click.Choice([i.value for i in Action]))
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('filename', type=click.Path(), required=False)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--silent', '-s', is_flag=True,
@@ -170,7 +170,7 @@ def automatic(filename, real, silent):
 
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('user', required=False)
 @click.option('--dry-run', '-d', is_flag=True,
               help='Do nothing, show the command only.')
@@ -182,7 +182,7 @@ def ssh(server, user, dry_run):
 
 
 @sink.command('diff', context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('filename', type=click.Path(exists=True), required=False)
 @click.option('--ignore-whitespace', '-i', is_flag=True,
               help='Ignore whitespace in diff.')
@@ -276,7 +276,7 @@ def check(required, server_names):
 
 # ------------------------------- Actions -------------------------------
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('action_name', required=False)
 @click.option('--real', '-r', is_flag=True)
 def action(server, action_name, real):
@@ -314,7 +314,7 @@ def vm():
 
 
 @vm.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('ip')
 @click.argument('hostname')
 def build(server, hostname, ip):
@@ -342,7 +342,7 @@ def build(server, hostname, ip):
 
 
 @vm.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('ip')
 @click.argument('hostname')
 def check(server, hostname, ip):
@@ -375,7 +375,7 @@ def deploy(ctx, method):
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.argument('dirs', nargs=-1)
 @click.pass_context
 def init(ctx, server, dirs):
@@ -401,7 +401,7 @@ def init(ctx, server, dirs):
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('--quiet', '-q', is_flag=True,
               help='No itemized output from rsync.')
@@ -431,7 +431,7 @@ def new(ctx, server, real, quiet, dump_db, note):
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', autocompletion=get_servers)
+@click.argument('server', shell_complete=get_servers)
 @click.option('--real', '-r', is_flag=True)
 @click.option('-l', '--load-db', is_flag=True,
               help='Take a snapshot of the db.')
