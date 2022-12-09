@@ -6,3 +6,4 @@ sink.egg-info
 .mypy_cache
 man
 *egg*
+.secrets.org
