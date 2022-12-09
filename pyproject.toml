@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sink"
-version = "0.2.0"
+version = "0.2.1"
 description = "Sink is a command line tool for developers to help building websites."
 authors = ["sheldon <developer@8cylinder.com>"]
 license = "GPLv3"
@@ -12,6 +12,10 @@ click = "^8.1.3"
 PyYAML = "^6.0"
 coolname = "^2.0.0"
 plumbum = "^1.8.0"
+rich-click = "^1.5.2"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.6.0"
 
 [tool.poetry.scripts]
 sink = "sink.sink:sink"

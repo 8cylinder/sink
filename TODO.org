@@ -1,19 +1,18 @@
 
 #+TITLE: Sink Todo
 
-the show about the show
-line of duty
 
 * Todo
 
-** Now [10/17]
+** Now [10/11]
+
 *** COMPLETE With 'single' make sure the correct rsync is being used
 CLOSED: [2020-11-08 Sun 18:56]
 
 *** COMPLETE When using =single= ignore the "ask overwrite" yaml settings
 CLOSED: [2020-11-08 Sun 18:56]
 
-*** TO-DO Quiet/silent flags
+*** TODO Quiet/silent flags
 - quiet: output "Succcess", server and base filename
   - eg: Success, prod, index.twig
   - eg: [Success] prod:.../dir/dir/index.twig
@@ -25,7 +24,7 @@ CLOSED: [2020-11-08 Sun 18:56]
 -q --no-command, -qq --no-output, -qqq both?
 --silent -s, for both?
 
-*** TO-DO Success messages
+*** TODO Success messages
 - file upload/download :: [Success] SERVER: upload complete
 - db put/pull :: [Success] SERVER: sql upload complete
 - single :: [Success] SERVER: <file path>
@@ -40,6 +39,7 @@ destinations, which is what would be needed for this to work with a
 single instance of rsync.
 
 Instead use the shell for this:
+
 #+BEGIN_SRC bash
 for f in $(find -path '*some*criteria*php'); do
     sink file put vagrant $f;
@@ -97,19 +97,20 @@ Traceback (most recent call last):
 TypeError: expected string or bytes-like object
 #+end_src
 
-*** TO-DO Put DEPLOY-INFO.yaml in site root
+*** TODO Put DEPLOY-INFO.yaml in site root
 We don't always have permisssion to put it the parent dir
 
-*** TO-DO Exclude DEPLOY-INFO.yaml when using normal file transfers
+*** TODO Exclude DEPLOY-INFO.yaml when using normal file transfers
 
-*** TO-DO Deploy warnings unnecessarily occur multiple times
+*** TODO Deploy warnings unnecessarily occur multiple times
 For sites that have =warn: true=
 
-*** TO-DO Check more values
+*** TODO Check more values
 - rsync_binary
 - pulls_dir
 - show warn & automatic status for each server
-*** TO-DO New command: build-vm
+
+*** TODO New command: build-vm
 Build a vagrant vm to get a project running quickly.
 : sink build-vm
 - download boss
@@ -126,20 +127,31 @@ Build a vagrant vm to get a project running quickly.
   - Boss
 
 
-** Then [7/24]
-*** TO-DO [#A] Use plumbum for shell commands
-https://github.com/tomerfiliba/plumbum
-*** TO-DO [#A] Set up virtualenv
+** Then [10/23]
 
-*** TO-DO [#A] Test/run setup.py
-- investigate flit :: https://flit.readthedocs.io/en/latest/index.html
-*** TO-DO Diff one file/all servers
+*** TODO [#A] Use plumbum for shell commands
+https://github.com/tomerfiliba/plumbum
+
+*** COMPLETE [#A] Set up virtualenv
+CLOSED: [2022-11-11 Fri 12:22]
+Used Poetry
+
+**** CANCELED [#A] Test/run setup.py
+CLOSED: [2022-12-09 Fri 13:18]
+- +investigate flit :: https://flit.readthedocs.io/en/latest/index.html+
+- Flit not needed, Poetry does deploy to pypi.
+- Setup not used anymore.
+
+*** CANCELED Diff one file/all servers
+CLOSED: [2022-12-09 Fri 13:19]
 sink diff 'all' path...= compare one file on all servers at one time?
 or download all and group by differences:
 [A] LOCAL, dev, vagrant
 [B] stag
 [C] prod, mamp
 Compare LOCAL to [B, C]: ?
+
+~Don't do, the use case is to rare to make the effort worthwhile.~
 
 **** vimdiff
 #+BEGIN_SRC bash
@@ -152,11 +164,11 @@ CLOSED: [2020-12-26 Sat 12:20]
 CLOSED: [2020-12-26 Sat 12:22]
 Define difftool in sink.yaml
 
-*** TO-DO progress bar
-**** TO-DO Add flag for pv in sink.yaml so it can be used from the server
+*** TODO progress bar
+**** TODO Add flag for pv in sink.yaml so it can be used from the server
 Try =mysqlpump= if it's on the server.  It has =--watch-progress=
 
-**** TO-DO Check for pv locally before using
+**** TODO Check for pv locally before using
 
 *** DONT-DO When downloading db don't overwrite existing file
 CLOSED: [2020-12-26 Sat 12:27]
@@ -168,7 +180,7 @@ more than once in one day, the filename will be the same.
 
 add time if file exists
 
-*** TO-DO Enable tab complete on osx
+*** TODO Enable tab complete on osx
 Part of setup.py?
 Directions on how to setup .bashrc?
 
@@ -224,13 +236,13 @@ CLOSED: [2020-07-20 Mon 20:45]
 Using info from rsync's itemize-changes?
 
 *** COMPLETE sink diff multiple files
-CLOSED: [2020-12-26 Sat 12:24]
 
 *** DONT-DO DB put, use tab completion for filename
 CLOSED: [2020-11-21 Sat 14:35]
 +Get list of files in the db dir+
 
 The command line completion is fine.
+
 *** MAYBE Pre pull before put
 A list of files to to pull before putting files.  The usecase is for
 something like craft's project config (project.yaml), where you want
@@ -271,5 +283,6 @@ sink deploy 2020-10-15
 sink deploy clean  # rsync --delete?
 #+END_SRC
 
-*** TO-DO Allow multiple ssh accounts
+*** DONE Allow multiple ssh accounts
+CLOSED: [2022-11-11 Fri 10:29]
 Make the same as db, check each one, but only use the first one for actions
