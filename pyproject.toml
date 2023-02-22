@@ -15,7 +15,7 @@ plumbum = "^1.8.0"
 rich-click = "^1.5.2"
 
 [tool.poetry.group.dev.dependencies]
-ipython = "^8.6.0"
+ipython = "^8.10.0"
 
 [tool.poetry.scripts]
 sink = "sink.sink:sink"
