@@ -18,7 +18,7 @@ from pathlib import Path
 class TestConfig:
     good = click.style('[\u2713]', fg=Color.GREEN.value)
     bad = click.style('[X]', fg=Color.RED.value)
-    timeout = 100
+    timeout = 25
 
     def __init__(self):
         self.config = config
@@ -58,56 +58,61 @@ class TestConfig:
                     continue
             try:
                 click.echo()
-                click.secho(f'{s.servername}', fg=Color.GREEN.value, bold=True, underline=True)
+                click.secho(f'{s.servername}', fg=Color.GREEN.value,
+                            bold=True, underline=True)
             except AttributeError:
                 pass
 
-            user = s.ssh.username
-            url = s.ssh.server
-
-            key = ''
-            if s.ssh.key:
-                key = f' -i "{s.ssh.key}"'
             # ssh login
-            try:
-                s.ssh.username
-                # s.ssh.password
-                s.ssh.server
-            except AttributeError:
-                ui.error(f'ssh values are wrong in {s.servername}')
-            if not s.ssh.username or not s.ssh.server:
-                ui.warn('missing values for ssh.', indent='  ')
-                continue
+            for ssh in s.ssh:
+                user = ssh.username
+                url = ssh.server
 
-            cmd = 'exit'
-            good = 'ssh login good.'
-            bad = f'ssh login failed for "{user}@{url}".'
+                key = ''
+                if ssh.key:
+                    key = f' -i "{ssh.key}"'
 
-            port = ''
-            if s.ssh.port:
-                port = f'-p {s.ssh.port}'
+                # print('>>>', ssh)
+                try:
+                    ssh.username
+                    # s.ssh.password
+                    ssh.server
+                except AttributeError:
+                    ui.error(f'ssh values are wrong in {s.servername}')
+                if not ssh.username or not ssh.server:
+                    ui.warn('missing values for ssh.', indent='  ')
+                    continue
 
-            if self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key):
-                # root
-                cmd = f'cd "{s.root}"'
-                good = f'root dir exists.'
-                bad = f'root dir does not exist on server: {s.root}.'
-                self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
+                cmd = 'exit'
+                good = f'ssh login good ({ssh.username}).'
+                bad = f'ssh login failed for "{user}@{url}".'
 
-                dbs = self.config.dbs(s.mysql)
-                for db in dbs:
-                    host = ''
-                    if db.hostname:
-                        host = f'--host={db.hostname}'
-                    cmd = f'mysql --user={db.username} --password="{db.password}" {host} {db.db} --execute="exit";'
-                    good = f'DB({db.db}): mysql username, password and db are good.'
-                    bad = f'DB({db.db}): mysql error.'
+                port = ''
+                if ssh.port:
+                    port = f'-p {ssh.port}'
+
+                if self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key):
+                    # root
+                    cmd = f'cd "{s.root}"'
+                    good = f'root dir exists.'
+                    bad = f'root dir does not exist on server: {s.root}.'
                     self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
+
+                    dbs = self.config.dbs(s.mysql)
+                    for db in dbs:
+                        host = ''
+                        if db.hostname:
+                            host = f'--host={db.hostname}'
+                        cmd = f'mysql --user={db.username} --password="{db.password}" {host} {db.db} --execute="exit";'
+                        good = f'DB({db.db}): mysql username, password and db are good.'
+                        bad = f'DB({db.db}): mysql error.'
+                        self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
 
             urls = self.config.urls(s.urls)
             for u in urls:
                 if not u.url:
-                    # if there is a url section in the yaml file, but no values for it, continue.
+                    # if there is a url section in the yaml file, but
+                    # no values for it, continue.
                     continue
                 spinner = Spinner(indent=2, delay=0.1)
                 spinner.start()

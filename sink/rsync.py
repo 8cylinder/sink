@@ -129,12 +129,13 @@ class Transfer:
         # remove temp dirs
         ...
 
-    def diff(self, local_file, server, ignore=False, word_diff=None, difftool=False):
+    def diff(self, local_file, ignore=False, word_diff=None, difftool=False):
+        server_name = self.server.name
         local_file = Path(local_file)
         if local_file.is_dir():
             self.multiple = True
             # difftool = True
-        with tempfile.TemporaryDirectory(suffix=f' [{server}]') as diffdir:
+        with tempfile.TemporaryDirectory(suffix=f' [{server_name}]') as diffdir:
             tmp_file = f'{diffdir}/{local_file.name}'
             locations = self._locations(local_file)
             remotef = locations['remote']

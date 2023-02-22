@@ -8,6 +8,9 @@ from collections import OrderedDict
 import yaml
 from enum import Enum
 import click
+# from rich_click import RichCommand, RichGroup, rich_click
+# import rich_click # as click
+
 
 from sink.config import config
 from sink.config import Color
@@ -26,8 +29,25 @@ from sink.actions import Actions
 from sink.vm import Vagrant
 
 
+## RICH_CLICK
+# rich_click.USE_RICH_MARKUP = True
+# rich_click.SHOW_ARGUMENTS = True
+# rich_click.GROUP_ARGUMENTS_OPTIONS = True
+# # rich_click.SHOW_METAVARS_COLUMN = False
+# # rich_click.APPEND_METAVARS_HELP = True
+# rich_click.STYLE_OPTION = "magenta"
+# rich_click.STYLE_OPTIONS_PANEL_BORDER = 'red'
+# rich_click.STYLE_COMMANDS_PANEL_BORDER = 'green'
+# rich_click.OPTIONS_PANEL_TITLE = ""
+# rich_click.COMMANDS_PANEL_TITLE = ""
+# rich_click.MAX_WIDTH = 75
+
 # from IPython import embed
 # embed()
+
+
+__version__ = '0.2.1'
+
 
 def get_servers(ctx, args, incomplete):
     config.load_config()
@@ -35,14 +55,6 @@ def get_servers(ctx, args, incomplete):
     # if not servers:
     #     ui.error('no servers defined (you are probably not in a project)')
     return servers
-
-
-# def get_server_choices():
-#     try:
-#         config.load_config(raise_err=True)
-#     except FileNotFoundError:
-#         return ["SERVER"]
-#     return [i.name for i in config.servers()]
 
 
 class NaturalOrderGroup(click.Group):
@@ -57,8 +69,6 @@ class NaturalOrderGroup(click.Group):
         return self.commands.keys()
 
 
-__version__ = '0.1.0'
-
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help'],
     # 'token_normalize_func': lambda x: x.lower(),
@@ -66,17 +76,20 @@ CONTEXT_SETTINGS = {
 
 
 @click.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
+# @click.group(context_settings=CONTEXT_SETTINGS, cls=RichGroup) # RICH_CLICK
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
+@click.version_option()
 def sink(suppress_commands):
     """🐙 Tools to manage projects.
 
-    Use `sink COMMAND -h` for help on specific commands.
+    [red]Use[/] `sink COMMAND -h` for help on specific commands.
     """
     config.suppress_commands = suppress_commands
 
 
 # --------------------------------- DB ---------------------------------
+# @sink.command('db', context_settings=CONTEXT_SETTINGS, cls=RichCommand)  # RICH_CLICK
 @sink.command('db', context_settings=CONTEXT_SETTINGS)
 @click.argument('db-action', type=click.Choice([i.value for i in Action]))
 # @click.argument('server', type=click.Choice(get_server_choices()), shell_complete=get_servers)
@@ -104,6 +117,7 @@ def database(db_action, sql_gz, server, real, quiet, tag):
     """
     config.load_config()
     db = DB(real=real, quiet=quiet)
+
     if db_action == Action.PULL.value:
         db.pull(server, tag=tag)
     elif db_action == Action.PUT.value:
@@ -114,7 +128,7 @@ def database(db_action, sql_gz, server, real, quiet, tag):
 
 # ------------------------------- Files -------------------------------
 @sink.command('file', context_settings=CONTEXT_SETTINGS)
-@click.argument('action', type=click.Choice([i.value for i in Action]))
+@click.argument('action', type=click.Choice([str(i.value) for i in Action]))
 @click.argument('server', shell_complete=get_servers)
 @click.argument('filename', type=click.Path(), required=False)
 @click.option('--real', '-r', is_flag=True)
@@ -310,7 +324,9 @@ def action(server, action_name, real):
 # --------------------------------- VM --------------------------------
 @sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 def vm():
-    """[Group] Setup a vm."""
+    """[Group] Setup a vm.
+
+    Run "sink check" first to see what is needed."""
 
 
 @vm.command(context_settings=CONTEXT_SETTINGS)

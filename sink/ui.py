@@ -98,3 +98,10 @@ class ui:
             val = click.style(f'({val})', fg=Color.BLUE.value)
             click.echo(f'  {key}  {val}')
 
+    @staticmethod
+    def print_stack():
+        import traceback
+        for line in traceback.format_stack()[:-1]:
+            filename, code = line.strip().split('\n')
+            print(click.style('■', fg='red'), filename)
+            print(click.style(code, fg='yellow'))

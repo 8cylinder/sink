@@ -1,5 +1,7 @@
 #+STARTUP: indent
 
+cd ~/projects/sink && poetry build && pip install --force-reinstall dist/sink-0.2.1-py3-none-any.whl && cd - && echo -e "\n\n---------------------------\n" && sink db pull prod
+
 [[sink-logo.png?raw=true]]
 
 Sink is a web development project management tool for the command
@@ -7,7 +9,6 @@ line.  The main things it does are:
 
 - Sync files between servers.
 - Sync databases between servers.
-- Atomic deploys.
 - Diffs between a local file and a remote file.
 - Central storage (sink.yaml) for all website data; passwords,
   usernames, urls, etc.
@@ -57,3 +58,16 @@ servers:
   prod:
     root: /var/www
 #+end_src
+
+
+* Install
+
+** Production
+- =git clone git@github.com:8cylinder/sink.git=
+- =poetry build=
+- =pip install ./dist/sink-<VERSION-NUMBER>-py3-none-any.whl=
+
+** Dev
+- =git clone git@github.com:8cylinder/sink.git=
+- =poetry shell=
+- =pip install --editable .=

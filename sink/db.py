@@ -42,7 +42,7 @@ class DB:
         p = self.config.project()
         s = self.config.server(server)
         self.server = s
-        db = Dict2obj(**s.mysql[0])
+        db = s.mysql[0]
 
         here = os.path.abspath(os.path.curdir)
         there = config.project_root
@@ -74,14 +74,15 @@ class DB:
     def _pull(self, sqlfile, server, local=True):
         p = self.config.project()
         s = self.config.server(server)
-        db = Dict2obj(**s.mysql[0])
+        db = s.mysql[0]
 
         if p.pulls_dir is None or not p.pulls_dir.exists():
             ui.error(f'Pulls dir not found: {p.pulls_dir}')
 
-        if s.ssh.key:
-            identity = f'-i "{s.ssh.key}"'
-            # click.echo(f'Using identity: "{s.ssh.key}"')
+        ssh = s.ssh[0]
+        if ssh.key:
+            identity = f'-i "{ssh.key}"'
+            # click.echo(f'Using identity: "{ssh.key}"')
         else:
             identity = ''
 
@@ -107,11 +108,11 @@ class DB:
             mamp_path = ''
 
         port = ''
-        if s.ssh.port:
-            port = f'-p {s.ssh.port}'
+        if ssh.port:
+            port = f'-p {ssh.port}'
 
         cmd = [
-            f'''ssh {port} -C -T {identity} {s.ssh.username}@{s.ssh.server}''',
+            f'''ssh {port} -C -T {identity} {ssh.username}@{ssh.server}''',
             f'''export MYSQL_PWD="{db.password}"; {mysqldump} {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines --no-tablespaces {db.db}''',
             f'''| gzip -c > "{sqlfile}"'''
         ]
@@ -172,7 +173,7 @@ class DB:
     def put(self, server, sqlfile):
         s = self.config.server(server)
         self.server = s
-        db = Dict2obj(**s.mysql[0])
+        db = Dict2obj(**dict(s.mysql[0]))
         sql = Path(sqlfile)
         if s.type == 'lando':
             self._put_lando(sql)
@@ -186,17 +187,16 @@ class DB:
         self.run_put_cmd(cmd, progress=False)
 
     def _put_ddev(self, sql):
-        # cmd = f'''lando db-import {sql} 2>/dev/null'''
         cmd = f'''ddev import-db --progress --src={sql}'''
-        # print(cmd);exit()
         self.run_put_cmd(cmd, progress=False)
 
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
-        db = Dict2obj(**s.mysql[0])
+        db = s.mysql[0]
 
-        if s.ssh.key:
-            identity = f'-i "{s.ssh.key}"'
+        ssh = s.ssh[0]
+        if ssh.key:
+            identity = f'-i "{ssh.key}"'
         else:
             identity = ''
 
@@ -204,7 +204,7 @@ class DB:
             if not sqlfile.exists():
                 ui.error(f'{sqlfile} does not exist')
         else:
-            cmd = f'''ssh -C -T {identity} {s.ssh.username}@{s.ssh.server} "test -f {sqlfile}"'''
+            cmd = f'''ssh -C -T {identity} {ssh.username}@{ssh.server} "test -f {sqlfile}"'''
             result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
             ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
             if result.returncode:
@@ -218,8 +218,8 @@ class DB:
             skip_secure = ''
 
         port = ''
-        if s.ssh.port:
-            port = f'-p {s.ssh.port}'
+        if ssh.port:
+            port = f'-p {ssh.port}'
 
         mysql = 'mysql'
         try:
@@ -240,12 +240,12 @@ class DB:
             cmd = [
                 f'''pv --numeric {sqlfile}''',
                 # f'''cat {sqlfile}''',
-                f'''| ssh {port} {identity} {s.ssh.username}@{s.ssh.server}''',
+                f'''| ssh {port} {identity} {ssh.username}@{ssh.server}''',
                 f'''export MYSQL_PWD="{db.password}"; gunzip -c | {mysql} {skip_secure} --user={db.username} {db.db}''',
             ]
             cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
         else:
-            cmd = f'''ssh {port} -T {identity} {s.ssh.username}@{s.ssh.server}
+            cmd = f'''ssh {port} -T {identity} {ssh.username}@{ssh.server}
                       "export MYSQL_PWD="{db.password}"; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
             cmd = ' '.join(cmd.split())
         self.run_put_cmd(cmd)

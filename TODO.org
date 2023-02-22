@@ -286,3 +286,13 @@ sink deploy clean  # rsync --delete?
 *** DONE Allow multiple ssh accounts
 CLOSED: [2022-11-11 Fri 10:29]
 Make the same as db, check each one, but only use the first one for actions
+
+
+* Scratch
+
+- config.project
+- config.servers
+  - config.ssh
+  - config.mysql
+  - config.urls
+  - config.actions

@@ -42,7 +42,7 @@ class Spinner:
             for cursor in cursors:
                 yield click.style(
                     f'{indent}[{cursor}]',
-                    fg=Color.YELLOW.value)
+                    fg=str(Color.YELLOW.value))
 
     def __init__(self, delay=None, indent=0):
         self.indent = indent
@@ -69,7 +69,22 @@ class Spinner:
 
 
 class Dict2obj:
+    """
+    test = {
+        'cow':{
+            'sound': 'moo',
+            'size': 'lg',
+            'color': {
+                'fg': 'white',
+                'bg': 'black'
+            }
+        }
+    }
+    test = Dict2obj(**test)
+    print(test.cow.color.bg) # black
+    """
     def __init__(self, **level):
+        self.raw = level
         for k, v in level.items():
             if isinstance(v, dict):
                 self.__dict__[k] = Dict2obj(**v)
@@ -82,12 +97,23 @@ class Dict2obj:
                 yield k, v
 
     def __repr__(self):
-        return 'Dict2obj()'
+        return f'{self.__class__.__name__}()'
 
-    def __str__(self):
-        from pprint import pformat
-        return pformat(self.__dict__)
+    # def __str__(self):
+        # print(self.raw)
 
+        # from pprint import pformat
+        # name = self.__repr__()
+        # name = click.style(name, fg='cyan', bold=True)
+        #
+        # data = pformat(self.raw)
+        # data = click.style(data, fg='cyan')
+        #
+        # return f'{name}\n{data}'
+
+    def to_dict(self):
+        pass
+        # return self.raw
 
 
 class Configuration:
@@ -324,7 +350,8 @@ class Configuration:
             ui.display_options(options)
             ui.error(f'Server: "{name}" does not exist in {self.config_file}')
 
-        return self._server(server, name)
+        server_data = self._server(server, name)
+        return server_data
 
     def _server(self, server, name):
         """Convert a server dict to obj"""
@@ -337,6 +364,13 @@ class Configuration:
                 cp = self.default_server['control_panel'].copy()
                 cp.update(v)
                 server['control_panel'] = cp
+            elif k == 'mysql':
+                mysql_holder = []
+                for mysql_db in v:
+                    mysql_template = self.default_mysql.copy()
+                    mysql_template.update(mysql_db)
+                    mysql_holder.append(Dict2obj(**mysql_template))
+                server['mysql'] = mysql_holder
             elif k == 'ssh':
                 ssh_holder = []
                 for ssh_user in v:
@@ -345,7 +379,12 @@ class Configuration:
                         ssh_template.update(ssh_user)
                     except ValueError:
                         ui.error(f'SSH settings are not an array, update sink.yaml to new format.')
-                    ssh_key = ssh_user['key']
+
+                    ssh_key = None
+                    try:
+                        ssh_key = ssh_user['key']
+                    except TypeError:
+                        pass
                     if ssh_key:
                         abs_ssh_key = os.path.abspath(os.path.expanduser(ssh_key))
                         prj_ssh_key = os.path.join(self.project_root, ssh_key)
