@@ -1,6 +1,5 @@
 #+STARTUP: indent
 
-cd ~/projects/sink && poetry build && pip install --force-reinstall dist/sink-0.2.1-py3-none-any.whl && cd - && echo -e "\n\n---------------------------\n" && sink db pull prod
 
 [[sink-logo.png?raw=true]]
 
