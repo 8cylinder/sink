@@ -115,7 +115,7 @@ class Transfer:
             for f in included_list:
                 conf_file = self._find(f, dest)
                 if conf_file:
-                    base_name = re.sub(f'\.{server.name}$', '', str(conf_file))
+                    base_name = re.sub(fr'\.{server.name}$', '', str(conf_file))
                     base_name = Path(base_name)
                     base_name.symlink_to(conf_file.name)
                     print(f'Symlink created to {conf_file.name} from {base_name}')
@@ -227,9 +227,11 @@ class Transfer:
             # "sudo rsync".  Also the '--group' and '--owner' flags
             # have to be used as well, otherwise '--chown' will be
             # ignored.
+            # https://askubuntu.com/a/719440
             group_flag = '--group' if s.group else ''
             user_flag = '--owner' if s.user else ''
-            group = f'{group_flag} {user_flag} --rsync-path="sudo rsync" --chown={s.group or ""}:{s.user or ""}'
+            # group = f'{group_flag} {user_flag} --rsync-path="sudo rsync" --chown={s.user or ""}:{s.group or ""}'
+            group = f'{group_flag} {user_flag} --chown={s.user or ""}:{s.group or ""}'
 
         if self.silent or self.quiet:
             extra_flags += ' --quiet '
