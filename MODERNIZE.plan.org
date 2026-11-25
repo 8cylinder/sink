@@ -96,10 +96,14 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =f1a4899= (Stage 2
-    docs).  The pre-modernization tag is =baseline-2026-11-25= at =064973c=.
+  - Branch =modernize=; last implementation commit =176ba54= (Stage 3
+    red/integration tests).  The pre-modernization tag is
+    =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
-    gates).  Next: Stage 3 (test harness).
+    gates), Stage 3 (test harness).  Next: Stage 4 (execution layer).
+  - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
+    root options), =176b556= (loader contract), =ffd9117= (golden
+    commands), =176ba54= (red regressions and integration marker).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -112,9 +116,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 5 passed, 11 strict =xfail=, branch coverage
-    38.88%, =fail_under = 35=; =ty= has 0 errors and 37 warnings
-    (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 68 passed, 30 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 55.75%, =fail_under = 35=; =ty=
+    has 0 errors and 37 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -496,7 +500,7 @@ scan covered 150 commits with zero findings.  Commits =7e234d8= (gates),
       commit.
 - The history scan is clean (150 commits, zero findings).
 
-* Stage 3 - Test harness and characterization tests                             :stage_3:
+* DONE Stage 3 - Test harness and characterization tests                        :stage_3:
 ** Goal
 Build the safety net the original code never had, before the behavioral
 refactors.  Tests must be hermetic: no real home directory, network, rsync, ssh,
@@ -539,36 +543,62 @@ or mysql.
    any packaging or metadata change still gets a test if it can regress.
 
 ** Tasks
-- [ ] =tests/conftest.py=: a temporary project fixture that writes a
+- [X] =tests/conftest.py=: a temporary project fixture that writes a
       =sink.yaml=, sets =HOME=, =XDG_CONFIG_HOME=, and =XDG_DATA_HOME=
       to =tmp_path=, and provides a Click =CliRunner=.
-- [ ] Add stub executables for =rsync=, =ssh=, =scp=, =mysql=,
-      =mysqldump=, =pv=, =git=, and =lando=/=ddev= that record argv and
-      exit 0.  The rsync stub must record whether =--dry-run= was present
-      so the default and =--real= variants can be asserted.  Put them at
-      the front of =PATH= per test.
-- [ ] Help tests: =-h= and =--help= for the root and every command,
+- [X] Add stub executables for =rsync=, =ssh=, =scp=, =mysql=,
+      =mysqldump=, =pv=, =git=, =less=, and =lando=/=ddev= that record
+      argv and exit 0.  The rsync stub records the full argv, including
+      whether =--dry-run= was present, so the default and =--real=
+      variants can be asserted.  Put them at the front of =PATH= per test.
+- [X] Help tests: =-h= and =--help= for the root and every command,
       exit 0, no ANSI, no required arguments.
-- [ ] Meta tests: =--version=, =--config=, =--completions=,
+- [X] Meta tests: =--version=, =--config=, =--completions=,
       =--color=, and the "not in a project" error.
-- [ ] Golden tests for generated commands (normalize the project path,
+- [X] Golden tests for generated commands (normalize the project path,
       temp dir names, and terminal width).
-- [ ] Loader tests: valid config, missing keys, unknown keys, bad YAML,
+- [X] Loader tests: valid config, missing keys, unknown keys, bad YAML,
       relative paths, ssh key resolution, =${ENV_VAR}=.
-- [ ] Mark =integration= tests for anything that needs real binaries or
+- [X] Mark =integration= tests for anything that needs real binaries or
       a network; skip them by default.
-- [ ] Keep the Stage 0 =xfail= tests; each later stage removes the
+- [X] Keep the Stage 0 =xfail= tests; each later stage removes the
       marker when it fixes the bug.
-- [ ] Add passing entrypoint tests: =sink vm= is gone, =--version=
+- [X] Add passing entrypoint tests: =sink vm= is gone, =--version=
       matches =pyproject.toml=, =python -m sink= works, and every help
       command exits 0 with no ANSI.
-- [ ] Add passing characterization tests for the current dry-run command
+- [X] Add passing characterization tests for the current dry-run command
       text for =file=, =db=, =deploy=, =diff=, and =single=; normalize
       paths and temp names.
-- [ ] Add red strict-=xfail= tests for unsupported behavior not yet
+- [X] Add red strict-=xfail= tests for unsupported behavior not yet
       covered: optional =file= server, =diff= exit status, =ssh= default
-      dry-run, deploy warning dedupe, =db= input validation, and
-      lando/ddev paths.
+      dry-run, =db= input validation, and lando/ddev paths.
+
+** Result
+68 tests pass, 30 are strict =xfail=, and one =integration= test is
+deselected by default; branch coverage rose from 38.88% to 55.75% with
+=fail_under = 35= still in place (the ratchet remains Stage 4/6/10 work).
+=ty= reports 0 errors and the same 37 legacy warnings; =make check= is
+green.
+
+New test modules: =test_help.py= (every command and nested group),
+=test_cli_meta.py= (version, entrypoints, project discovery, root
+options), =test_config_loader.py= (path/key resolution and Stage 5 error
+contract), =test_golden_commands.py= (normalized command text for file,
+db, deploy, diff, and check), =test_red_behaviors.py= (diff status, db
+input validation, lando/ddev failures, secret redaction), and
+=test_integration.py=.  =tests/helpers.py= holds ANSI stripping,
+stdout/stderr joining, shell-continuation unwrapping, and stub-log
+parsing.  The old top-level =sink/= directory contained only stale
+=__pycache__= files and was removed; coverage was measuring that empty
+path instead of =src/sink=.
+
+Red proofs: every new strict =xfail= was run with =--runxfail= and fails
+at its intended assertion.  Two caveats are recorded for the fixing
+stage: =misc settings= currently crashes on the ssh list before it can
+print a password, and no reproducible duplicate deploy-warning prompt
+exists yet, so the one-prompt put case is a passing characterization.
+The deploy warning dedupe repro moves to Stage 9 with the other deploy
+fixes.
 
 ** Exit criteria
 - =uv run pytest= passes on the unmodified code (expected failures are
@@ -1425,7 +1455,7 @@ Poetry/setup.py era.
   Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
   Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
   Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
-  Stage 3  | TODO | test count:              | coverage:
+  Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
   Stage 4  | TODO | shell=True sites: 0      | secrets test:
   Stage 5  | TODO | Dict2obj refs: 0         | loader tests:
   Stage 6  | TODO | commands split:          | help tests:
