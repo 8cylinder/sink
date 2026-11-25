@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: ./server
+      args:
+        UBUNTU_VERSION: ${SINK_TEST_UBUNTU:-26.04}
+    image: sink-test-server:${SINK_TEST_UBUNTU:-26.04}
+    ports:
+      - "127.0.0.1::22"
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      sink.integration: "true"
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootsecret
+      MYSQL_DATABASE: demo
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - -h
+        - 127.0.0.1
+        - -uroot
+        - -prootsecret
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    labels:
+      sink.integration: "true"

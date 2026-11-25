@@ -1,0 +1,11 @@
+Port 22
+ListenAddress 0.0.0.0
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+UsePAM no
+AllowUsers deploy
+AuthorizedKeysFile .ssh/authorized_keys
+PrintMotd no
+X11Forwarding no
+Subsystem sftp /usr/lib/openssh/sftp-server

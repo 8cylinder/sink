@@ -1,7 +1,12 @@
 SHELL := bash
 
 .DEFAULT_GOAL := help
-.PHONY: help sync hooks fmt fmt-check lint lint-check type arch test secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
+
+UBUNTU_OLDEST ?= 20.04
+UBUNTU_LATEST ?= 26.04
+UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
+
+.PHONY: help sync hooks fmt fmt-check lint lint-check type arch test integration integration-oldest integration-matrix integration-down secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -32,6 +37,21 @@ arch:  ## Check import boundaries
 
 test:  ## Run tests
 	uv run pytest
+
+integration:  ## Run Docker tests on the latest Ubuntu LTS
+	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration --no-cov
+
+integration-oldest:  ## Run Docker tests on the oldest Ubuntu LTS
+	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration --no-cov
+
+integration-matrix:  ## Run Docker tests on oldest and latest Ubuntu LTS
+	@for version in $(UBUNTU_VERSIONS); do \
+		echo "==> Ubuntu $$version"; \
+		SINK_TEST_UBUNTU=$$version uv run pytest -m integration --no-cov || exit $$?; \
+	done
+
+integration-down:  ## Remove leftover integration containers
+	docker ps -aq --filter label=sink.integration=true | xargs -r docker rm -f
 
 secrets:  ## Scan the repository history for secrets
 	gitleaks git --redact --no-banner
