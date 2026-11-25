@@ -116,7 +116,7 @@ parameter-already-assigned = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config --cov=sink --cov-branch --cov-report=term-missing"
+addopts = "-ra --strict-markers --strict-config -m 'not integration' --cov=sink --cov-branch --cov-report=term-missing"
 markers = [
   "integration: needs real rsync, ssh, mysql, or network",
 ]
