@@ -32,7 +32,7 @@ class DeployViaRename:
         self.date_file = f"SINK-DATE:{self.stamp}"
 
     def init_deploy(self, *dirs):
-        click.secho(f"\nOn remote server ({self.s.name}) run:", bold=True)
+        ui.heading(f"\nOn remote server ({self.s.name}) run:")
         deploy_dir = Path(self.s.deploy_root, self.stamp)
         date_file = deploy_dir / self.date_file
         if not dirs:
@@ -66,9 +66,7 @@ class DeployViaRename:
         ssh = self.ssh
         cmd = f"'mkdir {deploy_dest}'"
         ssh.run(cmd)
-        click.echo(
-            "\nNew dir created: {}".format(click.style(deploy_dest, fg="green"))
-        )
+        ui.output(f"\nNew dir created: {deploy_dest}\n")
 
         ssh.run(f"touch {self.s.deploy_root}/{self.stamp}/{self.date_file}")
 
@@ -114,7 +112,7 @@ class DeployViaSymlink:
         The second creates a symlink with the original <root> directory
         name that points to the new <root>.<timestamp>.original dir.
         """
-        click.secho(f"\nOn remote server ({self.s.name}) run:", bold=True)
+        ui.heading(f"\nOn remote server ({self.s.name}) run:")
         ui.display_cmd(f"mkdir {self.s.deploy_root}")
         ui.display_cmd(
             f"sudo mv {self.s.root} {self.s.deploy_root}/{self.stamp}"
@@ -142,9 +140,7 @@ class DeployViaSymlink:
         # cmd = f"'mkdir {deploy_dest} && sudo chown {self.s.group}: {deploy_dest}'"
         cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
         ssh.run(cmd)
-        click.echo(
-            "\nNew dir created: {}".format(click.style(deploy_dest, fg="green"))
-        )
+        ui.output(f"\nNew dir created: {deploy_dest}\n")
 
         previous_dest = self._get_active()
         if dump_db:
@@ -179,15 +175,15 @@ class DeployViaSymlink:
         ):
             data[letter] = full_filename
 
-        click.echo()
+        ui.echo()
         # pointer = '->'
         pointer = "▶"
-        pointer_pretty = click.style(pointer, fg="green", bold=True)
-        click.echo(
+        pointer_pretty = pointer
+        ui.echo(
             f"Select a letter to change the symlink to.  The {pointer_pretty} indicates"
         )
-        click.echo("the dir that the symlink currently points to.")
-        click.echo()
+        ui.echo("the dir that the symlink currently points to.")
+        ui.echo()
         for letter, full_filename in data.items():
             filename = Path(full_filename).parts[-1]
             indicator = " " * len(pointer)
@@ -199,15 +195,11 @@ class DeployViaSymlink:
                 date_tail, "%y-%m-%d_%H%M%S_%Z"
             )
             pretty_date = pretty_date.strftime("%b %d/%Y, %I:%M%p %Z").strip()
-            pretty_date = click.style(f"({pretty_date})", dim=True, fg="green")
-            full_filename = click.style(full_filename, bold=True)
-            indicator = click.style(indicator, fg="red", bold=True)
-            letter = click.style(f"{letter})", fg="green", bold=True)
-            click.echo(f"{indicator} {letter} {full_filename} {pretty_date}")
+            pretty_date = f"({pretty_date})"
+            letter = f"{letter})"
+            ui.echo(f"{indicator} {letter} {full_filename} {pretty_date}")
 
-        msg = click.style(
-            "Select a dir to link to (ctrl-c to abort)", fg="white"
-        )
+        msg = "Select a dir to link to (ctrl-c to abort)"
         choice = click.prompt(msg)
 
         if load_db:
@@ -229,7 +221,7 @@ class DeployViaSymlink:
         link_cmd = " ".join(link_cmd.split())
         ssh.run(link_cmd)
 
-        click.echo()
+        ui.echo()
         ui.display_success(self.real)
 
     def server_time(self):
@@ -357,11 +349,11 @@ class DeployViaLocal:
         extra_flags = ""
         if delete:
             msg = "This will delete files on the remote server, continue? [y/n]"
-            msg = click.style(msg, fg="red", bold=True)
+            # keep the confirmation text plain
             choice = click.prompt(f"\n{msg}")
             if choice.lower() == "y":
                 extra_flags = "--delete"
-                click.echo()
+                ui.echo()
             else:
                 return
 
@@ -387,7 +379,7 @@ class DeployViaLocal:
     def display_choices(self, dirs, current, server_name):
         pointer = "->"
         # pointer = '▶ '
-        pointer_pretty = click.style(pointer, fg="green", bold=True)
+        pointer_pretty = pointer
 
         try:
             deployed_date = current["created date"]
@@ -426,11 +418,11 @@ class DeployViaLocal:
                 f"No deploys on the server ({server_name}). This is OK if it's the first deploy."
             )
 
-        click.echo()
-        click.echo(
+        ui.echo()
+        ui.echo(
             f"The {pointer_pretty} indicates the currently deployed version."
         )
-        click.echo()
+        ui.echo()
 
         for letter, data in choices.items():
             try:
@@ -443,32 +435,26 @@ class DeployViaLocal:
                 active = pointer_pretty
 
             name = data.get("deploy name", "")
-            name = click.style(name, fg="bright_blue")
+            # deploy names are printed unstyled
 
             current_date = current_date.split("T")
-            current_date = (
-                click.style(current_date[0], fg="green")
-                + " "
-                + click.style(current_date[1], fg="green")
-            )
+            current_date = f"{current_date[0]} {current_date[1]}"
             line = f"{active} {letter}) {current_date} {name}"
-            click.echo(line)
+            ui.echo(line)
             note = data.get("note", None)
             if note:
-                click.secho(f"      {note}", fg="yellow")
+                ui.output(f"      {note}\n")
 
-        click.echo()
+        ui.echo()
         return self.choose_letter(choices)
 
     def choose_letter(self, choices):
-        msg = click.style(
-            "Select a deploy to upload (ctrl-c to abort)", fg="white"
-        )
+        msg = "Select a deploy to upload (ctrl-c to abort)"
         choice = click.prompt(msg)
         try:
             selected = choices[choice]
         except KeyError:
-            click.echo()
+            ui.echo()
             ui.warn("Invaid choice")
             selected = self.choose_letter(choices)
         return selected

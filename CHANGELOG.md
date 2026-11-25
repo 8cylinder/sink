@@ -4,6 +4,20 @@
 
 ### Changed
 
+- The Click command tree now lives in `sink.cli`, with one module per command
+  group and `sink.cli:main` as the console entry point. Root options include
+  `--color`, `--config`, `--completions`, `-q/-qq`, `--silent`, `-s`, and
+  `-v`.
+- Output modes are explicit: `-q` hides rendered commands, `-qq` hides all
+  output, and `--suppress-commands`/`--silent` remain aliases. Success lines
+  use `[Success]` and `[Success (DRY RUN)]` labels.
+- `--completions` writes a static bash script to the first configured
+  bash-completion directory and prints only its path on stdout.
+- `misc api` is JSON-only, redacts secret-looking values by default, and
+  offers `--show-secrets`. `misc settings` also redacts by default.
+- `db --quiet` is now `--filename-only`; `deploy new --quiet` is now
+  `--no-itemize`; `check --required` uses `-R` so `--real` can use `-r`.
+- Human output uses Rich; `click.style` and `click.secho` are gone.
 - Configuration is now loaded into immutable, typed models by a pure loader.
   A per-invocation `Runtime` owns the working directory and lazily loads the
   config; the mutable global `config` singleton and `Dict2obj` are gone.

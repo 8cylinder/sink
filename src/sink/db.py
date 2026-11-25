@@ -11,7 +11,7 @@ from sink.config.models import DatabaseConfig, Project, Server
 from sink.credentials import remote_mysql_credentials
 from sink.errors import CommandError
 from sink.shell import Argv, Pipeline, remote_command, run
-from sink.ui import Color, ui
+from sink.ui import ui
 
 
 @contextmanager
@@ -78,13 +78,13 @@ class DB:
         server: Server,
         real=False,
         verbose=False,
-        quiet=False,
+        filename_only=False,
     ):
         self.verbose = bool(verbose)
         self.real = real
         self.project = project
         self.server = server
-        self.quiet = quiet
+        self.filename_only = filename_only
         self.secrets: tuple[str, ...] = ()
 
     def _database(self) -> DatabaseConfig:
@@ -202,21 +202,35 @@ class DB:
 
     def _report_pull(self, result, sqlfile, local):
         if not self.real:
-            ui.display_success(self.real)
+            ui.display_success(
+                self.real,
+                server=self.server.name,
+                message="sql download complete",
+            )
         elif result.stderr:
-            click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
+            if ui.quiet < 2:
+                ui.err_console.print(str(sqlfile.absolute()), style="yellow")
             ui.error(f"\n{result.stderr}", secrets=self.secrets)
         elif local and (sqlfile.exists() or Path(f"{sqlfile}.gz").exists()):
             actual = sqlfile if sqlfile.exists() else Path(f"{sqlfile}.gz")
             filename = str(actual.absolute())
-            click.secho(filename, fg=Color.GREEN.value)
-            if not self.quiet:
-                ui.display_success(self.real)
+            if ui.quiet < 2:
+                ui.console.print(filename, style="green")
+            if not self.filename_only:
+                ui.display_success(
+                    self.real,
+                    server=self.server.name,
+                    message="sql download complete",
+                )
             self.make_symlink(actual)
         elif not local and result.ok:
-            ui.display_success(self.real)
+            ui.display_success(
+                self.real,
+                server=self.server.name,
+                message="sql download complete",
+            )
         elif local:
-            click.secho("Command failed", fg=Color.RED.value)
+            ui.error("Command failed", exit=False)
 
     def run_pull_cmd(self, cmd, sqlfile, local):
         result = run(cmd, real=self.real, capture=True)
@@ -316,7 +330,11 @@ class DB:
 
     def _report_put(self, result):
         if not self.real:
-            ui.display_success(self.real)
+            ui.display_success(
+                self.real,
+                server=self.server.name,
+                message="sql upload complete",
+            )
             return
         errors = [
             line
@@ -327,24 +345,20 @@ class DB:
             for line in errors:
                 ui.error(line, exit=False, secrets=self.secrets)
             sys.exit(1)
-        ui.display_success(self.real)
+        ui.display_success(
+            self.real,
+            server=self.server.name,
+            message="sql upload complete",
+        )
 
     def run_put_cmd(self, cmd):
         s = self.server
         if self.real and s.warn:
-            warn = click.style(
-                " WARNING: ",
-                bg=Color.YELLOW.value,
-                fg=Color.RED.value,
-                bold=True,
-                dim=True,
+            msg = (
+                f" WARNING: You are about to overwrite the {s.name} "
+                "database, continue?"
             )
-            msg = click.style(
-                f": You are about to overwrite the {s.name} "
-                "database, continue?",
-                fg=Color.YELLOW.value,
-            )
-            if not click.confirm(warn + msg):
+            if not click.confirm(msg):
                 return
         result = run(cmd, real=self.real, capture=True)
         self._report_put(result)

@@ -1,5 +1,3 @@
-import click
-
 from sink.config.models import Config, Server, SSHConfig
 
 
@@ -28,16 +26,14 @@ class Applications:
 
     def pretify(self, data):
         pretty = ""
-        for s in data:
+        for section in data:
             pretty += "\n"
-            pretty += click.style(f"{s[0][1]}\n", fg="blue", bold=True)
-            for field_name, field_value in s:
+            pretty += f"{section[0][1]}\n"
+            for field_name, field_value in section:
                 if not field_value:
                     field_value = ""
                 field_value = str(field_value)
-                field_name = click.style(field_name.ljust(18), dim=True)
-                field_value = click.style(field_value, fg="white")
-                pretty += f"{field_name} - {field_value}\n"
+                pretty += f"{field_name.ljust(18)} - {field_value}\n"
         return pretty
 
     @staticmethod
@@ -102,27 +98,13 @@ class Applications:
                 connection = []
                 title = "--".join([i for i in [p.name, s.name, db.db] if i])
                 connection.append(["Connection Name", f"{title}"])
-                connection.append(
-                    [
-                        click.style(
-                            "Main tab", fg="yellow", bold=True, underline=True
-                        ),
-                        "",
-                    ]
-                )
+                connection.append(["Main tab", ""])
                 connection.append(["Server Host", db.hostname])
                 connection.append(["Port", db.port])
                 connection.append(["Database", db.db])
                 connection.append(["Username", db.username])
                 connection.append(["Password", db.password])
-                connection.append(
-                    [
-                        click.style(
-                            "SSH tab", fg="yellow", bold=True, underline=True
-                        ),
-                        "",
-                    ]
-                )
+                connection.append(["SSH tab", ""])
                 connection.append(["Host/IP", ssh.server])
                 connection.append(["User Name", ssh.username])
                 connection.append(["Password", ssh.password])

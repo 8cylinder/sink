@@ -3,17 +3,15 @@ import ssl
 import urllib.error
 import urllib.request
 
-import click
-
 from sink.config.models import Config
 from sink.credentials import remote_mysql_credentials
 from sink.shell import remote_command, run
-from sink.ui import Color, Spinner, ui
+from sink.ui import Spinner, ui
 
 
 class TestConfig:
-    good = click.style("[\u2713]", fg=Color.GREEN.value)
-    bad = click.style("[X]", fg=Color.RED.value)
+    good = "[\u2713]"
+    bad = "[X]"
     timeout = 25
 
     def __init__(self, config: Config, real=False, insecure=False):
@@ -22,8 +20,8 @@ class TestConfig:
         self.insecure = insecure
 
     def test_project(self):
-        click.echo()
-        click.secho("Local dirs", fg=Color.GREEN.value, bold=True)
+        ui.echo()
+        ui.heading("Local dirs")
 
         indent = 2
         for name in ["pulls_dir", "log_dir", "cache_dir"]:
@@ -46,22 +44,17 @@ class TestConfig:
         req = " ".join(required)
         spliter = "==="
         cmd = f"""for prg in {req}; do echo '{spliter}'; $prg; done"""
-        click.echo()
-        click.echo("Run the following bash command:")
-        click.echo(cmd)
+        ui.echo()
+        ui.echo("Run the following bash command:")
+        ui.echo(cmd)
 
     def test_servers(self, server_names=None):
-        click.echo()
+        ui.echo()
         for s in self.config.servers.values():
             if server_names and s.name not in server_names:
                 continue
-            click.echo()
-            click.secho(
-                f"{s.name}",
-                fg=Color.GREEN.value,
-                bold=True,
-                underline=True,
-            )
+            ui.echo()
+            ui.heading(s.name, underline=True)
 
             # ssh login
             for ssh in s.ssh:
@@ -139,7 +132,7 @@ class TestConfig:
 
     def out(self, msg, spaces):
         indent = " " * spaces
-        click.echo(f"{indent}{msg}")
+        ui.output(f"{indent}{msg}\n")
 
     def run_cmd_on_server(self, ssh, cmd, good, bad):
         command = remote_command(

@@ -10,7 +10,8 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from sink.sink import sink
+from sink.cli import cli as sink
+from sink.ui import ui
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,13 @@ class ProjectFixture:
 # Every test starts outside a project and outside the real home directory.
 # Stage 5 replaces the global singleton; until then the reset below keeps the
 # pre-modernization suite deterministic.
+@pytest.fixture(autouse=True)
+def reset_ui():
+    ui.configure(color="auto", quiet=0, verbose=0, suppress=False)
+    yield
+    ui.configure(color="auto", quiet=0, verbose=0, suppress=False)
+
+
 @pytest.fixture(autouse=True)
 def isolated_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

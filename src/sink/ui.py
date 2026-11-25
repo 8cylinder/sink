@@ -1,10 +1,12 @@
+import os
 import random
 import sys
 import threading
 import time
-from enum import Enum
 
 import click
+from rich.console import Console
+from rich.text import Text
 
 
 class Spinner:
@@ -23,9 +25,7 @@ class Spinner:
         cursors = random.choice(cursors)
         while True:
             for cursor in cursors:
-                yield click.style(
-                    f"{indent}[{cursor}]", fg=str(Color.YELLOW.value)
-                )
+                yield f"{indent}[{cursor}]"
 
     def __init__(self, delay=None, indent=0):
         self.indent = indent
@@ -51,50 +51,54 @@ class Spinner:
         time.sleep(self.delay)
 
 
-class Color(Enum):
-    BLACK = "black"
-    RED = "red"
-    GREEN = "green"
-    YELLOW = "yellow"
-    BLUE = "blue"
-    MAGENTA = "magenta"
-    CYAN = "cyan"
-    WHITE = "white"
-    # RESET = 'reset'
-
-
 class ui:
+    quiet = 0
+    verbose = 0
     suppress = False
+    console = Console(highlight=False)
+    err_console = Console(stderr=True, highlight=False)
+
+    @classmethod
+    def configure(
+        cls,
+        *,
+        color="auto",
+        quiet=0,
+        verbose=0,
+        suppress=False,
+    ):
+        cls.quiet = quiet
+        cls.verbose = verbose
+        cls.suppress = suppress
+        if color == "always":
+            cls.console = Console(
+                force_terminal=True, highlight=False, color_system="standard"
+            )
+            cls.err_console = Console(
+                stderr=True,
+                force_terminal=True,
+                highlight=False,
+                color_system="standard",
+            )
+        elif color == "never":
+            cls.console = Console(no_color=True, highlight=False)
+            cls.err_console = Console(
+                stderr=True, no_color=True, highlight=False
+            )
+        else:
+            no_color = bool(os.environ.get("NO_COLOR"))
+            cls.console = Console(no_color=no_color, highlight=False)
+            cls.err_console = Console(
+                stderr=True, no_color=no_color, highlight=False
+            )
 
     @staticmethod
-    def msg(msg):
-        msg = [i.strip() for i in msg.split("\n")]
-        click.echo("\n".join(msg))
-
-    @staticmethod
-    def notice(msg):
-        w = click.style("Notice:", bold=True, fg=Color.BLUE.value)
-        m = click.style(msg, fg=Color.BLUE.value, reset=True)
-        click.echo(f"{w} {m}", err=True)
-
-    @staticmethod
-    def warn(msg, indent=""):
-        w = click.style("Warning:", bold=True, fg=Color.YELLOW.value)
-        m = click.style(msg, fg=Color.YELLOW.value, reset=True)
-        click.echo(f"{indent}{w} {m}", err=True)
-
-    @staticmethod
-    def error(msg, exit=True, indent=0, secrets=()):
-        msg = ui.redact(msg, secrets)
-        distance = ""
-        if indent:
-            distance = " " * indent
-            msg = "\n".join([f"{distance}{i}" for i in msg.split("\n")])
-        e = click.style(f"\n{distance}Error:", bold=True, fg=Color.RED.value)
-        m = click.style(msg, fg="red", reset=True)
-        click.echo(f"{e} {m}", err=True)
-        if exit:
-            sys.exit(1)
+    def heading(msg, *, underline=False):
+        if ui.quiet >= 2:
+            return
+        text = Text(msg, style="bold green")
+        text.stylize("underline" if underline else "bold")
+        ui.console.print(text, soft_wrap=True)
 
     @staticmethod
     def redact(text, secrets=()):
@@ -104,55 +108,102 @@ class ui:
         return text
 
     @staticmethod
+    def echo(msg="", nl=True):
+        if ui.quiet >= 2:
+            return
+        click.echo(msg, nl=nl)
+
+    @staticmethod
+    def output(text):
+        """Print command output verbatim unless -qq is active."""
+        if ui.quiet >= 2 or not text:
+            return
+        click.echo(text, nl=False)
+
+    @staticmethod
+    def msg(msg):
+        msg = [i.strip() for i in msg.split("\n")]
+        if ui.quiet >= 2:
+            return
+        click.echo("\n".join(msg))
+
+    @staticmethod
+    def notice(msg):
+        if ui.quiet >= 2:
+            return
+        ui.err_console.print(
+            Text(f"[Notice:] {msg}", style="blue"), soft_wrap=True
+        )
+
+    @staticmethod
+    def warn(msg, indent=""):
+        if ui.quiet >= 2:
+            return
+        ui.err_console.print(
+            Text(f"{indent}[Warning:] {msg}", style="yellow"), soft_wrap=True
+        )
+
+    @staticmethod
+    def error(msg, exit=True, indent=0, secrets=()):
+        msg = ui.redact(msg, secrets)
+        distance = ""
+        if indent:
+            distance = " " * indent
+            msg = "\n".join([f"{distance}{i}" for i in msg.split("\n")])
+        if ui.quiet < 2:
+            ui.err_console.print(
+                Text(f"{distance}[Error:] {msg}", style="red"), soft_wrap=True
+            )
+        if exit:
+            sys.exit(1)
+
+    @staticmethod
     def display_cmd(cmd, indent=0, suppress_commands=False, secrets=()):
-        if ui.suppress or suppress_commands:
+        if ui.quiet >= 1 or ui.suppress or suppress_commands:
             return
         cmd = ui.redact(cmd, secrets)
         distance = " " * indent
-        click.secho(f"{distance}+ {cmd}", fg=Color.YELLOW.value, dim=True)
+        ui.console.print(
+            Text(f"{distance}+ {cmd}", style="yellow dim"),
+            soft_wrap=True,
+        )
 
     @staticmethod
-    def display_success(real, extra=None):
-        nl = True
-        if extra:
-            nl = False
-            extra = f" {extra}"
-        if real:
-            click.secho(
-                "Success",
-                nl=nl,
-                bg=Color.GREEN.value,
-                fg=Color.WHITE.value,
-                bold=True,
-            )
-        else:
-            click.secho(
-                "Success (DRY RUN)",
-                nl=nl,
-                bg=Color.BLUE.value,
-                fg=Color.WHITE.value,
-                bold=True,
-            )
-        if extra:
-            # click.secho(extra)
-            print(extra)
+    def display_success(real, extra=None, *, server=None, message=None):
+        if ui.quiet >= 2:
+            return
+        label = "[Success]" if real else "[Success (DRY RUN)]"
+        style = "bold white on green" if real else "bold white on blue"
+        text = Text(label, style=style)
+        detail = ""
+        if server is not None:
+            detail = f"{server}: {message or 'complete'}"
+        elif message is not None:
+            detail = message
+        elif extra:
+            detail = extra
+        if detail:
+            text.append(f" {detail}")
+        ui.console.print(text)
 
     @staticmethod
     def display_options(data):
-        max = 0
-        for key, _val in data.items():
-            if len(key) > max:
-                max = len(key)
+        if ui.quiet >= 2:
+            return
+        width = max((len(key) for key in data), default=0)
         for key, val in data.items():
-            key = click.style(key.ljust(max), bold=True)
-            val = click.style(f"({val})", fg=Color.BLUE.value)
-            click.echo(f"  {key}  {val}")
+            text = Text()
+            text.append(key.ljust(width), style="bold")
+            text.append(f"  ({val})", style="blue")
+            ui.console.print(text, soft_wrap=True)
 
     @staticmethod
     def print_stack():
         import traceback
 
+        if ui.quiet >= 2:
+            return
         for line in traceback.format_stack()[:-1]:
             filename, code = line.strip().split("\n")
-            print(click.style("■", fg="red"), filename)
-            print(click.style(code, fg="yellow"))
+            ui.console.print(Text(f"\u25a0 {filename}", style="red"))
+            ui.console.print(Text(code, style="yellow"))

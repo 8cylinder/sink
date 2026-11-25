@@ -9,7 +9,7 @@ import yaml
 from click.testing import CliRunner
 from helpers import combined, commands_named, unwrap
 
-from sink.sink import sink
+from sink.cli import cli as sink
 
 
 def test_valid_config_resolves_relative_paths_and_ssh_key(

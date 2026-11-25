@@ -1,7 +1,5 @@
 import shlex
 
-import click
-
 from sink.config.models import Project, Server
 from sink.errors import CommandError
 from sink.shell import Argv, run
@@ -25,9 +23,7 @@ class Actions:
 
     def list_actions(self):
         for name, cmd in self.actions().items():
-            name = click.style(name, bold=True)
-            cmd = click.style(f'"{cmd}"', dim=True)
-            click.echo(f"{name} - {cmd}")
+            ui.output(f'{name} - "{cmd}"\n')
 
     def run(self, command_name):
         commands = self.actions()
@@ -44,7 +40,7 @@ class Actions:
                 raise CommandError(f'"{command_name}" is empty')
             result = run(Argv(argv), real=not self.dry_run, capture=True)
             if result.stdout:
-                print(result.stdout)
+                ui.output(result.stdout)
             if result.returncode:
                 raise CommandError(
                     result.stderr.strip() or f'"{command_name}" failed'
@@ -52,4 +48,4 @@ class Actions:
         else:
             ssh = SSH(server=self.server, dry_run=self.dry_run)
             result = ssh.run(cmd)
-            print(result)
+            ui.output(result)

@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 from helpers import combined
 
-from sink.sink import sink
+from sink.cli import cli as sink
 
 
 def walk_commands(

@@ -9,11 +9,10 @@ import tomllib
 from importlib.metadata import version
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
 from helpers import combined
 
-from sink.sink import sink
+from sink.cli import cli as sink
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -74,9 +73,6 @@ def test_no_arguments_shows_help() -> None:
     assert "Usage: sink" in result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 6: --config prints the discovered path"
-)
 def test_config_prints_the_discovered_path(project_factory) -> None:
     project = project_factory()
     result = project.invoke("--config")
@@ -88,24 +84,19 @@ def test_config_prints_the_discovered_path(project_factory) -> None:
     assert "\x1b[" not in result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 6: --completions installs a static script"
-)
 def test_completions_writes_a_static_script(project_factory) -> None:
     project = project_factory()
     result = project.invoke("--completions")
 
     assert result.exit_code == 0, combined(result)
-    printed = Path(result.output.strip())
+    printed = Path(result.stdout.strip())
     assert printed.is_absolute()
     assert printed.name == "sink.bash"
     assert printed.is_file()
-    assert "\x1b[" not in result.output
+    assert "source " in result.stderr
+    assert "\x1b[" not in result.stdout
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 6: root --color option is not implemented"
-)
 def test_color_never_is_accepted_and_plain(project_factory) -> None:
     project = project_factory()
     result = project.invoke("--color", "never", "--help")
@@ -115,22 +106,15 @@ def test_color_never_is_accepted_and_plain(project_factory) -> None:
     assert "\x1b[" not in result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 6: root -q/--quiet count option is not implemented",
-)
 def test_quiet_hides_only_the_rendered_command(project_factory) -> None:
     project = project_factory()
     result = project.invoke("-q", "file", "put", "dev")
 
     assert result.exit_code == 0, combined(result)
     assert "+ rsync" not in result.output
-    assert "Success (DRY RUN)" in result.output
+    assert "[Success (DRY RUN)]" in result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 6: root -qq silent mode is not implemented"
-)
 def test_double_quiet_suppresses_everything(project_factory) -> None:
     project = project_factory()
     result = project.invoke("-qq", "file", "put", "dev")
@@ -140,9 +124,6 @@ def test_double_quiet_suppresses_everything(project_factory) -> None:
     assert result.stderr == ""
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 6: root --silent alias is not implemented"
-)
 def test_silent_alias_still_exists(project_factory) -> None:
     project = project_factory()
     result = project.invoke("--silent", "file", "put", "dev")
@@ -159,7 +140,7 @@ def test_suppress_commands_hides_only_the_render(project_factory) -> None:
 
     assert result.exit_code == 0, combined(result)
     assert "+ rsync" not in result.output
-    assert "Success (DRY RUN)" in result.output
+    assert "[Success (DRY RUN)]" in result.output
 
 
 def test_suppress_commands_is_documented() -> None:

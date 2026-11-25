@@ -85,10 +85,6 @@ def test_ddev_pull_failure_is_reported(project_factory) -> None:
     assert "ddev exploded" in combined(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N23/S5: misc settings prints database passwords",
-)
 def test_misc_settings_redacts_passwords(project_factory) -> None:
     project = project_factory()
 
@@ -98,10 +94,6 @@ def test_misc_settings_redacts_passwords(project_factory) -> None:
     assert "secret" not in combined(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N23/S5: misc api prints database passwords",
-)
 def test_misc_api_redacts_passwords(project_factory) -> None:
     project = project_factory()
 

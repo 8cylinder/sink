@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sink = "sink.sink:sink"
+sink = "sink.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/8cylinder/sink"
@@ -124,7 +124,7 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 60
+fail_under = 65
 show_missing = true
 
 [tool.importlinter]
@@ -135,7 +135,7 @@ include_external_packages = true
 name = "Runtime sits above the loader"
 type = "layers"
 layers = [
-  "sink.sink",
+  "sink.cli",
   "sink.runtime",
   "sink.config.loader",
   "sink.config.models",

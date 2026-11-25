@@ -1,4 +1,4 @@
-from sink.sink import sink
+from sink.cli import main
 
 if __name__ == "__main__":
-    sink(prog_name="sink")
+    raise SystemExit(main())

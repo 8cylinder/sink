@@ -1,1 +1,1 @@
-Warning: DIST (<CONFIG_DIR>/dist) dir does not exist, creating it.
+[Warning:] DIST (<CONFIG_DIR>/dist) dir does not exist, creating it.

@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from sink.cli import cli as sink
 from sink.config.loader import load
 from sink.config.models import Config
 from sink.errors import NotInProject
 from sink.runtime import Runtime
-from sink.sink import sink
 
 
 def test_runtime_does_not_load_config_on_creation(tmp_path: Path) -> None:

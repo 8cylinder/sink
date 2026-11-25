@@ -27,6 +27,10 @@ class Runtime:
     ) -> Runtime:
         return cls(cwd=cwd or Path.cwd(), quiet=quiet, _config=config)
 
+    @staticmethod
+    def discover_config(cwd: Path) -> Path | None:
+        return find_config(cwd)
+
     @property
     def config(self) -> Config:
         if self._config is None:

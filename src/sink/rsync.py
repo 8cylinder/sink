@@ -9,7 +9,7 @@ import click
 
 from sink.config.models import Action, Project, Server
 from sink.shell import Argv, Pipeline, run
-from sink.ui import Color, ui
+from sink.ui import ui
 
 
 # Rsync ignore owner, group, time, and perms:
@@ -209,7 +209,7 @@ class Transfer:
             pipeline = Pipeline((Argv(tuple(argv)), Argv(("less",))))
             result = run(pipeline, real=self.real, capture=False)
             if self.real and result.returncode == 0:
-                click.echo("Files are the same.")
+                ui.echo("Files are the same.")
 
     def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
         gui = self.project.difftool
@@ -340,19 +340,11 @@ class Transfer:
         doit = True
         if not single and action == Action.PUT and server.warn and self.real:
             doit = False
-            warn = click.style(
-                " WARNING: ",
-                bg=Color.YELLOW.value,
-                fg=Color.RED.value,
-                bold=True,
-                dim=True,
+            msg = (
+                f" WARNING: You are about to overwrite the {server.name} "
+                f'"{remotef}" files, continue?'
             )
-            msg = click.style(
-                f": You are about to overwrite the {server.name} "
-                f'"{remotef}" files, continue?',
-                fg=Color.YELLOW.value,
-            )
-            if click.confirm(warn + msg):
+            if click.confirm(msg):
                 doit = True
 
         if not doit:
@@ -360,13 +352,20 @@ class Transfer:
 
         result = run(command, real=self.real, capture=True)
         if result.stdout:
-            click.echo(result.stdout, nl=False)
+            ui.output(result.stdout)
         if result.returncode:
             ui.error(f"\n{result.stderr}")
         elif single:
-            ui.display_success(self.real, f"[{server.name}] {localf}")
+            ui.display_success(
+                self.real, server=server.name, message=str(localf)
+            )
         else:
-            ui.display_success(self.real)
+            message = (
+                "upload complete"
+                if action == Action.PUT
+                else "download complete"
+            )
+            ui.display_success(self.real, server=server.name, message=message)
 
     def error_code(self, code):
         code = str(code)
