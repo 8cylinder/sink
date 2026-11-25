@@ -21,11 +21,8 @@ class TestConfig:
     bad = "[X]"
     timeout = 25
 
-    def __init__(
-        self, config: Config, real: bool = False, insecure: bool = False
-    ) -> None:
+    def __init__(self, config: Config, insecure: bool = False) -> None:
         self.config = config
-        self.real = real
         self.insecure = insecure
 
     def test_unknown_keys(self) -> None:
@@ -118,7 +115,7 @@ class TestConfig:
                             user=db.username,
                             host=db.hostname,
                             port=_port(db),
-                            real=self.real,
+                            real=True,
                         ) as credentials:
                             argv = [
                                 "mysql",
@@ -136,9 +133,6 @@ class TestConfig:
 
             for u in s.urls:
                 if not u.url:
-                    continue
-                if not self.real:
-                    self.out(f"+ URL({u.url})", 2)
                     continue
                 with ui.status(f"Checking {u.url}"):
                     try:
@@ -201,9 +195,7 @@ class TestConfig:
             batch=True,
             timeout=self.timeout,
         )
-        result = run(command, real=self.real, capture=True)
-        if not self.real:
-            return True
+        result = run(command, real=True, capture=True)
         if result.returncode:
             self.out(f"{self.bad} {bad} (error: {result.returncode})", 2)
             if result.stderr:

@@ -11,6 +11,8 @@
 
 ### Changed
 
+- `sink check` always runs its read-only probes and no longer has a
+  `--real` flag. `--insecure` remains the TLS opt-out.
 - The source tree is fully annotated and type-checked with `ty` without
   warning downgrades. Ruff now enforces `ANN`, `PTH`, `DTZ`, `RET`, and
   `ARG`, and branch coverage is gated at 90%.

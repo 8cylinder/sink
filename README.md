@@ -112,7 +112,8 @@ See [docs/cli.md](docs/cli.md) or `sink COMMAND -h` for the full reference.
 
 Dry-run is the default. Commands with a native dry-run (`rsync --dry-run`)
 execute that variant so you can see the intended action. Other commands are
-printed and not spawned.
+printed and not spawned. `sink check` is the exception: its probes are
+read-only, so it always executes them and has no `--real` flag.
 
 ```console
 $ sink file put dev index.html

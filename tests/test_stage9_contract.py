@@ -18,7 +18,7 @@ def test_check_reports_project_and_server_fields(project_factory) -> None:
     assert "pulls_dir" in text
     assert "warn" in text
     assert "automatic" in text
-    assert project.stub_log.read_text() == ""
+    assert project.stub_log.read_text() != ""
 
 
 def test_check_reports_a_missing_rsync_binary(project_factory) -> None:
@@ -33,14 +33,19 @@ def test_check_reports_a_missing_rsync_binary(project_factory) -> None:
     assert "missing" in combined(result)
 
 
-def test_check_dry_run_prints_url_probes(project_factory) -> None:
+def test_check_runs_url_probes(project_factory, monkeypatch) -> None:
     project = project_factory(urls=[{"url": "https://example.test"}])
 
+    def fake_urlopen(_url, timeout=None, context=None):
+        _ = timeout, context
+        return object()
+
+    monkeypatch.setattr("sink.check.urllib.request.urlopen", fake_urlopen)
     result = project.invoke("check", "dev")
 
     assert result.exit_code == 0, combined(result)
-    assert "+ URL(https://example.test)" in combined(result)
-    assert project.stub_log.read_text() == ""
+    assert "URL(https://example.test)" in combined(result)
+    assert project.stub_log.read_text() != ""
 
 
 def test_db_pull_creates_the_latest_symlink(project_factory) -> None:

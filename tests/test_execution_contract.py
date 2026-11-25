@@ -37,24 +37,6 @@ def test_command_module_and_plumbum_are_gone() -> None:
     assert "plumbum" not in pyproject
 
 
-def test_check_defaults_to_dry_run(project_factory) -> None:
-    project = project_factory()
-
-    result = project.invoke("check", "dev")
-
-    assert result.exit_code == 0, combined(result)
-    assert project.stub_log.read_text() == ""
-
-
-def test_check_accepts_real(project_factory) -> None:
-    project = project_factory()
-
-    result = project.invoke("check", "dev", "--real")
-
-    assert result.exit_code == 0, combined(result)
-    assert project.stub_log.read_text() != ""
-
-
 def test_check_accepts_insecure(project_factory) -> None:
     project = project_factory()
 
@@ -77,13 +59,13 @@ def test_check_verifies_tls_by_default(
 
     monkeypatch.setattr("sink.check.urllib.request.urlopen", fake_urlopen)
 
-    result = project.invoke("check", "dev", "--real")
+    result = project.invoke("check", "dev")
     assert result.exit_code == 0, combined(result)
     assert contexts[0].verify_mode == ssl.CERT_REQUIRED
     assert contexts[0].check_hostname is True
 
     contexts.clear()
-    result = project.invoke("check", "dev", "--real", "--insecure")
+    result = project.invoke("check", "dev", "--insecure")
     assert result.exit_code == 0, combined(result)
     assert contexts[0].verify_mode == ssl.CERT_NONE
 
@@ -138,7 +120,7 @@ def test_db_put_does_not_leak_the_password(project_factory) -> None:
 def test_check_does_not_leak_the_password(project_factory) -> None:
     project = project_factory()
 
-    result = project.invoke("check", "dev", "--real")
+    result = project.invoke("check", "dev")
 
     assert result.exit_code == 0, combined(result)
     assert "secret" not in combined(result)

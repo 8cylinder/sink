@@ -31,7 +31,8 @@ sink file put dev index.html
 
 `rsync` runs its native `--dry-run` variant by default. Commands without a
 native dry-run are printed and not executed. Use `--real`/`-r` to run the
-printed command.
+printed command. `sink check` is the exception: its probes are read-only and
+always run.
 
 ## Output levels
 

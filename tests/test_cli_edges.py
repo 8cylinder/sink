@@ -174,9 +174,7 @@ def test_check_required_and_missing_fields(project_factory) -> None:
 def test_check_real_failure(project_factory) -> None:
     project = project_factory()
 
-    result = project.invoke(
-        "check", "dev", "--real", env={"STUB_EXIT_SSH": "1"}
-    )
+    result = project.invoke("check", "dev", env={"STUB_EXIT_SSH": "1"})
 
     assert result.exit_code == 0
     assert "ssh login failed" in combined(result)
