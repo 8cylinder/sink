@@ -16,7 +16,9 @@
   the unused `log_dir` and `cache_dir` settings. Status lines now lead with
   colored `✓`/`✗` markers, omit the table header, and render `key: value`
   with the key and value in different colors. Probe errors print a compact
-  indented `[Error]` line without surrounding blank lines.
+  indented `[Error]` line without surrounding blank lines. Database status
+  lines include the username so multiple entries for the same database are
+  distinguishable.
 - The source tree is fully annotated and type-checked with `ty` without
   warning downgrades. Ruff now enforces `ANN`, `PTH`, `DTZ`, `RET`, and
   `ARG`, and branch coverage is gated at 90%.
