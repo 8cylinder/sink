@@ -1,32 +1,27 @@
 #!/usr/bin/env python3
-import os
-# noinspection PyUnresolvedReferences
-from pprint import pprint as pp
-from pathlib import Path
 import datetime
-from collections import OrderedDict
-import yaml
+import os
+from contextlib import suppress
 from enum import Enum
+from pathlib import Path
+
+# noinspection PyUnresolvedReferences
 import click
+import yaml
+
+from sink.actions import Actions
+from sink.applications import Applications
+from sink.check import TestConfig
+
 # from rich_click import RichCommand, RichGroup, rich_click
 # import rich_click # as click
-
-
-from sink.config import config
-from sink.config import Color
-from sink.config import Action
-from sink.check import TestConfig
+from sink.config import Action, Color, config
 from sink.db import DB
-from sink.rsync import Transfer
-from sink.ui import ui
-from sink.ssh import SSH
-from sink.applications import Applications
+from sink.deploy import DeployViaLocal, DeployViaRename, DeployViaSymlink
 from sink.init import Init
-from sink.deploy import DeployViaSymlink
-from sink.deploy import DeployViaRename
-from sink.deploy import DeployViaLocal
-from sink.actions import Actions
-
+from sink.rsync import Transfer
+from sink.ssh import SSH
+from sink.ui import ui
 
 ## RICH_CLICK
 # rich_click.USE_RICH_MARKUP = True
@@ -47,7 +42,9 @@ from sink.actions import Actions
 
 def get_servers(ctx, args, incomplete):
     config.load_config()
-    servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
+    servers = [
+        i.name for i in config.servers() if i.name.startswith(incomplete)
+    ]
     # if not servers:
     #     ui.error('no servers defined (you are probably not in a project)')
     return servers
@@ -61,20 +58,25 @@ class NaturalOrderGroup(click.Group):
 
     https://github.com/pallets/click/issues/513
     """
+
     def list_commands(self, ctx):
         return self.commands.keys()
 
 
 CONTEXT_SETTINGS = {
-    'help_option_names': ['-h', '--help'],
+    "help_option_names": ["-h", "--help"],
     # 'token_normalize_func': lambda x: x.lower(),
 }
 
 
 @click.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 # @click.group(context_settings=CONTEXT_SETTINGS, cls=RichGroup) # RICH_CLICK
-@click.option('-s', '--suppress-commands', is_flag=True,
-              help="Don't display the bash commands used.")
+@click.option(
+    "-s",
+    "--suppress-commands",
+    is_flag=True,
+    help="Don't display the bash commands used.",
+)
 @click.version_option(package_name="sink", prog_name="sink")
 def sink(suppress_commands):
     """🐙 Tools to manage projects.
@@ -86,16 +88,19 @@ def sink(suppress_commands):
 
 # --------------------------------- DB ---------------------------------
 # @sink.command('db', context_settings=CONTEXT_SETTINGS, cls=RichCommand)  # RICH_CLICK
-@sink.command('db', context_settings=CONTEXT_SETTINGS)
-@click.argument('db-action', type=click.Choice([i.value for i in Action]))
+@sink.command("db", context_settings=CONTEXT_SETTINGS)
+@click.argument("db-action", type=click.Choice([i.value for i in Action]))
 # @click.argument('server', type=click.Choice(get_server_choices()), shell_complete=get_servers)
-@click.argument('server', type=click.STRING, shell_complete=get_servers)
-@click.argument('sql-gz', type=click.Path(exists=True), required=False)
-@click.option('--tag', '-t', type=click.STRING,
-              help="Add a tag to the generated filename when pulling.")
-@click.option('--real', '-r', is_flag=True)
-@click.option('--quiet', '-q', is_flag=True,
-              help='Return only the filename')
+@click.argument("server", type=click.STRING, shell_complete=get_servers)
+@click.argument("sql-gz", type=click.Path(exists=True), required=False)
+@click.option(
+    "--tag",
+    "-t",
+    type=click.STRING,
+    help="Add a tag to the generated filename when pulling.",
+)
+@click.option("--real", "-r", is_flag=True)
+@click.option("--quiet", "-q", is_flag=True, help="Return only the filename")
 def database(db_action, sql_gz, server, real, quiet, tag):
     """Overwrite a db with a gzipped sql file.
 
@@ -123,15 +128,15 @@ def database(db_action, sql_gz, server, real, quiet, tag):
 
 
 # ------------------------------- Files -------------------------------
-@sink.command('file', context_settings=CONTEXT_SETTINGS)
-@click.argument('action', type=click.Choice([str(i.value) for i in Action]))
-@click.argument('server', shell_complete=get_servers)
-@click.argument('filename', type=click.Path(), required=False)
-@click.option('--real', '-r', is_flag=True)
-@click.option('--silent', '-s', is_flag=True,
-              help='Reduced output, for use in Emacs.')
-@click.option('--extra-flags',
-              help='extra flags to pass to rsync.')
+@sink.command("file", context_settings=CONTEXT_SETTINGS)
+@click.argument("action", type=click.Choice([str(i.value) for i in Action]))
+@click.argument("server", shell_complete=get_servers)
+@click.argument("filename", type=click.Path(), required=False)
+@click.option("--real", "-r", is_flag=True)
+@click.option(
+    "--silent", "-s", is_flag=True, help="Reduced output, for use in Emacs."
+)
+@click.option("--extra-flags", help="extra flags to pass to rsync.")
 def files(action, filename, server, real, silent, extra_flags):
     """Send files to and fro.
 
@@ -143,7 +148,7 @@ def files(action, filename, server, real, silent, extra_flags):
     FILENAME: file/dir to be transfered."""
 
     if filename and action == Action.PUT.value and not os.path.exists(filename):
-        ui.error(f'Path does not exist: {filename}')
+        ui.error(f"Path does not exist: {filename}")
 
     config.load_config()
     if filename:
@@ -153,7 +158,7 @@ def files(action, filename, server, real, silent, extra_flags):
         f = Path(prj.root)
 
     xfer = Transfer(real, server_name=server, silent=silent)
-    extra_flags = '' if not extra_flags else extra_flags
+    extra_flags = extra_flags if extra_flags else ""
 
     if action == Action.PULL.value:
         xfer.pull(f, extra_flags)
@@ -161,11 +166,12 @@ def files(action, filename, server, real, silent, extra_flags):
         xfer.put(f, extra_flags)
 
 
-@sink.command('single', context_settings=CONTEXT_SETTINGS)
-@click.argument('filename', type=click.Path(), required=True)
-@click.option('--real', '-r', is_flag=True)
-@click.option('--silent', '-s', is_flag=True,
-              help='Reduced output, for use in Emacs.')
+@sink.command("single", context_settings=CONTEXT_SETTINGS)
+@click.argument("filename", type=click.Path(), required=True)
+@click.option("--real", "-r", is_flag=True)
+@click.option(
+    "--silent", "-s", is_flag=True, help="Reduced output, for use in Emacs."
+)
 def automatic(filename, real, silent):
     """Send a single file to any server marked as automatic.
 
@@ -180,10 +186,11 @@ def automatic(filename, real, silent):
 
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('user', required=False)
-@click.option('--dry-run', '-d', is_flag=True,
-              help='Do nothing, show the command only.')
+@click.argument("server", shell_complete=get_servers)
+@click.argument("user", required=False)
+@click.option(
+    "--dry-run", "-d", is_flag=True, help="Do nothing, show the command only."
+)
 def ssh(server, user, dry_run):
     """SSH into a server."""
     config.load_config()
@@ -191,15 +198,21 @@ def ssh(server, user, dry_run):
     ssh.visit_ssh()
 
 
-@sink.command('diff', context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('filename', type=click.Path(exists=True), required=False)
-@click.option('--ignore-whitespace', '-i', is_flag=True,
-              help='Ignore whitespace in diff.')
-@click.option('--difftool', '-d', is_flag=True,
-              help='Use meld instead of "git diff".')
-@click.option('--word-diff', '-w', type=click.Choice(['word', 'letter']),
-              help='Refine diffs to word or letter differences.')
+@sink.command("diff", context_settings=CONTEXT_SETTINGS)
+@click.argument("server", shell_complete=get_servers)
+@click.argument("filename", type=click.Path(exists=True), required=False)
+@click.option(
+    "--ignore-whitespace", "-i", is_flag=True, help="Ignore whitespace in diff."
+)
+@click.option(
+    "--difftool", "-d", is_flag=True, help='Use meld instead of "git diff".'
+)
+@click.option(
+    "--word-diff",
+    "-w",
+    type=click.Choice(["word", "letter"]),
+    help="Refine diffs to word or letter differences.",
+)
 def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
     """Diff a local and remote file.
 
@@ -214,8 +227,9 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
         filename = Path(prj.root)
     fx = Path(os.path.abspath(filename))
     xfer = Transfer(real=True, server_name=server)
-    xfer.diff(fx, ignore=ignore_whitespace,
-              word_diff=word_diff, difftool=difftool)
+    xfer.diff(
+        fx, ignore=ignore_whitespace, word_diff=word_diff, difftool=difftool
+    )
 
 
 def edit_config():
@@ -224,30 +238,32 @@ def edit_config():
         with open(config.config_file) as f:
             yaml.safe_load(f)
     except yaml.YAMLError as e:
-        if hasattr(e, 'problem_mark'):
-            msg = 'There was an error while parsing the config file'
+        if hasattr(e, "problem_mark"):
+            msg = "There was an error while parsing the config file"
             if e.context is not None:
                 ui.error(
-                    f'{msg}:\n{e.problem_mark}\n{e.problem} {e.context}.',
-                    exit=False)
+                    f"{msg}:\n{e.problem_mark}\n{e.problem} {e.context}.",
+                    exit=False,
+                )
             else:
-                ui.error(
-                    f'{msg}:\n{e.problem_mark} {e.problem}.', exit=False)
+                ui.error(f"{msg}:\n{e.problem_mark} {e.problem}.", exit=False)
         else:
             ui.error(
-                "Something went wrong while parsing the yaml file.",
-                exit=False)
+                "Something went wrong while parsing the yaml file.", exit=False
+            )
 
         re_edit = click.confirm(
-            '\nDo you want to edit the file again?', default=True)
+            "\nDo you want to edit the file again?", default=True
+        )
 
         if re_edit:
             edit_config()
 
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.option('--view/--edit', '-v/-e', default=True,
-              help='View or edit config file.')
+@click.option(
+    "--view/--edit", "-v/-e", default=True, help="View or edit config file."
+)
 def info(view):
     """View or edit the config file.
 
@@ -270,8 +286,8 @@ def info(view):
 
 
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server-names', nargs=-1)
-@click.option('--required', '-r', is_flag=True)
+@click.argument("server-names", nargs=-1)
+@click.option("--required", "-r", is_flag=True)
 def check(required, server_names):
     """Test server settings in config."""
     config.load_config()
@@ -286,9 +302,9 @@ def check(required, server_names):
 
 # ------------------------------- Actions -------------------------------
 @sink.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('action_name', required=False)
-@click.option('--real', '-r', is_flag=True)
+@click.argument("server", shell_complete=get_servers)
+@click.argument("action_name", required=False)
+@click.option("--real", "-r", is_flag=True)
 def action(server, action_name, real):
     """Run a pre defined command on the server.
 
@@ -319,16 +335,21 @@ def action(server, action_name, real):
 
 # ------------------------------- Deploy ------------------------------
 
+
 class DeployType(Enum):
-    RENAME = 'rename'
-    SYMLINK = 'symlink'
-    LOCAL = 'local'
+    RENAME = "rename"
+    SYMLINK = "symlink"
+    LOCAL = "local"
 
 
 @sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
-@click.option('-m', '--method', default=DeployType.LOCAL.value,
-              type=click.Choice([i.value for i in DeployType]),
-              help=f"Deploy method, default {DeployType.LOCAL.value}")
+@click.option(
+    "-m",
+    "--method",
+    default=DeployType.LOCAL.value,
+    type=click.Choice([i.value for i in DeployType]),
+    help=f"Deploy method, default {DeployType.LOCAL.value}",
+)
 @click.pass_context
 def deploy(ctx, method):
     """[Group] Deploy site to server with rollback."""
@@ -336,8 +357,8 @@ def deploy(ctx, method):
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('dirs', nargs=-1)
+@click.argument("server", shell_complete=get_servers)
+@click.argument("dirs", nargs=-1)
 @click.pass_context
 def init(ctx, server, dirs):
     """Initialize and setup a deploy.
@@ -358,17 +379,19 @@ def init(ctx, server, dirs):
         deploy = DeployViaLocal()
         deploy.init_deploy()
     else:
-        ui.error('deploy type wrong')
+        ui.error("deploy type wrong")
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.option('--real', '-r', is_flag=True)
-@click.option('--quiet', '-q', is_flag=True,
-              help='No itemized output from rsync.')
-@click.option('-d', '--dump-db', is_flag=True,
-              help='Take a snapshot of the db.')
-@click.option('-n', '--note', help="Add a note to DEPLOY_INFO.yaml.")
+@click.argument("server", shell_complete=get_servers)
+@click.option("--real", "-r", is_flag=True)
+@click.option(
+    "--quiet", "-q", is_flag=True, help="No itemized output from rsync."
+)
+@click.option(
+    "-d", "--dump-db", is_flag=True, help="Take a snapshot of the db."
+)
+@click.option("-n", "--note", help="Add a note to DEPLOY_INFO.yaml.")
 @click.pass_context
 def new(ctx, server, real, quiet, dump_db, note):
     """Upload a new version of the site.
@@ -388,16 +411,20 @@ def new(ctx, server, real, quiet, dump_db, note):
         deploy = DeployViaLocal()
         deploy.new(server, real=real, note=note)
     else:
-        ui.error('deploy type wrong')
+        ui.error("deploy type wrong")
 
 
 @deploy.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.option('--real', '-r', is_flag=True)
-@click.option('-l', '--load-db', is_flag=True,
-              help='Take a snapshot of the db.')
-@click.option('--delete', is_flag=True,
-              help='Delete any files on remote server that are not part of the upload.')
+@click.argument("server", shell_complete=get_servers)
+@click.option("--real", "-r", is_flag=True)
+@click.option(
+    "-l", "--load-db", is_flag=True, help="Take a snapshot of the db."
+)
+@click.option(
+    "--delete",
+    is_flag=True,
+    help="Delete any files on remote server that are not part of the upload.",
+)
 @click.pass_context
 def switch(ctx, server, real, load_db, delete):
     """Change the symlink to point to a different dir in the deploy root."""
@@ -414,10 +441,11 @@ def switch(ctx, server, real, load_db, delete):
         deploy = DeployViaLocal()
         deploy.change_current(server, real=real, delete=delete)
     else:
-        ui.error('deploy type wrong')
+        ui.error("deploy type wrong")
 
 
 # ------------------------------- Misc --------------------------------
+
 
 @sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
 def misc():
@@ -425,9 +453,13 @@ def misc():
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('keys', nargs=-1, required=True)
-@click.option('--json/--no-json', '-j/-n', default=True,
-              help='Return the data as JSON instead of the default python output.')
+@click.argument("keys", nargs=-1, required=True)
+@click.option(
+    "--json/--no-json",
+    "-j/-n",
+    default=True,
+    help="Return the data as JSON instead of the default python output.",
+)
 def api(keys, json):
     """Retrieve information from the config file.
 
@@ -450,11 +482,9 @@ def api(keys, json):
     config.load_config()
     data = config.data
     for k in keys:
-        try:
+        with suppress(ValueError):
+            # If this is not an integer, keep it as a string key.
             k = int(k)
-        except ValueError:
-            # could not convert to an int, continue on as string.
-            pass
         try:
             data = data[k]
         except KeyError:
@@ -463,6 +493,7 @@ def api(keys, json):
             ui.error(str(e))
     if json:
         import json
+
         click.echo(json.dumps(data))
     else:
         click.echo(data)
@@ -473,17 +504,17 @@ def pack():
     """Display a command to gzip uncommitted files."""
     config.load_config()
     now = datetime.datetime.now()
-    now = now.strftime('%y-%m-%d-%H-%M-%S')
+    now = now.strftime("%y-%m-%d-%H-%M-%S")
 
-    tarname = f'changed-{config.project().name}-{now}.tar.gz'
-    cmd = f'git ls-files -mz | xargs -0 tar -czvf {tarname}'
+    tarname = f"changed-{config.project().name}-{now}.tar.gz"
+    cmd = f"git ls-files -mz | xargs -0 tar -czvf {tarname}"
     cmd = click.style(cmd, bold=True)
-    title = click.style('Run:', fg=Color.YELLOW.value)
-    click.echo(f'{title} {cmd}')
+    title = click.style("Run:", fg=Color.YELLOW.value)
+    click.echo(f"{title} {cmd}")
 
 
-@misc.command('init', context_settings=CONTEXT_SETTINGS)
-@click.argument('servers', nargs=-1)
+@misc.command("init", context_settings=CONTEXT_SETTINGS)
+@click.argument("servers", nargs=-1)
 def init_config(servers):
     """Create a blank config.
 
@@ -500,7 +531,7 @@ def init_config(servers):
 
 
 @misc.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('application', required=False)
+@click.argument("application", required=False)
 def settings(application):
     """Output settings values for the requested application.
 
@@ -510,7 +541,7 @@ def settings(application):
     config.load_config()
     app = Applications()
     if not app.name(application):
-        click.echo(f'Unknown application: {application}')
-        click.echo(f'Known are: {app.known()}')
+        click.echo(f"Unknown application: {application}")
+        click.echo(f"Known are: {app.known()}")
     else:
         click.echo(app.app_settings())

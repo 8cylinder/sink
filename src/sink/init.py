@@ -1,13 +1,12 @@
-
 class Init:
     def __init__(self):
         self.server_names = None
 
-    def servers(self, names: tuple):
+    def servers(self, names: tuple[str, ...]):
         self.server_names = names
 
     def create(self):
-        blank_config = f'''
+        blank_config = """
           # -*- make-backup-files: nil; -*-
 
           project:
@@ -25,9 +24,9 @@ class Init:
             rsync_binary:
               osx:
               linux:
-            # specify a gui diff tool to use.  Use {{local}} and {{remote}} for the arguments.
-            # eg: meld {{local}} {{remote}}
-            difftool: meld {{local}} {{remote}}
+            # specify a gui diff tool to use.  Use {local} and {remote} for the arguments.
+            # eg: meld {local} {remote}
+            difftool: meld {local} {remote}
             # these files will be excluded from any dir syncing:
             exclude:
               - .git
@@ -46,11 +45,13 @@ class Init:
               - __pycache__
               - .env
 
-          servers:'''
+          servers:"""
         if not self.server_names:
-            self.server_names = ['example_server']
+            self.server_names = ["example_server"]
         for server in self.server_names:
-            blank_config = blank_config + f'''
+            blank_config = (
+                blank_config
+                + f"""
             {server}:
               # Everything below this point should match
               # everything below the project root.
@@ -80,9 +81,9 @@ class Init:
                 password:
                 note: |
               ssh:
-                # Multiple ssh configs can be defined and given a name.  These 
-                # can be specified when sshing into a server, but rsync 
-                # commands will only use the first one.  
+                # Multiple ssh configs can be defined and given a name.  These
+                # can be specified when sshing into a server, but rsync
+                # commands will only use the first one.
                 - name:
                   username:
                   password:
@@ -130,9 +131,10 @@ class Init:
                 clearcache: 'sudo -u www-data php /var/www/craft/craft clear-caches/all'
                 restartapache: sudo service apache2 restart
                 files: ls -al
-            '''
+            """
+            )
 
         # remove the leading spaces
-        blank_config = blank_config.split('\n')
-        blank_config = '\n'.join([i[10:] for i in blank_config])
+        blank_config = blank_config.split("\n")
+        blank_config = "\n".join([i[10:] for i in blank_config])
         return blank_config

@@ -1,11 +1,9 @@
-import os
-import sys
+import shlex
 import subprocess
+
 # noinspection PyUnresolvedReferences
-from pprint import pprint as pp
 import plumbum
 from plumbum import local
-import shlex
 
 
 class Command:
@@ -15,9 +13,9 @@ class Command:
 
     def run(self, cmd):
         result = subprocess.check_output(
-            cmd, shell=True,
-            stderr=subprocess.PIPE)
-        return result.decode('utf-8')
+            cmd, shell=True, stderr=subprocess.PIPE
+        )
+        return result.decode("utf-8")
 
     def runp(self, cmd):
         cmd = shlex.split(cmd)
@@ -45,7 +43,7 @@ class SSHCommand(Command):
 
     def execute(self, cmd):
         ssh_cmd = self.ssh(cmd)
-        result = self.run(ssh_cmd)
+        self.run(ssh_cmd)
 
     def ssh(self, cmd):
-        return f'ssh x@x.com {cmd}'
+        return f"ssh x@x.com {cmd}"

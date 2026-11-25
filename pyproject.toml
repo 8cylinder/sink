@@ -59,3 +59,72 @@ exclude = [
   "**/__pycache__",
   "**/*.pyc",
 ]
+
+[tool.ruff]
+line-length = 80
+target-version = "py315"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+  "UP",
+  "B",
+  "C4",
+  "SIM",
+  "S",
+  "RUF",
+  "PGH003",
+  "PYI",
+]
+ignore = [
+  "E501",    # long legacy strings and comments; formatter handles code
+  "RUF001",  # ambiguous unicode in user-facing labels
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607"]
+"src/sink/**" = [
+  "S602",  # subprocess shell=True: removed in Stage 4
+  "S603",  # subprocess call: removed in Stage 4
+  "S604",  # subprocess shell=True: removed in Stage 4
+  "S607",  # partial executable path: removed in Stage 4
+  "S310",  # urllib URL open: reviewed in Stage 4
+  "S311",  # non-crypto random for the spinner
+]
+
+[tool.ty.rules]
+dynamic-function-decorator-return = "error"
+missing-type-argument = "error"
+possibly-unresolved-reference = "warn"
+unsound-return = "error"
+# Legacy code: restore these to "error" in Stage 10 after the typed config
+# refactor.  They are named here so the downgrade is explicit, not a blanket
+# suppression.
+invalid-assignment = "warn"
+invalid-argument-type = "warn"
+missing-attribute = "warn"
+missing-union-attribute = "warn"
+no-matching-overload = "warn"
+not-callable = "warn"
+not-subscriptable = "warn"
+parameter-already-assigned = "warn"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --cov=sink --cov-branch --cov-report=term-missing"
+markers = [
+  "integration: needs real rsync, ssh, mysql, or network",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["sink"]
+
+[tool.coverage.report]
+fail_under = 35
+show_missing = true

@@ -1,23 +1,22 @@
 # import os
 # import sys
 # import re
+import ssl
 import subprocess
+import urllib.error
+import urllib.request
+from pathlib import Path
+
 # import datetime
 import click
-import urllib.request, urllib.error
-import socket
-import ssl
 
-from sink.config import config
-from sink.config import Spinner
-from sink.ui import Color
-from sink.ui import ui
-from pathlib import Path
+from sink.config import Spinner, config
+from sink.ui import Color, ui
 
 
 class TestConfig:
-    good = click.style('[\u2713]', fg=Color.GREEN.value)
-    bad = click.style('[X]', fg=Color.RED.value)
+    good = click.style("[\u2713]", fg=Color.GREEN.value)
+    bad = click.style("[X]", fg=Color.RED.value)
     timeout = 25
 
     def __init__(self):
@@ -25,41 +24,46 @@ class TestConfig:
 
     def test_project(self):
         click.echo()
-        click.secho('Local dirs', fg=Color.GREEN.value, bold=True)
+        click.secho("Local dirs", fg=Color.GREEN.value, bold=True)
 
         INDENT = 2
-        for local_dir in ['pulls_dir', 'log_dir', 'cache_dir']:
+        for local_dir in ["pulls_dir", "log_dir", "cache_dir"]:
             try:
-                d = Path(self.config.data['project'][local_dir])
+                d = Path(self.config.data["project"][local_dir])
             except KeyError:
-                self.out(f'{self.bad} "{local_dir}" setting in {self.config.config_file} does not exist.', INDENT)
+                self.out(
+                    f'{self.bad} "{local_dir}" setting in {self.config.config_file} does not exist.',
+                    INDENT,
+                )
                 continue
             if d.exists():
-                self.out(f'{self.good} {d}', INDENT)
+                self.out(f"{self.good} {d}", INDENT)
             else:
-                self.out(f'{self.bad} {d}', INDENT)
+                self.out(f"{self.bad} {d}", INDENT)
 
     def test_requirements(self):
-        required = ['ssh -V', 'git --version', 'rsync --version']
+        required = ["ssh -V", "git --version", "rsync --version"]
         required = [f"'{i}'" for i in required]
-        req = ' '.join(required)
-        spliter = '==='
-        cmd = f'''for prg in {req}; do echo '{spliter}'; $prg; done'''
+        req = " ".join(required)
+        spliter = "==="
+        cmd = f"""for prg in {req}; do echo '{spliter}'; $prg; done"""
         click.echo()
-        click.echo('Run the following bash command:')
+        click.echo("Run the following bash command:")
         click.echo(cmd)
 
     def test_servers(self, server_names=None):
         click.echo()
-        INDENT = 2
         for s in self.config.servers():
-            if server_names:
-                if s.servername not in server_names:
-                    continue
+            if server_names and s.servername not in server_names:
+                continue
             try:
                 click.echo()
-                click.secho(f'{s.servername}', fg=Color.GREEN.value,
-                            bold=True, underline=True)
+                click.secho(
+                    f"{s.servername}",
+                    fg=Color.GREEN.value,
+                    bold=True,
+                    underline=True,
+                )
             except AttributeError:
                 pass
 
@@ -68,45 +72,51 @@ class TestConfig:
                 user = ssh.username
                 url = ssh.server
 
-                key = ''
+                key = ""
                 if ssh.key:
                     key = f' -i "{ssh.key}"'
 
                 # print('>>>', ssh)
                 try:
-                    ssh.username
+                    ssh.username  # noqa: B018 - intentional attribute probe
                     # s.ssh.password
-                    ssh.server
+                    ssh.server  # noqa: B018 - intentional attribute probe
                 except AttributeError:
-                    ui.error(f'ssh values are wrong in {s.servername}')
+                    ui.error(f"ssh values are wrong in {s.servername}")
                 if not ssh.username or not ssh.server:
-                    ui.warn('missing values for ssh.', indent='  ')
+                    ui.warn("missing values for ssh.", indent="  ")
                     continue
 
-                cmd = 'exit'
-                good = f'ssh login good ({ssh.username}).'
+                cmd = "exit"
+                good = f"ssh login good ({ssh.username})."
                 bad = f'ssh login failed for "{user}@{url}".'
 
-                port = ''
+                port = ""
                 if ssh.port:
-                    port = f'-p {ssh.port}'
+                    port = f"-p {ssh.port}"
 
-                if self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key):
+                if self.run_cmd_on_server(
+                    user, url, cmd, good, bad, port, key=key
+                ):
                     # root
                     cmd = f'cd "{s.root}"'
-                    good = f'root dir exists.'
-                    bad = f'root dir does not exist on server: {s.root}.'
-                    self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
+                    good = "root dir exists."
+                    bad = f"root dir does not exist on server: {s.root}."
+                    self.run_cmd_on_server(
+                        user, url, cmd, good, bad, port, key=key
+                    )
 
                     dbs = self.config.dbs(s.mysql)
                     for db in dbs:
-                        host = ''
+                        host = ""
                         if db.hostname:
-                            host = f'--host={db.hostname}'
+                            host = f"--host={db.hostname}"
                         cmd = f'mysql --user={db.username} --password="{db.password}" {host} {db.db} --execute="exit";'
-                        good = f'DB({db.db}): mysql username, password and db are good.'
-                        bad = f'DB({db.db}): mysql error.'
-                        self.run_cmd_on_server(user, url, cmd, good, bad, port, key=key)
+                        good = f"DB({db.db}): mysql username, password and db are good."
+                        bad = f"DB({db.db}): mysql error."
+                        self.run_cmd_on_server(
+                            user, url, cmd, good, bad, port, key=key
+                        )
 
             urls = self.config.urls(s.urls)
             for u in urls:
@@ -122,57 +132,65 @@ class TestConfig:
                     ctx = ssl.create_default_context()
                     ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_NONE
-                    result = urllib.request.urlopen(u.url, timeout=self.timeout, context=ctx)
+                    urllib.request.urlopen(
+                        u.url, timeout=self.timeout, context=ctx
+                    )
                 except urllib.error.HTTPError as e:
                     # Return code error (e.g. 404, 501, ...)
-                    msg = f'{self.bad} URL({u.url}): HTTPError: {e.code}.'
+                    msg = f"{self.bad} URL({u.url}): HTTPError: {e.code}."
                 except urllib.error.URLError as e:
                     # Not an HTTP-specific error (e.g. connection refused)
-                    msg = f'{self.bad} URL({u.url}): URLError: {e.reason}.'
-                except ValueError as e:
-                    msg = f'{self.bad} URL({u.url}): Not a valid URL.'
+                    msg = f"{self.bad} URL({u.url}): URLError: {e.reason}."
+                except ValueError:
+                    msg = f"{self.bad} URL({u.url}): Not a valid URL."
                 except AttributeError as e:
-                    msg = f'AttributeError? {u.url} {e}'
-                except socket.timeout:
-                    msg = f'{self.bad} URL({u.url}) Timeout.'
+                    msg = f"AttributeError? {u.url} {e}"
+                except TimeoutError:
+                    msg = f"{self.bad} URL({u.url}) Timeout."
                 # except:  # socket.timeout:
-                    # msg = f'{self.bad} some error {u.url}.'
+                # msg = f'{self.bad} some error {u.url}.'
                 else:
                     # 200
-                    msg = f'{self.good} URL({u.url})'
+                    msg = f"{self.good} URL({u.url})"
                 spinner.stop()
                 self.out(msg, 2)
 
     def out(self, msg, spaces):
-        indent = ' ' * spaces
-        click.echo(f'{indent}{msg}')
+        indent = " " * spaces
+        click.echo(f"{indent}{msg}")
 
-    def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=''):
+    def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=""):
 
-        cmd = f'''ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} '{cmd}' '''
+        cmd = f"""ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} '{cmd}' """
         # print(cmd)
         # exit()
         result = self.run_cmd(cmd, good, bad)
         if not result:
-            print('        You might need to run ssh command outside of sink to add to known_hosts: sink ssh <server> -d')
+            print(
+                "        You might need to run ssh command outside of sink to add to known_hosts: sink ssh <server> -d"
+            )
         return result
 
     def run_cmd(self, cmd, good, bad):
 
         spinner = Spinner(indent=2, delay=0.1)
         spinner.start()
-        result = subprocess.run(cmd, shell=True,
-                                stderr=subprocess.PIPE,
-                                stdout=subprocess.DEVNULL)
+        result = subprocess.run(
+            cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL
+        )
         spinner.stop()
         if result.returncode:
             # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
-            self.out(f'{self.bad} {bad} (error: {result.returncode})', 2)
-            ui.display_cmd(cmd, indent=8, suppress_commands=config.suppress_commands)
-            ui.error(f'\n{result.stderr.decode("utf-8")}', exit=False, indent=8)
+            self.out(f"{self.bad} {bad} (error: {result.returncode})", 2)
+            ui.display_cmd(
+                cmd, indent=8, suppress_commands=config.suppress_commands
+            )
+            ui.error(f"\n{result.stderr.decode('utf-8')}", exit=False, indent=8)
             return False
         else:
             # click.echo(f'    {self.good} {good}')
-            self.out(f'{self.good} {good}', 2)
-            ui.display_cmd(cmd, indent=6, suppress_commands=config.suppress_commands)
+            self.out(f"{self.good} {good}", 2)
+            ui.display_cmd(
+                cmd, indent=6, suppress_commands=config.suppress_commands
+            )
             return True

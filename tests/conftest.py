@@ -149,7 +149,9 @@ def project_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             project["actions"] = project_actions
 
         document = {"project": project, "servers": {"dev": server}}
-        (root / "sink.yaml").write_text(yaml.safe_dump(document, sort_keys=False))
+        (root / "sink.yaml").write_text(
+            yaml.safe_dump(document, sort_keys=False)
+        )
 
         monkeypatch.chdir(root)
         monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
