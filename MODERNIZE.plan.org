@@ -96,14 +96,15 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =176ba54= (Stage 3
-    red/integration tests).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =56209d2= (Stage 3
+    hermetic-isolation test).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness).  Next: Stage 4 (execution layer).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
-    commands), =176ba54= (red regressions and integration marker).
+    commands), =176ba54= (red regressions and integration marker),
+    =56209d2= (home/XDG isolation proof).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -1455,7 +1456,7 @@ Poetry/setup.py era.
   Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
   Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
   Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
-  Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
+  Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
   Stage 4  | TODO | shell=True sites: 0      | secrets test:
   Stage 5  | TODO | Dict2obj refs: 0         | loader tests:
   Stage 6  | TODO | commands split:          | help tests:
