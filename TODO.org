@@ -5,7 +5,6 @@
 * Todo
 
 ** Now [10/11]
-
 *** COMPLETE With 'single' make sure the correct rsync is being used
 CLOSED: [2020-11-08 Sun 18:56]
 
@@ -126,9 +125,7 @@ Build a vagrant vm to get a project running quickly.
     - mount point - ./server
   - Boss
 
-
-** Then [10/23]
-
+** Future [10/23]
 *** TODO [#A] Use plumbum for shell commands
 https://github.com/tomerfiliba/plumbum
 
@@ -286,13 +283,3 @@ sink deploy clean  # rsync --delete?
 *** DONE Allow multiple ssh accounts
 CLOSED: [2022-11-11 Fri 10:29]
 Make the same as db, check each one, but only use the first one for actions
-
-
-* Scratch
-
-- config.project
-- config.servers
-  - config.ssh
-  - config.mysql
-  - config.urls
-  - config.actions
