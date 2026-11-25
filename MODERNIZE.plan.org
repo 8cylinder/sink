@@ -141,9 +141,9 @@
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
   - Current test baseline: 237 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 91.80%, =fail_under = 90=; =ty=
-    is clean with no warning downgrades.  Release tag =v0.3.0=; the
-    post-release unknown-key change is commit =422c7a3=.
+    =integration= test, branch coverage 91.76%, =fail_under = 90=; =ty=
+    is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
+    changes: unknown-key policy =422c7a3=, check execution =d339d65=.
   - Documentation: =make docs=, =make man=, =make install-man=.  The
     sandbox has no =groff=/=man=; templates were generated and inspected.
   - CI still needs the first push; no package has been published.
@@ -1380,11 +1380,10 @@ The deploy workflow was dropped (D11); there is no deploy command to repair.
       =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
       a stable table.
 - [X] Check: report unknown config keys as warnings without failing normal
-      commands.
+      commands.  Check always executes its probes; no dry-run switch.
 - [X] Check: verify TLS by default and add a timeout.
-- [X] Check: add =--real/-r= and default to dry-run, printing every
-      ssh/mysql/url probe it would run.  =--real= prints the same probes
-      and executes them.
+- [X] Check: run its read-only ssh/mysql/url probes directly.  There is
+      no =--real= switch for check; the probes are non-destructive.
 - [X] Check: replace the =Spinner= thread with =rich= status.
 - [X] Remove =os.chdir= from =db.cd= and pass =cwd= to command objects;
       no deploy helper remains.
@@ -1403,8 +1402,9 @@ reports unknown config keys as warnings, then a table for each server's
 root, =warn=, and =automatic= fields before the ssh/mysql/url probes.  Missing values are reported without
 aborting the remaining checks.
 
-The URL probe uses a Rich status context instead of the old threaded
-=Spinner=, so =ui.py= no longer contains the spinner implementation.
+The URL probe executes directly and uses a Rich status context; check has
+no =--real= flag because its probes are read-only.  =ui.py= no longer
+contains the spinner implementation.
 =db.make_symlink= builds an absolute link path and no longer calls
 =os.chdir=; the =db.cd= helper was removed.  Check and database paths
 have no directory-changing calls.
