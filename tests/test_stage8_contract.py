@@ -68,9 +68,14 @@ def test_db_put_uses_pv_when_enabled(project_factory) -> None:
     assert "pv --numeric project/dump.sql.gz" in unwrap(combined(result))
 
 
-def test_db_put_falls_back_when_pv_is_missing(project_factory) -> None:
+def test_db_put_falls_back_when_pv_is_missing(
+    project_factory, monkeypatch
+) -> None:
     project = project_factory(project_overrides={"pv": True})
     (project.bin_dir / "pv").unlink()
+    # Keep system binaries available (gzip, ssh, ...) but make sure a real
+    # pv installation cannot satisfy shutil.which().
+    monkeypatch.setenv("PATH", str(project.bin_dir))
     filename = gzip_dump(project)
 
     result = project.invoke("db", "put", "dev", filename)
