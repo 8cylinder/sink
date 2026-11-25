@@ -1,0 +1,1559 @@
+
+#+title:    App base
+#+subtitle: Base functionality for all python cli apps
+
+
+If this is being applied to an existing app, iterate asking the user questions
+one at a time until a plan is worked out to apply and modify the existing app.
+
+* Base packages
+
+Use these placeholders throughout this document:
+- =APP= — console command name.
+- =PACKAGE= — importable Python package name.
+- =AUTHOR= — copyright holder name or organization.
+- =PYTHON_VERSION= — latest stable CPython minor at the time the project is
+  created.  As of 2026-11 that is =3.15=.
+
+For a new project, use the latest stable CPython and install every package in
+this section.  For an existing project, leave Python 3.11 or newer alone unless
+the user asks to upgrade; upgrade Python 3.10 or older to the latest stable
+release before applying anything else.  Ask before changing the supported
+Python version.
+
+| Package             | When                                                       | Group       |
+|---------------------+------------------------------------------------------------+-------------|
+| =click=               | all new projects; ask before converting an existing parser | runtime     |
+| =rich=                | all projects                                               | runtime     |
+| =ty=                  | all projects                                               | development |
+| =ruff=                | all projects                                               | development |
+| =pytest= + =pytest-cov= | all projects                                               | development |
+
+Use =uv= for dependency management.  Commit =uv.lock=.  Put the minimum Python
+version in =requires-python= and add a matching =.python-version= file.
+
+#+begin_src toml
+  [project]
+  requires-python = ">=3.15"
+#+end_src
+
+#+begin_src shell
+  uv add click rich
+  uv add --dev pytest pytest-cov ruff ty
+#+end_src
+
+** click
+Use click for all new CLI apps.  If an existing app uses argparse or another
+parser, ask whether to convert before changing the interface.  Do not change
+command names, option names, defaults, or exit codes during conversion without
+approval.
+
+Use a root =click.Group= with =no_args_is_help=True= and an entry point in
+=pyproject.toml=:
+
+#+begin_src toml
+  [project.scripts]
+  APP = "PACKAGE.cli:main"
+#+end_src
+
+Define reusable base =Group= and =Command= classes so every command gets the
+same help option names, error handling, and version/config options.  Keep the
+CLI layer thin: parse and validate input in =cli.py=, put behavior in separate
+modules, and return an exit code rather than calling =sys.exit()= deep in the
+code.
+
+Do not add rich-click.  Use plain click help formatting so =--help=, man pages,
+and documentation stay predictable.
+
+** rich
+Use =rich= for human-facing output.  Do not add =rich-click=.
+
+- Create the =Console= after parsing global options.  Do not create a
+  module-level console with =force_terminal=True=.
+- Use =Console()= for normal output and =Console(stderr=True)= for warnings and
+  errors.
+- Respect =NO_COLOR=, =FORCE_COLOR=, and =TERM=dumb=.  Rich already disables
+  color when stdout is not a terminal; do not override that by default.
+- Escape untrusted or dynamic text with =rich.markup.escape()= before passing it
+  to rich.  Never build markup from user input with an f-string.
+- Use markup for status labels, for example =[green]ok[/green]=,
+  =[yellow]warning[/yellow]=, and =[red]error[/red]=.  Always include text or a
+  symbol, not color alone, so the message still works without color.
+- Keep machine-readable output plain.  =--version=, =--config=, and
+  =--completions= must not emit ANSI codes or rich markup.
+- Use =rich.logging.RichHandler= if the app uses logging; otherwise keep
+  printing through a single console object.
+- If a table is used for output, follow these guides:
+  - Use sentence case for the titles.
+  - Don't draw a border around the table.
+  - Add a horizontal seperator between the headings and the table content.
+  - When the table is used in a pipe, don't display the title row, seperate the
+    columns with tabs, and make any relative paths absolute.
+
+** ty
+Replace mypy with ty.  Do not run both mypy and ty after migration unless the
+user wants a transition period.  Remove mypy dependencies and config only after
+ty passes or the user approves the remaining suppressions.
+
+ty has no =--strict= flag.  Define strictness in =pyproject.toml= and use
+targeted =# ty: ignore[rule]= comments only.  Do not use blanket
+=# type: ignore= comments.
+
+For existing projects, use the recommended strict configuration:
+
+#+begin_src toml
+  [tool.ty.rules]
+  dynamic-function-decorator-return = "error"
+  missing-type-argument = "error"
+  possibly-unresolved-reference = "warn"
+  unsound-return-statement = "error"
+#+end_src
+
+For new projects, use the extra-strict configuration and relax it only if a
+rule produces unavoidable false positives:
+
+#+begin_src toml
+  [tool.ty.rules]
+  blanket-ignore-comment = "error"
+  dynamic-function-decorator-return = "error"
+  missing-type-argument = "error"
+  possibly-unresolved-reference = "warn"
+  unsound-assignment = "error"
+  unsound-return-statement = "error"
+  unsound-yield = "error"
+  unsupported-dynamic-base = "warn"
+  division-by-zero = "warn"
+  possibly-missing-attribute = "warn"
+  possibly-missing-import = "warn"
+
+  [tool.ty.analysis]
+  strict-equality-semantics = true
+  strict-generic-narrowing = true
+#+end_src
+
+Add the matching Ruff rules in the Ruff section.  Keep ty in the development
+dependency group and commit =uv.lock= so its version is reproducible.  Upgrade ty
+deliberately and rerun the checks; if an upgrade removes or renames a rule, fix
+the configuration instead of silently dropping strictness.
+
+** ruff
+Replace black with ruff for both formatting and linting.  Remove black from the
+project after ruff format produces the same or an approved result.
+
+Start with:
+
+#+begin_src toml
+  [tool.ruff]
+  line-length = 80
+  target-version = "py315"   # use the Ruff name for PYTHON_VERSION
+
+  [tool.ruff.lint]
+  extend-select = ["ANN", "PGH003", "PYI"]
+#+end_src
+
+For new projects, add =preview=true= if you want =PYI033= to run on =.py= files as
+well as stubs.  Preview rules can change between Ruff releases, so do not enable
+preview for an existing project without approval.
+
+Use =ruff check --fix= for safe fixes only.  Do not enable =--unsafe-fixes= by
+default.  Fix lint errors instead of adding blanket suppressions; any
+suppression must name the rule.
+
+** pytest
+Use pytest for all tests.  If an existing project uses unittest, ask before
+converting its tests.  Add =pytest= and =pytest-cov= to the development
+dependency group and enforce 90% branch coverage.
+
+#+begin_src toml
+  [dependency-groups]
+  dev = [
+    "pytest>=8",
+    "pytest-cov>=6",
+    "ruff",
+    "ty",
+  ]
+
+  [tool.pytest.ini_options]
+  testpaths = ["tests"]
+  addopts = "-ra --strict-markers --strict-config --cov=PACKAGE --cov-branch --cov-report=term-missing"
+
+  [tool.coverage.run]
+  branch = true
+  source = ["PACKAGE"]
+
+  [tool.coverage.report]
+  fail_under = 90
+  show_missing = true
+#+end_src
+
+Use =src/PACKAGE/= for application code and =tests/= for tests.  Test the CLI
+through =click.testing.CliRunner=, not by spawning subprocesses, unless a test
+specifically needs a real process.
+
+Tests must not touch the real home directory, network, or system config.  Use
+pytest's =tmp_path= and =monkeypatch= to set =XDG_CONFIG_HOME=,
+=XDG_DATA_HOME=, and =HOME= per test.  Cover at least:
+- =-h= and =--help=
+- =--version=
+- =--config=, when the app has a config file
+- =--completions=
+- normal output, piped/non-TTY output, and error exit codes
+
+* Use make for command runner
+Use make as the command runner.  Keep the Makefile usable with GNU make and
+bash on Linux and macOS.  Mark all targets phony, make =help= the default
+target, and document each target with a =##= comment.
+
+All install targets are user-level: they write to the user's XDG directories
+and must not require =sudo=.
+
+#+begin_src Makefile
+  SHELL := bash
+
+  .DEFAULT_GOAL := help
+  .PHONY: help sync hooks fmt fmt-check lint lint-check type test secrets docs docs-serve man check ci build install install-completions install-man uninstall upgrade clean
+
+  help:  ## Show this help
+  	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+  sync:  ## Install or update dependencies
+  	uv sync --all-groups
+
+  hooks:  ## Install the git hook that blocks secrets
+  	git config core.hooksPath .githooks
+
+  fmt:  ## Format code
+  	uv run ruff format .
+
+  fmt-check:  ## Check formatting without changing files
+  	uv run ruff format --check .
+
+  lint:  ## Lint and apply safe fixes
+  	uv run ruff check --fix .
+
+  lint-check:  ## Lint without changing files
+  	uv run ruff check .
+
+  type:  ## Type-check the project
+  	uv run ty check
+
+  test:  ## Run tests
+  	uv run pytest
+
+  secrets:  ## Scan the repository history for secrets
+  	gitleaks git --redact --no-banner
+
+  docs:  ## Build HTML documentation
+  	uv run sphinx-build -W -b html docs docs/_build/html
+
+  docs-serve:  ## Serve documentation with live reload
+  	uv run sphinx-autobuild docs docs/_build/html
+
+  man:  ## Build the man page
+  	uv run sphinx-build -W -b man docs docs/_build/man
+
+  check: fmt-check lint-check type test docs  ## Run all checks without changing files
+
+  ci:  ## Install locked dependencies and run all checks
+  	uv sync --locked --all-groups
+  	$(MAKE) check
+  	$(MAKE) secrets
+
+  build:  ## Build the wheel and sdist
+  	uv build
+
+  install:  ## Install the app, bash completions, and man page
+  	uv tool install --editable --force .
+  	$(MAKE) install-completions install-man
+
+  install-completions:  ## Generate and install bash completions
+  	uv run APP --completions
+
+  MANPAGE := docs/_build/man/APP.1
+  MANDIR ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)/man/man1
+
+  install-man: man  ## Install the man page
+  	mkdir -p "$(MANDIR)"
+  	install -m 644 "$(MANPAGE)" "$(MANDIR)/APP.1"
+
+  uninstall:  ## Remove the installed tool
+  	uv tool uninstall APP
+
+  upgrade:  ## Upgrade dependencies and the lockfile
+  	uv sync --upgrade --all-groups
+
+  clean:  ## Remove build and test artifacts
+  	rm -rf build dist docs/_build .pytest_cache .ruff_cache .ty_cache .coverage htmlcov
+  	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+#+end_src
+
+- =make check= must not modify source files.  It may write generated output
+  under =docs/_build/=; use =make fmt= and =make lint= when you want source
+  fixes.
+- =make ci= installs exactly the locked dependencies and then runs =check= and
+  =secrets=.  =secrets= needs =gitleaks= on =PATH=; the CI workflow installs it.
+- =make hooks= installs the commit hook that blocks secrets.  Run it once per
+  clone; it is not part of =sync=.
+- =make install= installs the app, bash completions, and man page.
+  =install-man= depends on =man=, which builds the man page with Sphinx.
+- =make docs= builds the Sphinx HTML site and =make docs-serve= runs the live
+  preview server.
+
+* CLI completions
+Every app must add a =--completions= option to the root click command.  It is a
+root-level option, so it must appear before any subcommand.  It takes no
+arguments, generates a static bash completion script for the entire command
+tree, writes it, prints the path, and exits.
+
+#+begin_example
+$ APP --completions
+/home/user/.local/share/bash-completion/completions/APP.bash
+To use it in this shell:
+  source /home/user/.local/share/bash-completion/completions/APP.bash
+#+end_example
+
+Do not use Click's dynamic completion API and do not run the app at tab-press
+time.  The generated file is static; rerun =APP --completions= after changing
+commands or options.
+
+** Destination
+Resolve the destination in this order:
+1. If =BASH_COMPLETION_USER_DIR= is set and non-empty, use its first non-empty
+   colon-separated entry.
+2. Otherwise, if =XDG_DATA_HOME= is set and non-empty, use it.
+3. Otherwise use =~/.local/share=.
+
+Append =bash-completion/completions/APP.bash=.  Expand =~=, create parent
+directories, and write the file atomically with mode =0644=.  Overwrite an
+existing file; it is generated output.
+
+Use =APP.bash=, not unsuffixed =APP=.  bash-completion >= 2.18 prefers the
+=.bash= suffix and deprecates unsuffixed files.  Auto-loading therefore
+requires bash-completion >= 2.18; users on older 2.x versions can still source
+the file manually.
+
+Print only the absolute path to stdout, with no color or markup.  Print the
+"source" instruction and any warnings to stderr, so command substitution gets
+only the path.
+
+** Generated script
+Generate one bash function per command, with a root dispatcher named after the
+sanitized app name, for example =_my_app_complete=.  Keep the literal =APP= name
+only in the =complete= command.  Assign each command a numeric ID during
+traversal and name its function =_my_app_cmd_<id>= to avoid collisions between
+command names such as =foo-bar= and =foo_bar=.  Dispatch child commands by their
+literal names.
+
+Register the script with:
+
+#+begin_src bash
+  complete -o nosort -o bashdefault -o default -F _my_app_complete my-app
+#+end_src
+
+The script must:
+- Offer non-hidden subcommand names for the current command.
+- Offer long and short options valid for the current command, including
+  =-h=, =--help=, =--version=, =--config=, and =--completions= when they exist.
+  Remember that Click adds the help option separately from =command.params=.
+- Complete values for options and positional arguments according to their
+  Click type:
+  | Click type                | Completion                                 |
+  |---------------------------+--------------------------------------------|
+  | =click.Choice=              | the allowed choices                        |
+  | =click.Path=                | files, or directories when =file_okay=False= |
+  | =click.File=                | files                                      |
+  | =click.DateTime=            | no suggestions                             |
+  | integer/float/range types | no suggestions                             |
+- Support ~--opt=value~ by completing only the value after the equals sign.
+- Use =compopt -o nospace= while completing ~--opt=value~ so bash does not add
+  a space after the equals sign.
+- Stop offering options after a standalone =--=.
+- Track positional arguments so the next argument's type is used; for
+  nargs-1, keep using the last argument's type.
+- Handle flags, =multiple=True=, =count=True=, and options with =nargs > 1=
+  without crashing.  For =click.Tuple=, use the type for the corresponding
+  position.
+- Exclude hidden commands and hidden options.
+- Use =_filedir= when bash-completion provides it; otherwise fall back to
+  =compgen -f= or =compgen -d= so the script still works when sourced without
+  bash-completion loaded.
+- Quote every command, option, and choice inserted into the script with
+  =shlex.quote()= or an equivalent bash-safe quoting helper.
+- Not run Python, the app, or any external command during completion.
+- Include a header comment with the app name, version, and a warning that the
+  file is generated and will be overwritten.
+
+Do not offer parent command options after a subcommand.  This matches Click's
+default behavior, where root options must appear before the subcommand.
+
+** Implementation
+Put the generator in =src/PACKAGE/completions.py=.  Keep generation separate
+from installation so it can be tested without touching the filesystem:
+
+#+begin_src python
+  def generate_bash(group: click.Group, prog_name: str, version: str) -> str:
+      """Return the complete bash completion script."""
+
+  def install_bash_completion(
+      group: click.Group, prog_name: str, version: str
+  ) -> Path:
+      """Write the script, print its path, and return the path."""
+#+end_src
+
+Register the option on the root group with an eager callback:
+
+#+begin_src python
+  @click.option(
+      "--completions",
+      is_flag=True,
+      is_eager=True,
+      expose_value=False,
+      callback=completions_callback,
+      help="Write bash completions and exit.",
+  )
+#+end_src
+
+The callback must use =ctx.command= as the group, =ctx.info_name= as the
+command name, and then call =ctx.exit()=.  This lets =APP --completions= work
+without requiring the app's other options.  Do not import the CLI module from
+=completions.py=; pass the group object in to avoid import cycles.
+
+** Bash requirements and warnings
+The generated script uses bash arrays, =compgen=, =compopt=, and
+=complete -o nosort=, so it requires bash >= 4.4.  At generation time:
+
+1. Find =bash= with =shutil.which("bash")=.
+2. If it is missing, warn on stderr and still write the file.
+3. Ask bash for =BASH_VERSINFO= and compare the major/minor version to 4.4.
+4. If it is older than 4.4, warn on stderr and still write the file.  The file
+   is still valid when sourced from a newer bash.
+
+Do not check the user's current shell; the option may be run from zsh or from a
+script.  Only bash is supported.
+
+On macOS, =/bin/bash= is 3.2 and the default login shell is zsh.  Document in
+both the README and the =--completions= message that macOS users need a newer
+bash (for example =brew install bash=) and that zsh is not covered.
+
+** Tests
+Add =tests/test_completions.py=.  Use =tmp_path= and =monkeypatch= to set
+=BASH_COMPLETION_USER_DIR=, =XDG_DATA_HOME=, and =HOME=; never write to the
+real home directory.
+
+Cover at least:
+- Destination precedence: =BASH_COMPLETION_USER_DIR=, then =XDG_DATA_HOME=,
+  then =~/.local/share=.
+- Creating missing parent directories and overwriting an existing file.
+- The path is the only thing written to stdout.
+- The script passes =bash -n=.
+- Subcommand completion.
+- Option and short-option completion.
+- =click.Choice= value completion.
+- Path and directory completion.
+- ~--opt=value~ completion.
+- No option completion after =--=.
+- Hidden commands and options are not suggested.
+- The old-bash warning, by mocking the version check.
+- =APP --completions= through =click.testing.CliRunner= exits 0.
+
+Run the generated script in a real bash for behavior tests, for example:
+
+#+begin_src bash
+source "$completion_file"
+COMP_WORDS=(APP --)
+COMP_CWORD=1
+_my_app_complete
+printf '%s\n' "${COMPREPLY[@]}"
+#+end_src
+
+** Documentation
+Document in README:
+- =APP --completions=
+- The path it writes and the =source= command.
+- bash >= 4.4 and bash-completion >= 2.18 for auto-loading.
+- macOS Homebrew bash and the lack of zsh support.
+
+Add =--completions= to the man page OPTIONS section and the completion path to
+FILES.  =make install= runs =APP --completions= after installing the tool.
+
+* Help
+In addition to =--help=, make =-h= work for help on the root command and every
+subcommand.
+
+Click's =context_settings= apply per command; setting =help_option_names= on the
+root group does not automatically propagate to subcommands.  Use reusable base
+classes and make every command use them:
+
+#+begin_src python
+class _HelpOptions:
+    def __init__(self, *args, **kwargs):
+        context_settings = dict(kwargs.pop("context_settings", {}) or {})
+        context_settings.setdefault("help_option_names", ["-h", "--help"])
+        super().__init__(*args, context_settings=context_settings, **kwargs)
+
+
+class AppCommand(_HelpOptions, click.Command):
+    pass
+
+
+class AppGroup(_HelpOptions, click.Group):
+    def command(self, *args, **kwargs):
+        kwargs.setdefault("cls", AppCommand)
+        return super().command(*args, **kwargs)
+
+    def group(self, *args, **kwargs):
+        kwargs.setdefault("cls", AppGroup)
+        return super().group(*args, **kwargs)
+#+end_src
+
+Decorate the root with =@click.group(cls=AppGroup, no_args_is_help=True)=.
+Use =AppGroup= for nested groups and =AppCommand= for leaf commands.  If an
+existing command already uses =-h= for another option, such as =--host=, stop
+and ask before changing or removing it.
+
+Help text rules:
+- Use the command docstring for command help; keep the first line short.
+- Use =help= on every option and document positional arguments in the command
+  docstring.
+- Use =show_default=True= for options with non-obvious defaults.
+- Put examples in =epilog=; use Click's =\b= marker only when line breaks must
+  be preserved.
+- Do not use rich-click.  Help output is plain Click text.
+
+Test =-h= and =--help= for the root and every subcommand.  Both must exit 0,
+print usage, and not require other arguments.  In non-TTY tests, help output
+must contain no ANSI escapes.
+
+* Configuration
+This section is conditional: apply it only if the app needs persistent
+configuration.  If it does not, do not add a config file or =--config=.
+
+Use a TOML file named =config.toml= in the platform's per-user config
+directory.  Use =platformdirs= rather than constructing paths by hand:
+
+#+begin_src python
+  from pathlib import Path
+  import platformdirs
+
+  APP = "APP"
+
+  def config_path() -> Path:
+      return Path(platformdirs.user_config_dir(APP)) / "config.toml"
+#+end_src
+
+Add =platformdirs= as a runtime dependency.  Use =tomllib= from the standard
+library; do not add =tomli= because the template targets Python >= 3.11.
+
+Add a root-level, eager =--config= option that prints the effective path to
+stdout and exits:
+
+#+begin_src python
+  def config_callback(ctx: click.Context, _param: click.Parameter, value: bool) -> None:
+      if not value or ctx.resilient_parsing:
+          return
+      click.echo(config_path())
+      ctx.exit()
+#+end_src
+
+#+begin_src python
+  @click.option(
+      "--config",
+      is_flag=True,
+      is_eager=True,
+      expose_value=False,
+      callback=config_callback,
+      help="Print the config file path and exit.",
+  )
+#+end_src
+
+Rules:
+- =--config= prints the absolute path only.  Do not create the directory or
+  file, do not print the file contents, and do not emit color or markup.
+- =--config= is a root-level option and must work without any other required
+  options.
+- Do not add =--config-file= or an =APP_CONFIG= environment variable unless the
+  user later asks for a path override.
+- If the file is missing, use built-in defaults and continue.  A missing file is
+  not an error.
+- If the file exists but is not valid TOML, print a clear error naming the path
+  and exit nonzero.  Do not fall back to defaults silently.
+- Read the file with =tomllib= opened in binary mode.  Never parse TOML with
+  =eval= or a hand-written parser.
+- Use top-level snake_case keys that match the app's Python parameter names.
+  Nested tables are allowed only when the app documents their schema.
+- Validate types explicitly after loading.  Do not pass raw TOML values directly
+  into code that expects another type.
+- Precedence is command-line option > config value > code default.
+- For new projects, unknown keys are an error.  For existing projects, print a
+  warning to stderr and ignore them.  This keeps old configs working while
+  catching typos in new ones.
+- Resolve relative filesystem paths in the config against the config file's
+  parent directory, not the current working directory.
+- Load the file once in the root group callback and store the parsed mapping on
+  =ctx.obj=.  Do not re-read the file in every subcommand.
+- Do not create or modify the config file from =--config=.  If another command
+  creates it, use mode =0600=.
+- Never log or print config values; they may contain secrets.
+
+Path examples:
+| Platform | Default path                                  |
+|----------+-----------------------------------------------|
+| Linux    | =~/.config/APP/config.toml=                     |
+| macOS    | =~/Library/Application Support/APP/config.toml= |
+| Windows  | =%LOCALAPPDATA%\APP\config.toml=                |
+
+The exact paths come from =platformdirs=; treat these as examples, not as
+hard-coded values.
+
+A minimal config file might look like:
+
+#+begin_src toml
+  # ~/.config/APP/config.toml
+  output_dir = "reports"
+  verbose = true
+#+end_src
+
+** Tests
+Add config tests using =tmp_path= and =monkeypatch=.  Set =XDG_CONFIG_HOME=,
+=HOME=, and =APPDATA= per test; never read or write the real user config
+directory.
+
+Cover at least:
+- =config_path()= returns the expected path for the patched environment.
+- =--config= exits 0 and prints only the absolute path.
+- =--config= does not create the directory or file.
+- =--config= works without other required options.
+- A missing config file loads defaults.
+- A valid config file overrides defaults.
+- Command-line options override config values.
+- Invalid TOML exits nonzero and names the path.
+- Unknown keys error for a new project and warn for an existing project.
+- Relative paths inside the config resolve against the config file's parent.
+- =--config= output contains no ANSI escapes.
+
+** Documentation
+Add a README section covering:
+- The default config path.
+- An example =config.toml=.
+- The precedence order.
+- =APP --config=.
+
+Add =--config= to the man page OPTIONS section and the config path to FILES.
+Do not document a path override that does not exist.
+
+* README.md
+Write the README as the project's landing page.  Keep every command and path
+accurate; do not leave placeholders or document features that do not exist.
+
+Include these sections in order:
+1. Title and one-line description.
+2. Badges for CI and license (optional but recommended).
+3. Requirements:
+   - Python >= PYTHON_VERSION.
+   - bash >= 4.4 for completions.
+   - bash-completion >= 2.18 for automatic completion loading.
+   - gitleaks >= 8.19 to commit; link to its install page.
+   - Supported operating systems.
+4. Installation:
+   - From PyPI, if published: =uv tool install APP=.
+   - From source: clone the repository, =cd APP=, =make sync=, =make install=.
+   - Explain that =make install= installs the command, bash completions, and
+     man page.
+5. Quick start with two or three realistic examples.
+6. Command reference:
+   - Document each command, argument, and option.
+   - Include =APP --help= and =APP -h=.
+   - Prefer concise tables or examples plus a link to =APP --help= and the man
+     page; do not let a duplicated option table go stale.
+7. Configuration, if the app has a config file:
+   - Default path from =APP --config=.
+   - Example =config.toml=.
+   - Precedence order.
+8. Bash completions:
+   - =APP --completions=.
+   - The =source= command.
+   - bash >= 4.4 and bash-completion >= 2.18 for auto-loading.
+   - macOS: =/bin/bash= is 3.2; install a newer bash (for example
+     =brew install bash=).  zsh is not supported.
+9. Man page:
+   - =man APP=.
+   - How =make install= installs it.
+   - Mention =MANPATH= if the page is not found.
+10. Documentation website:
+   - Link to the published Sphinx documentation.
+   - =make docs= builds the HTML site and =make docs-serve= runs the local
+     preview server.
+   - Keep =README.md= as the manually written landing page; do not generate it.
+11. Development:
+   - =make sync=, =make hooks=, =make fmt=, =make lint=, =make type=,
+     =make test=, =make check=.
+   - =make hooks= installs the commit hook; run it once per clone.
+   - =make secrets= scans the history with gitleaks and needs it installed.
+   - State that =git commit --no-verify= bypasses the hook and that CI runs
+     =make secrets= as the gate.
+   - How to run one test.
+   - =make build= writes artifacts to =dist/=.
+12. License:
+   - GPL-2.0-only, matching =pyproject.toml=.
+   - Link to =LICENSE=.
+13. Repository links:
+   - GitHub URL near the top and in the Contributing/Issues section.
+   - Add matching =[project.urls]= entries in =pyproject.toml= for Homepage,
+     Repository, and Issues.
+
+Use fenced code blocks with =bash= or =console= and show the command and
+expected output where useful.  Do not include ANSI color in copied examples.
+
+Keep =README.md= manually written.  The Sphinx documentation site can include it
+as its landing page, but do not generate the README from Sphinx.
+
+* Version
+Keep a single source of truth: the static =version= field in =[project]= in
+=pyproject.toml=.  Do not duplicate the version in =__init__.py=, =cli.py=, or
+another Python module.
+
+#+begin_src toml
+  [project]
+  name = "PACKAGE"
+  version = "0.1.0"
+#+end_src
+
+Do not use =dynamic = ["version"]= or a git-derived version unless the user
+explicitly asks for it.  If an existing project already uses dynamic versioning,
+ask before replacing it.
+
+Add =--version= to the root command:
+
+#+begin_src python
+  @click.version_option(package_name="PACKAGE", prog_name="APP")
+#+end_src
+
+Click reads the installed distribution metadata with
+=importlib.metadata.version()=, so the value in =pyproject.toml= remains the only
+place the version is set.  Pass =package_name= with the distribution name (it
+may differ from the import package name) and =prog_name= so the output uses the
+command name.
+
+Rules:
+- =--version= must work without other required options and exit 0.
+- Output the standard =APP, version X.Y.Z= line.  Do not add color or markup.
+- Do not define a fallback version constant in Python.  If the distribution is
+  not installed, fail with a clear error instead of silently reporting a stale
+  version.
+- If existing code exposes =__version__=, keep it only as a compatibility
+  wrapper around =importlib.metadata.version("PACKAGE")=; do not store the
+  version there.
+- Add =--version= to README and the man page OPTIONS section.
+- Test that =APP --version= matches the version in =pyproject.toml= and that the
+  output contains no ANSI escapes.
+
+* Color
+Default to color when writing to a terminal and disable all ANSI styling when
+the destination is not a terminal.  Use =rich= for human-facing output; do not
+add rich-click.
+
+Add a root-level global option:
+
+#+begin_example
+  --color [auto|always|never]   (default: auto)
+#+end_example
+
+- =auto=: let Rich detect whether the destination is a terminal and respect
+  =NO_COLOR=, =FORCE_COLOR=, and =TERM=dumb=.
+- =always=: force color on, even in a pipe.
+- =never=: disable color and all ANSI styling.
+
+The option applies to the whole invocation and must appear before the
+subcommand.  It must be parsed before the console is created.  Precedence is
+~--color~ > =FORCE_COLOR= > =NO_COLOR= > TTY detection.
+
+#+begin_src python
+  @click.option(
+      "--color",
+      type=click.Choice(["auto", "always", "never"], case_sensitive=False),
+      default="auto",
+      show_default=True,
+      help="Control colored output.",
+  )
+#+end_src
+
+Creating consoles:
+- Create a =Console()= for stdout and a =Console(stderr=True)= for stderr after
+  parsing global options.
+- For ~--color=always~, pass =force_terminal=True=.
+- For ~--color=never~, force non-terminal output and disable color so no ANSI
+  escapes reach the stream.
+- Do not create a module-level console with =force_terminal=True=.
+- Route all human-facing output through the console.  Do not mix =print()=,
+  =click.secho()=, and Rich markup.
+- Set =ctx.color= to =True=, =False=, or =None= to match the chosen mode so
+  Click's own error messages use the same decision.
+- Use =click.echo= only for plain machine-readable output.
+
+Status output:
+- Success: green with a text or symbol label, for example
+  =[green]ok[/green]= or =[green]✓[/green] created=.
+- Warning: yellow, prefixed with =warning:=, written to stderr.
+- Error: red, prefixed with =error:=, written to stderr.
+- Information/progress: blue or cyan, without implying success.
+- Never rely on color alone.  Include a word or symbol so the message works
+  when color is disabled.
+
+Safety and machine output:
+- Escape every dynamic value with =rich.markup.escape()= before interpolating it
+  into markup.  This includes paths, user input, and data read from files.
+- Keep =--version=, =--config=, =--completions=, and any =--json= or other
+  machine-readable mode free of ANSI escapes and rich markup.
+- Send diagnostics to stderr and normal data to stdout, so pipes see clean data.
+- If the app uses logging, configure =rich.logging.RichHandler= with the same
+  console settings; do not let logging and print output disagree about color.
+
+Tests:
+- ~--color=always~ emits ANSI escapes even when the output is captured.
+- ~--color=never~ emits no ANSI escapes.
+- ~--color=auto~ emits no ANSI escapes when redirected or captured.
+- =NO_COLOR= and =FORCE_COLOR= are honored when ~--color=auto~.
+- User-provided markup characters such as =[red]= are escaped literally.
+- Errors and warnings go to stderr; normal output goes to stdout.
+
+Document =--color= in =--help=, README, and the man page OPTIONS section.
+
+* Documentation tool
+*Note for the AI*: most project won't need full html documentation.  Ask the user
+what level of documentation they want this project to use.
+1. html, man pages, github pages
+2. html and man pages only
+3. man page only
+Adjust the plan accordingly based on the user's response.
+
+Use Sphinx for the HTML documentation site and the man page.  Keep =README.md=
+manually written; do not generate it from Sphinx.
+
+Use Markdown sources through MyST so the docs stay close to the README, and use
+=sphinx-click= to generate the CLI reference from the Click command tree.  Use
+Furo for the HTML theme and =sphinx-autobuild= for local preview.
+
+Add these development dependencies:
+
+#+begin_src toml
+  [dependency-groups]
+  dev = [
+    "sphinx>=9",
+    "sphinx-click>=6",
+    "furo",
+    "myst-parser",
+    "sphinx-autobuild",
+  ]
+#+end_src
+
+Project layout:
+
+#+begin_example
+  README.md          # manual GitHub landing page
+  docs/
+    conf.py
+    index.md         # includes ../README.md and links the CLI page
+    cli.md           # CLI reference and man-page sections
+    _build/          # generated; add to .gitignore
+#+end_example
+
+=docs/conf.py=:
+
+#+begin_src python
+  from importlib.metadata import version as pkg_version
+
+  project = "APP"
+  author = "AUTHOR"
+  release = pkg_version("PACKAGE")
+
+  extensions = ["myst_parser", "sphinx_click"]
+  source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+
+  root_doc = "index"
+  exclude_patterns = ["_build"]
+  html_theme = "furo"
+
+  man_pages = [
+      ("cli", "APP", "APP one-line description", ["AUTHOR"], 1),
+  ]
+#+end_src
+
+=docs/index.md= includes the manually written README and links the command
+reference:
+
+#+begin_src markdown
+  ```{include} ../README.md
+  :relative-docs: docs/
+  :relative-images:
+  ```
+
+  ```{toctree}
+  :maxdepth: 2
+
+  cli
+  ```
+#+end_src
+
+=docs/cli.md= is the single command-reference page used by both the HTML docs
+and the man page:
+
+#+begin_src markdown
+  # Command reference
+
+  ```{click} PACKAGE.cli:cli
+  :prog: APP
+  :nested: full
+  ```
+
+  ## FILES
+
+  ...
+
+  ## ENVIRONMENT
+
+  ...
+
+  ## SEE ALSO
+
+  ...
+#+end_src
+
+Do not add a second =sphinx-click= directive for the man page.  Build the man
+page from =docs/cli.md= so the HTML and man output share one source.
+
+The Makefile section defines these targets:
+
+#+begin_src Makefile
+  docs:  ## Build HTML documentation
+  	uv run sphinx-build -W -b html docs docs/_build/html
+
+  docs-serve:  ## Serve documentation with live reload
+  	uv run sphinx-autobuild docs docs/_build/html
+
+  man:  ## Build the man page
+  	uv run sphinx-build -W -b man docs docs/_build/man
+#+end_src
+
+Add =docs/_build/= to =.gitignore=.  Add =docs= to =make check= so Sphinx
+warnings fail CI.  Publish =docs/_build/html= to GitHub Pages with a workflow.
+
+Optional: if the project has a public Python API, add =sphinx.ext.autodoc= and
+=sphinx.ext.napoleon= and an API page.  Do not add them for a CLI-only project.
+
+Keep the README as the canonical GitHub landing page.  Do not use
+=sphinx-markdown-builder= or another Markdown generator for it.
+
+* Man page
+Generate the man page with Sphinx from =docs/cli.md=.  Do not hand-write a
+separate roff file and do not use click-man.
+
+The =man_pages= entry in =docs/conf.py= names the page:
+
+#+begin_src python
+  man_pages = [
+      ("cli", "APP", "APP one-line description", ["AUTHOR"], 1),
+  ]
+#+end_src
+
+The Makefile section defines the build and install targets:
+
+#+begin_src Makefile
+  MANPAGE := docs/_build/man/APP.1
+  MANDIR ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)/man/man1
+
+  man:  ## Build the man page
+  	uv run sphinx-build -W -b man docs docs/_build/man
+
+  install-man: man  ## Install the man page
+  	mkdir -p "$(MANDIR)"
+  	install -m 644 "$(MANPAGE)" "$(MANDIR)/APP.1"
+#+end_src
+
+Rules:
+- The man page is generated, not committed.  Add =docs/_build/= to =.gitignore=.
+- =make install= runs =install-man= after =uv tool install=.
+- =uv tool install= alone does not install man pages.  Document that users who
+  install from PyPI get the command but not the man page unless their package
+  manager installs data files.
+- Sphinx generates the =NAME= header from =man_pages=.  Write =SYNOPSIS=,
+  =DESCRIPTION=, =OPTIONS=, =COMMANDS=, =FILES=, =ENVIRONMENT=, =SEE ALSO=, and
+  any project-specific sections in =docs/cli.md=.
+- Include the config path in =FILES=, the bash requirements in =ENVIRONMENT= or
+  =NOTES=, and the GitHub URL in =SEE ALSO=.
+- Use simple paragraphs and lists.  Avoid tables that may not render in roff.
+- Verify the page with =man -l docs/_build/man/APP.1= or
+  =groff -man -z docs/_build/man/APP.1= when available, and keep
+  =sphinx-build -W= passing.
+- Document in README how to build, install, and view the page.
+
+* License
+Add GPL-2.0-only to the project if it does not already have a license.
+
+If an existing project already has a different license, stop and ask before
+changing it.  Do not replace a license that is already present.
+
+Add the canonical GPL-2.0 text as =LICENSE= from
+https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.  Do not edit the license
+text.
+
+Set the SPDX expression in =pyproject.toml=:
+
+#+begin_src toml
+  [project]
+  license = "GPL-2.0-only"
+  license-files = ["LICENSE"]
+#+end_src
+
+If the build backend does not support PEP 639 license expressions yet, use the
+older table form and note why:
+
+#+begin_src toml
+  [project]
+  license = { text = "GPL-2.0-only" }
+#+end_src
+
+Add a short copyright notice to README or a NOTICE file:
+
+#+begin_example
+  Copyright (C) 2026 AUTHOR
+#+end_example
+
+Use the current year and the actual copyright holder.  Do not invent a year or
+holder.
+
+Optional: add SPDX headers to source files:
+
+#+begin_example
+  # SPDX-License-Identifier: GPL-2.0-only
+#+end_example
+
+Also:
+- Add a License section to README linking to =LICENSE=.
+- Confirm the wheel and sdist include =LICENSE=.
+- GitHub detects the license from the =LICENSE= file.
+- Do not describe the project as "GPL 2 or later"; the SPDX expression is
+  =GPL-2.0-only=.
+
+* Preventing commits with secrets
+Block commits that contain secrets with =gitleaks= in a native git hook, and run
+=gitleaks= again in CI as the enforceable gate.
+
+The hook is a convenience, not a control: =--no-verify= skips it, and
+=core.hooksPath= is per-clone configuration.  Assume it protects nothing until
+CI and GitHub push protection agree.
+
+** Hook
+Commit =.githooks/pre-commit= with the executable bit set.  Install it with a
+make target rather than a symlink into =.git/hooks/=, so it also works in a
+=git worktree=, where =.git= is a file:
+
+#+begin_src Makefile
+  hooks:  ## Install the git hook that blocks secrets
+  	git config core.hooksPath .githooks
+#+end_src
+
+The hook checks for =gitleaks=, prints install instructions if it is missing or
+too old, and otherwise runs it on the staged changes:
+
+#+begin_src bash
+#!/usr/bin/env bash
+# Block commits that contain secrets. Installed by `make hooks`.
+set -euo pipefail
+
+min_major=8
+min_minor=19
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+error: gitleaks is not installed.
+
+This repository blocks commits that contain secrets. Install gitleaks
+however you prefer, then run your commit again:
+
+  https://github.com/gitleaks/gitleaks#installing
+
+EOF
+    exit 1
+fi
+
+version="$(gitleaks version 2>/dev/null | head -n1 || true)"
+version="${version#v}"
+IFS=. read -r major minor _rest <<<"$version"
+
+if [ -z "$version" ] ||
+    [ "${major:-0}" -lt "$min_major" ] ||
+    { [ "${major:-0}" -eq "$min_major" ] && [ "${minor:-0}" -lt "$min_minor" ]; }; then
+    printf 'error: gitleaks >= %s.%s is required for `gitleaks git`.\n       found: %s\n\n' \
+        "$min_major" "$min_minor" "${version:-unknown}" >&2
+    cat >&2 <<'EOF'
+Some distributions ship an older release: Debian 13 and Ubuntu 24.04-26.04
+have 8.16, which predates that command. Install a current release:
+
+  https://github.com/gitleaks/gitleaks#installing
+
+EOF
+    exit 1
+fi
+
+exec gitleaks git --staged --redact --no-banner --verbose
+#+end_src
+
+Rules:
+- The hook never installs anything, never calls =sudo=, and never uses the
+  network.  It reports what is missing and exits nonzero; the user installs
+  gitleaks however they prefer for their OS and re-runs the commit.
+- Do not vendor gitleaks, copy a binary into the repository, or add it to
+  =[dependency-groups]=.  It is a system tool, not a Python dependency.
+- Do not replace the script with the =pre-commit= framework.  Its =gitleaks=
+  hook declares =language: golang=, so pre-commit downloads a Go toolchain and
+  builds gitleaks from source on the first commit.  Its =gitleaks-system= hook
+  declares =language: system=, which fails with
+  =An error has occurred: FileNotFoundError= and no instructions.  The script
+  above checks the binary and prints something actionable; keep it that way.
+- Run =make hooks= once per clone.  =core.hooksPath= is local configuration, so
+  it survives worktrees but not a fresh clone, and it replaces any value that is
+  already set there.
+- Commit the script with mode =0755=.  If it was added from Windows, restore the
+  bit with =git update-index --chmod=+x .githooks/pre-commit=.
+
+** Version floor
+=gitleaks git --staged= requires gitleaks 8.19.0 or newer; the hook compares
+major and minor only.  Distribution packages lag behind that floor:
+
+| Source                                   | Version |
+|------------------------------------------+---------|
+| Homebrew, Arch, Fedora 43, Scoop, Alpine |  8.30.x |
+| Debian 14, Debian sid, Kali              |  8.26.0 |
+| Debian 13, Ubuntu 24.04 through 26.04    |  8.16.0 |
+
+Ubuntu 26.10 ships 8.26.0.  Do not repeat this table in the hook message; let
+=gitleaks version= decide.  The table is here so the minimum is not lowered
+casually.  gitleaks is feature complete, so 8.19 is a stable floor and later
+releases only carry security fixes.
+
+** What the hook sees
+- It runs on =git commit=, =git commit -a=, merges, and amendments.  Git stages
+  tracked changes before the hook runs, so =--staged= sees them.
+- Only staged content is scanned.  Unrelated dirty files are ignored, and a
+  forced =git add -f .env= is caught.
+- =--redact= keeps the secret out of the terminal scrollback, and =--no-banner=
+  keeps the output readable.
+- Do not advertise =--no-verify= in the message.  Document the escape hatch in
+  the README instead.
+
+** False positives
+- Prefer an inline =# gitleaks:allow= comment on test fixtures and documentation
+  examples.
+- Add the finding fingerprint to =.gitleaksignore= for anything else, and commit
+  that file.
+- Add a =.gitleaks.toml= only to teach it an internal token prefix.  Extend the
+  default rules instead of replacing them:
+
+#+begin_src toml
+  [extend]
+  useDefault = true
+#+end_src
+
+- Never allowlist a whole directory such as =tests/=, and do not select findings
+  by path unless that path cannot contain real credentials.
+
+** Existing repositories
+Scan the history before installing the hook:
+
+#+begin_src shell
+  gitleaks git --redact --no-banner
+#+end_src
+
+Triage every finding, rotate anything real, and only then run =make hooks=.  Do
+not start with a baseline: on an existing repository it turns current findings
+into permanent exceptions.  If the user insists on one, record why in the
+commit message or =SECURITY.md=.
+
+** CI
+The hook does not run in CI, and its =--staged= invocation must not be reused
+there: a fresh checkout has an empty index, so gitleaks scans nothing and prints
+"no leaks found" while the job passes.
+
+Call =make secrets= from =ci=, not from =check=, because =check= must stay
+runnable after =uv sync= alone:
+
+#+begin_src Makefile
+  secrets:  ## Scan the repository history for secrets
+  	gitleaks git --redact --no-banner
+#+end_src
+
+A full-history scan needs real history, so the CI checkout must not be shallow.
+Install a pinned release in the workflow:
+
+#+begin_src yaml
+  - uses: actions/checkout@v7
+    with:
+      fetch-depth: 0
+  - name: Install gitleaks
+    run: |
+      mkdir -p "$HOME/.local/bin"
+      curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+        | tar -xz -C "$HOME/.local/bin" gitleaks
+      echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+#+end_src
+
+Rules:
+- Pin the release and use =--redact=; Actions logs of public repositories are
+  public.
+- Use =linux_arm64= on Arm runners.
+- For a large history, narrow the range with =--log-opts=, for example
+  =--log-opts="origin/main..HEAD"=, or scan the working tree with
+  =gitleaks dir=.
+- Keep the pinned version at or above the hook's minimum.  Moving the floor
+  means changing the script, the workflow, and the README together.
+
+** After a leak
+Rotate the credential first; rewriting history does not revoke anything.  Then
+remove it with =git filter-repo= or BFG, force-push, and tell everyone holding a
+clone.  Assume a pushed key was already scraped.
+
+** Tests
+Add =tests/test_git_hooks.py=.  Put a stub =gitleaks= in =tmp_path= and prepend
+it to =PATH=; never install or run the real binary in tests.
+
+Cover at least:
+- The script parses: =bash -n .githooks/pre-commit=.
+- gitleaks missing: exit 1, and stderr names gitleaks and the install URL.
+- A stub reporting =8.16.0=: exit 1, and stderr names the minimum version.
+- A stub reporting =8.30.1=: exit 0, and the stub records
+  =git --staged --redact --no-banner --verbose=.
+- A stub that exits 1: the hook exits 1.
+
+** Documentation
+- README Requirements: gitleaks >= 8.19 is needed to commit, with a link to the
+  install page.
+- README Development: =make hooks= once per clone.
+- State plainly that =--no-verify= bypasses the hook and that CI is the gate.
+- Do not document a minimum version or an install method that the hook does not
+  enforce.
+
+* Github
+Separate repository files from repository settings.  Some settings require
+administrator access, billing, or a private-repository security product; ask
+the user before changing those.
+
+** Files to add
+*** .github/dependabot.yml
+#+begin_src yaml
+  version: 2
+  updates:
+    - package-ecosystem: "uv"
+      directory: "/"
+      schedule:
+        interval: "weekly"
+      groups:
+        python-dependencies:
+          patterns: ["*"]
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+        interval: "weekly"
+      groups:
+        github-actions:
+          patterns: ["*"]
+#+end_src
+
+Dependabot alerts and Dependabot version updates are different:
+- Alerts are a repository setting.
+- Version-update pull requests come from =dependabot.yml=.
+
+*** .github/workflows/ci.yml
+#+begin_src yaml
+  name: CI
+
+  on:
+    push:
+      branches: [main]
+    pull_request:
+
+  permissions:
+    contents: read
+
+  concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+  jobs:
+    check:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v7
+          with:
+            fetch-depth: 0
+        - uses: astral-sh/setup-uv@v10.3.3
+          with:
+            enable-cache: true
+        - run: uv sync --locked --all-groups
+        - run: make check
+        - name: Install gitleaks
+          run: |
+            mkdir -p "$HOME/.local/bin"
+            curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+              | tar -xz -C "$HOME/.local/bin" gitleaks
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        - run: make secrets
+#+end_src
+
+The checkout needs =fetch-depth: 0= because =make secrets= scans the full
+history; a shallow clone makes the scan cover one commit.  Pin the gitleaks
+release and keep it at or above the hook's minimum version.
+
+Pin =astral-sh/setup-uv= to a full release tag (for example =v10.3.3=) in
+every workflow that uses it (CI and Docs).  Unlike most actions it does not
+publish a floating major tag, so =@v10= cannot be resolved and the job fails
+during "Set up job" with =unable to find version v10= before any step runs.
+Dependabot still updates full-version tags.
+
+*** .github/workflows/codeql.yml
+#+begin_src yaml
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  security-events: write
+  packages: read
+  actions: read
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["python"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v4
+#+end_src
+
+Use either this workflow or CodeQL default setup, not both.
+
+*** .github/workflows/docs.yml
+#+begin_src yaml
+  name: Docs
+
+  on:
+    push:
+      branches: [main]
+    workflow_dispatch:
+
+  permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+  concurrency:
+    group: pages
+    cancel-in-progress: true
+
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v7
+        - uses: astral-sh/setup-uv@v10.3.3
+          with:
+            enable-cache: true
+        - run: uv sync --locked --all-groups
+        - uses: actions/configure-pages@v6
+        - run: make docs
+        - uses: actions/upload-pages-artifact@v5
+          with:
+            path: docs/_build/html
+
+    deploy:
+      needs: build
+      runs-on: ubuntu-latest
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+      steps:
+        - id: deployment
+          uses: actions/deploy-pages@v5
+#+end_src
+
+*** .github/CODEOWNERS
+#+begin_src text
+  # .github/CODEOWNERS
+  * @OWNER
+#+end_src
+
+=OWNER= must be a user or team with write access.  Use path-specific rules when
+different people own different parts of the repository.
+
+** Settings to enable
+Before changing repository settings, ask the user to authenticate the GitHub CLI
+with an account that can administer the repository, and ask for approval before
+running the commands:
+
+#+begin_src bash
+  gh auth login
+  gh auth status
+#+end_src
+
+Then use =gh api= (and =gh repo edit= for repository metadata) to turn on the
+necessary settings.  Do not ask for or handle the user's token.  If a setting
+requires organization-owner access, billing, or a paid security product, ask the
+user to enable it in the GitHub UI instead.
+
+#+begin_src bash
+  # Dependabot alerts
+  gh api --method PUT repos/OWNER/APP/vulnerability-alerts
+
+  # Dependabot security updates
+  gh api --method PUT repos/OWNER/APP/automated-security-fixes
+
+  # Secret scanning and push protection
+  gh api --method PATCH repos/OWNER/APP --input - <<'JSON'
+  {
+    "security_and_analysis": {
+      "secret_scanning": {
+        "status": "enabled"
+      },
+      "secret_scanning_push_protection": {
+        "status": "enabled"
+      }
+    }
+  }
+  JSON
+
+  # Code scanning default setup (or use the CodeQL workflow instead)
+  gh api --method PATCH repos/OWNER/APP/code-scanning/default-setup \
+    --input - <<'JSON'
+  {
+    "state": "configured"
+  }
+  JSON
+
+  # GitHub Pages with GitHub Actions as the source
+  gh api --method POST repos/OWNER/APP/pages \
+    --input - <<'JSON'
+  {
+    "build_type": "workflow"
+  }
+  JSON
+#+end_src
+
+Enable Pages before the first push that triggers the Docs workflow.  Until it
+is enabled, =actions/configure-pages= fails with =Get Pages site failed ...
+Not Found= and the build job aborts; re-run the Docs workflow after enabling
+it.  The action's =enablement: true= input is not a substitute: it requires a
+token other than the default =GITHUB_TOKEN= (a personal access token or
+GitHub App token).  Enabling Pages also creates the =github-pages= environment
+used by the deploy job.
+
+If the Pages site already exists, use =PUT= instead of =POST=.  Rulesets and
+branch protection are repository settings too; use =gh api= with the rulesets
+endpoint or the GitHub UI, since =gh ruleset= only lists and views them.
+
+1. *Dependabot alerts*: enable under Settings > Code security and analysis.
+   Optionally enable Dependabot security updates.
+2. *Secret scanning*: enable it for the repository.  Public repositories can
+   use it for free; private repositories require GitHub Secret Protection.
+3. *Push protection*: enable it where secret scanning is configured.  Decide who
+   may bypass it; prefer no bypass except repository administrators.
+4. *Code scanning*: use the CodeQL workflow above or CodeQL default setup.
+   Public repositories can use it for free; private repositories require
+   GitHub Code Security.
+5. *Code owners*: add =.github/CODEOWNERS= and enable "Require review from Code
+   Owners" in the repository ruleset.
+6. *GitHub Pages*: set Settings > Pages > Build and deployment > Source to
+   "GitHub Actions", then use the docs workflow.  If "project page" means a
+   GitHub Projects board instead, create it separately with
+   =gh project create --owner OWNER --title APP=; that is not a repository
+   setting.
+7. *Ruleset / branch protection*: require a pull request before merging,
+   require the =CI= and =CodeQL= checks, require code-owner review, and block
+   force pushes.  Consider linear history and signed commits if the project
+   wants them.
+8. *Repository metadata*: set the description, homepage, and topics.  For
+   example:
+
+#+begin_src bash
+  gh repo edit OWNER/APP \
+     --description "APP one-line description" \
+     --homepage "GITHUB_URL" \
+     --add-topic python \
+     --add-topic cli
+#+end_src
+
+Store secrets in GitHub Actions secrets, never in the repository.  Do not enable
+settings that require billing or a paid security product without asking the
+user.
+
+* Misc
+** .gitignore
+Add these entries to =.gitignore= for a Python/uv/Sphinx CLI app:
+
+#+begin_src gitignore
+  # Python
+  __pycache__/
+  ,*.py[cod]
+  ,*.egg-info/
+  .venv/
+  venv/
+  build/
+  dist/
+
+  # Tool caches
+  .pytest_cache/
+  .ruff_cache/
+  .ty_cache/
+  .mypy_cache/
+  .coverage
+  .coverage.*
+  htmlcov/
+
+  # Sphinx
+  docs/_build/
+
+  # Environment and secrets
+  .env
+  .env.*
+  !.env.example
+
+  # Editors and OS
+  .vscode/
+  .idea/
+  .DS_Store
+  Thumbs.db
+#+end_src
+
+Rules:
+- Commit =uv.lock= and =.python-version= for an application.  Do not ignore
+  them.
+- Do not commit =docs/_build/=, =dist/=, =build/=, caches, or coverage output.
+- Keep =.env.example= with placeholder values; ignore real =.env= files.
+- Do not ignore =LICENSE=, =README.md=, =.gitleaksignore=, =.gitleaks.toml=,
+  or other project metadata.
+
+** Project scaffolding
+- Use the =src/PACKAGE/= layout and keep tests in =tests/=.
+- Keep documentation sources in =docs/= and generated output out of version
+  control.
+- Commit =pyproject.toml=, =uv.lock=, =.python-version=, =README.md=,
+  =LICENSE=, =Makefile=, =docs/=, =tests/=, =.githooks/=, and any
+  =.gitleaksignore= or =.gitleaks.toml=.
+- Ensure =pyproject.toml= has project metadata, scripts, dependencies,
+  development dependency groups, license, URLs, and the Ruff/ty/pytest/coverage
+  configuration described above.
+- Add =.editorconfig= if the team wants consistent editor settings.
+- Add =CHANGELOG.md=, =CONTRIBUTING.md=, and =SECURITY.md= when the project is
+  public.
+- Do not commit generated man pages or documentation builds.

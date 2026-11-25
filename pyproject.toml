@@ -3,7 +3,7 @@ name = "sink"
 version = "0.2.1"
 description = "Sink is a command line tool for developers to help building websites."
 authors = ["sheldon <developer@8cylinder.com>"]
-license = "GPLv3"
+license = "GPL-2.0-only"
 readme = "README.org"
 
 [tool.poetry.dependencies]

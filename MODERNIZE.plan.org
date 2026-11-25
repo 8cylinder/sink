@@ -1,430 +1,1330 @@
 #+TITLE: Sink Modernization Plan
 #+AUTHOR: modernization review
-#+DATE: 2026-09-13
-#+OPTIONS: toc:2 num:t todo:t
+#+DATE: 2026-11-25
+#+OPTIONS: toc:3 num:t todo:t
 #+TODO: TODO NEXT WAIT BLOCKED | DONE CANCELLED
 #+PROPERTY: header-args:org :results silent
 #+STARTUP: indent
 
 * Overview
-  Review of the =sink= codebase (~3,100 LOC, 14 modules) to move it onto
-  modern Python (>=3.13), add complete type hints, harden security, and
-  fix latent bugs.  This plan is the deliverable of the review; execution
-  will follow separately.
+  This is a rewrite of the 2026-09-13 review.  It keeps the parts of the
+  original plan that survived verification, corrects the parts that did not,
+  and folds in =app-base.org= (the house standard for Python CLI apps) and
+  =TODO.org= (the author's backlog).
 
-  The dominant problems are structural rather than algorithmic:
-  - A mutable global =config= singleton and an untyped =Dict2obj= wrapper
-    used everywhere.
-  - All remote work goes through =subprocess(... shell=True)= with
-    f-string interpolation of config/user values, including passwords.
-  - No tests, no CI, no lint/format/typecheck configuration.
-  - Several modules are unreachable or crash-on-use (deploy, vm) because
-    of signature drift.
-  - Packaging still straddles a legacy =setup.py= and an untracked uv lock.
+  The app is ~3,100 lines across 14 modules.  The dominant problems are
+  structural, not algorithmic:
 
-* Goals and non-goals
-** Goals
-   - Target Python >=3.13, single-sourced version, clean packaging.
-   - Move dependency/venv/build management from Poetry to uv.
-   - Full type coverage checked by =ty=; Ruff lint+format enforced.
-   - Replace shell string building with a typed command-execution layer.
-   - Remove secrets from command lines, logs, and process tables.
-   - Fix the crash/incorrect-behavior bugs catalogued below.
-   - Build a real test suite and CI.
-** Non-goals
-   - Rewriting every command into a new UX; behavior stays recognizable.
-   - Removing the "dry-run by default / --real" model (it is core).
-   - Windows support (remote servers and tooling remain Linux/macOS).
+  - One mutable global =config= object is simultaneously the data store, the
+    loader, and the process-wide singleton.  Everything is an untyped
+    =Dict2obj=.
+  - All remote work goes through =subprocess(..., shell=True)= with f-string
+    interpolation of config and user values, including database passwords.
+  - There are no tests, no CI, no lint/format/type configuration, and no
+    working development environment: =poetry= is not installed, the committed
+    =.venv= is broken, and the tracked =uv.lock= is an unusable stub.
+  - Several commands are crash-on-use (=deploy=, =single=, =action local=),
+    and dry-run still executes remote tools.
+  - Packaging is split between Poetry, a legacy =setup.py=, and a stub lock.
+  - The CLI predates the house standard: no =--color=, no =--config=, no
+    static completions, no =make= targets, no gitleaks hook, no GitHub
+    workflows.
+
+  The hard product requirement is command transparency: every shell command,
+  rsync/ssh invocation, and database pipeline is printed in a copy-pasteable
+  form, and the printed command is the one executed in that mode.  Dry-run is
+  the default: it uses the tool's native dry-run when one exists (=rsync
+  --dry-run=) and prints only otherwise.  =--real/-r= prints and executes the
+  real variant.  See "Command transparency (core contract)".
+
+  This plan is organized as discrete, sequential stages.  Each stage has a
+  goal, a task list, and exit criteria.  No stage starts until the previous
+  stage's exit criteria are met, except where noted as parallelizable.
+
+* How this plan was produced
+  - Static review of all 14 modules, =pyproject.toml=, =setup.py=,
+    =poetry.lock=, =uv.lock=, =README.org=, =AGENTS.md=, =TODO.org=, and
+    =app-base.org=.
+  - Runtime verification in a scratch environment under =/tmp=, using the
+    dependency versions from =poetry.lock=, stubbed =rsync=/=ssh=/=mysql=, and
+    a temporary project.  No =--real= command was run against a real server.
+  - Every defect marked *confirmed* below has a reproduction or a
+    code-level proof.  Items marked *code-confirmed* were traced by reading
+    but not exercised (usually because an earlier crash blocks them).
+  - The repository was not modified during the review.
 
 * Locked decisions
-  | Decision       | Choice                                             |
-  |----------------+----------------------------------------------------|
-  | Python floor   | >=3.13 (runs on 3.14; this machine is 3.14-only)   |
-  | Deps/venv/lock | uv (replaces Poetry)                               |
-  | Build backend  | hatchling (proposed; poetry-core is low-churn alt) |
-  | Lint/format    | Ruff (check + format)                              |
-  | Type checker   | ty (Astral)                                        |
-  | Tests          | pytest (+ pytest-cov), click CliRunner             |
-  | Back-compat    | CLI and sink.yaml MAY change; migrate with tooling |
+  | Decision           | Choice                                                      |
+  |--------------------+-------------------------------------------------------------|
+  | Dependency manager | =uv=; delete Poetry entirely (user-confirmed)                 |
+  | Build backend      | =hatchling= (PEP 621, src layout)                             |
+  | Package layout     | =src/sink/= (app-base default)                                |
+  | Entry point        | =sink = "sink.cli:main"= (function returns an exit code)      |
+  | CLI framework      | Click; keep command and option names where possible         |
+  | Help formatting    | Plain Click; remove =rich-click=                              |
+  | Human output       | =rich= console + =--color auto/always/never=                    |
+  | Config format      | Project =sink.yaml= (YAML), not per-user XDG TOML             |
+  | Version            | Static =version= in =[project]=, read via Click metadata        |
+  | Lint/format        | Ruff, line length 80, target =py315=                          |
+  | Type checker       | =ty= only; no mypy                                            |
+  | Tests              | pytest + pytest-cov, Click =CliRunner=                        |
+  | Coverage           | Ratchet to 90% branch coverage (app-base floor)             |
+  | Secrets gate       | Native =.githooks/pre-commit= running gitleaks                |
+  | License            | GPL-2.0-only (changed 2026-11-25; was GPL-3.0-only)         |
+  | Completions        | Static bash script; commands/options only (no server names) |
+  | Documentation      | Man page + HTML (Sphinx/MyST); no GitHub Pages              |
+  | Execution layer    | Thin stdlib argv wrapper; remove =plumbum= and =command.py=     |
+  | Schema             | Stay on v1; schema v2 is deferred                           |
+  | Platforms          | Linux and macOS; remote servers Linux                       |
 
-* Current state
-** Repository facts
-   - Packaging: Poetry 2.x today; =pyproject.toml= + legacy =setup.py=
-     (unused), stale untracked =uv.lock=, in-project =.venv=.
-   - Entry point: =sink.sink:sink= (Click group in =sink/sink.py=).
-   - Config: =sink.yaml=, gitignored, discovered by walking up from CWD.
-   - No tests/, no CI, no ruff/ty/mypy config, no pre-commit.
-   - PyYAML was bumped 6.0 -> 6.0.3 in the lock to build on Python 3.14.
-** Baseline metrics
-   | Metric                      | Value |
-   |-----------------------------+-------|
-   | Python source lines         |  3128 |
-   | Modules                     |    14 |
-   | Functions with return hints |     2 |
-   | shell=True call sites       |    10 |
-   | Test files                  |     0 |
-** Verified defects already present
-   - =sink deploy ...= (rename/symlink) raises =AttributeError= before it
-     can run (=deploy.py:34=, =deploy.py:107=).
-   - =sink vm= reads =Dict2obj= with =[]= (=vm.py:64-66,207=), =TypeError=.
-   - Directory transfers pass a server object where a name is expected
-     (=rsync.py:220=), =KeyError=.
-   - =default_project= is mutated on every =project()= call
-     (=config.py:267=), leaking state between servers/commands.
+* Decisions confirmed 2026-11-25
+  | #   | Decision                   | Choice                                                  |
+  |-----+----------------------------+---------------------------------------------------------|
+  | D1  | Python floor               | =>=3.15=; =.python-version= = 3.15                          |
+  | D2  | Documentation              | Man page + HTML (Sphinx/MyST/Furo); no GitHub Pages     |
+  | D3  | Server-name completion     | Follow app-base literally: static only; drop dynamic    |
+  | D4  | Execution layer            | Thin stdlib argv wrapper; remove =plumbum= and =command.py= |
+  | D5  | README                     | Convert =README.org= to =README.md=                         |
+  | D6  | Config schema v2           | Deferred; this project ships on v1                      |
+  | D7  | =vm= command group           | Removed entirely; =vm build= is no longer needed          |
+  | D8  | Quiet/silent flags         | =-q= hides the rendered command; =-qq= hides everything     |
+  | D9  | Secret-displaying commands | Redact by default; explicit flag shows the values       |
+  | D10 | License                    | GPL-2.0-only (approved 2026-11-25)                      |
+
+* Decisions still open
+  None.  All structural decisions are closed; remaining choices are ordinary
+  implementation details inside the stages.
+
+* Baseline (verified 2026-11-25)
+** Repository and environment
+   - =pyproject.toml= is Poetry-only: =name = "sink"=, =version = "0.2.1"=,
+     =python = "^3.10"=, runtime deps =click=, =PyYAML=, =coolname=,
+     =plumbum=, =rich-click=; dev dep =ipython=.
+   - =setup.py= is legacy and unused.  =poetry.lock= exists.
+   - =uv.lock= is *tracked* but is a 52-byte stub:
+     =requires-python = ">=3.14"= and no package data.  =uv lock --check= fails
+     ("Python requirement changed from >=3.14 to >=3.11").
+   - =poetry= is not installed.  =.venv= was built with CPython 3.12.3 but the
+     base interpreter is now 3.11.2; its console scripts are dead and it
+     contains no project dependencies.
+   - Available CPython is 3.11.2 only.  =uv= 0.13.10 can download 3.15.
+   - =rsync=, =mysql=, and =mysqldump= are absent from the review machine;
+     =ssh=, =tar=, and =unzip= are present.  Integration tests must be
+     skippable.
+   - =uv build= from a pristine copy succeeds.  The wheel is
+     =sink-0.2.1-py3-none-any.whl= and *does* contain
+     =sink/resources/Vagrantfile=.  It excludes =.secrets.org=, =.org= docs,
+     =setup.py=, and =poetry.lock=.
+   - Wheel metadata says =Requires-Python: >=3.10,<4.0=, =License: GPLv3=
+     (the baseline; the working tree was changed to =GPL-2.0-only= on
+     2026-11-25), and still carries the stale classifier
+     =License :: Other/Proprietary License=.
+   - =sink/sink.py= has no =if __name__ == "__main__"= guard, so
+     =python -m sink.sink= prints nothing and exits 0.
+** Metrics
+   | Metric                       | Value |
+   |------------------------------+-------|
+   | Python source lines          |  3128 |
+   | Modules                      |    14 |
+   | Functions with return hints  |     2 |
+   | =shell=True= call sites        |    10 |
+   | =Dict2obj= references          |    13 |
+   | =click.style/secho/echo= calls |   108 |
+   | Test files                   |     0 |
+   | CI workflows                 |     0 |
+** Corrections to the previous plan
+   - =uv.lock= was described as untracked/stale.  It is tracked and is a
+     non-functional stub.
+   - =README.org= does not hardcode the wheel version; it uses the
+     placeholder =sink-<VERSION-NUMBER>-py3-none-any.whl=.
+   - =AGENTS.md= says =uv.lock= is untracked and that Poetry is the source of
+     truth.  Both are wrong for this project and must be rewritten.
+   - The package already ships =sink/resources/Vagrantfile=; this is not a
+     packaging defect.
+   - =ty= is not "Alpha" in the sense the old plan implied.  =app-base.org=
+     makes it the standard; do not add a mypy fallback unless the user
+     explicitly asks for a transition period.
+   - The old plan proposed =rich-click= and dynamic versioning.  Both
+     contradict =app-base.org= and are removed here.
+   - The old plan proposed a 60% coverage start.  =app-base.org= requires 90%
+     branch coverage; this plan ratchets to 90 and does not lower the target.
 
 * Target standards
 ** Python
-   - =requires-python = ">=3.13"=.
-   - PEP 604 unions (=X | None=), PEP 585 builtins (=list[str]=),
-     =Self=, =Literal=, =TypedDict=, =Protocol=, =@dataclass(slots=True)=.
-   - Timezone-aware =datetime.now(datetime.UTC)= (=DTZ= rules).
-   - =pathlib.Path= end to end; no =os.path= string juggling.
-** Tooling (proposed pyproject additions)
+   - =requires-python = ">=3.15"= and =.python-version= = 3.15 (D1 confirmed).
+   - PEP 604 unions, PEP 585 builtins, =Self=, =Literal=, =TypedDict=,
+     =Protocol=, =@dataclass(frozen=True, slots=True)=.
+   - Timezone-aware datetimes; =pathlib.Path= end to end; no =os.chdir=.
+   - Public functions fully annotated; =ty= rules from =app-base.org=.
+** Tooling
    #+begin_src toml
-   [project]
-   requires-python = ">=3.13"
-   dynamic = ["version"]
+     [project]
+     name = "sink"
+     version = "0.3.0"
+     readme = "README.md"
+     license = "GPL-2.0-only"
+     license-files = ["LICENSE", "NOTICE"]
+     requires-python = ">=3.15"
+     dependencies = ["click>=8.5", "PyYAML>=6.0.4", "coolname>=2.0", "rich>=15"]
 
-   [tool.ruff]
-   target-version = "py313"
-   line-length = 100
+     [project.scripts]
+     sink = "sink.cli:main"
 
-   [tool.ruff.lint]
-   select = ["E","F","W","I","UP","B","C4","SIM","S","RUF","ANN","PTH","DTZ","RET","ARG"]
-   ignore = ["ANN401"]           # initially; tighten over time
-   [tool.ruff.lint.per-file-ignores]
-   "tests/**" = ["S101", "ANN"]
+     [dependency-groups]
+     dev = ["pytest>=8", "pytest-cov>=6", "ruff", "ty", "import-linter"]
 
-   [tool.pytest.ini_options]
-   testpaths = ["tests"]
-   addopts = "-ra --strict-markers"
-   markers = ["integration: needs real rsync/ssh/mysql"]
+     [tool.ruff]
+     line-length = 80
+     target-version = "py315"
+
+     [tool.ruff.lint]
+     extend-select = ["ANN", "PGH003", "PYI"]
+
+     [tool.ty.rules]
+     dynamic-function-decorator-return = "error"
+     missing-type-argument = "error"
+     possibly-unresolved-reference = "warn"
+     unsound-return-statement = "error"
    #+end_src
-   - CI runs: =ruff check=, =ruff format --check=, =ty check=, =pytest=.
-   - =ty= is Alpha; see Risk register; keep =mypy= config-dormant as fallback.
-** Package layout (target)
+
+   - Add the broader legacy rules (=E=, =F=, =W=, =I=, =UP=, =B=, =C4=, =SIM=,
+     =S=, =RUF=) in Stage 2, then =PTH=, =DTZ=, =RET=, =ARG= in Stage 10.
+     Do not enable =--unsafe-fixes= or Ruff preview.
+   - Remove =rich-click=, =ipython=, and =plumbum=.  Keep =coolname= (deploy
+     names).  The stdlib wrapper in =sink/shell.py= replaces =command.py= and
+     the remaining plumbum usage (D4 confirmed).
+** Command transparency (core contract)
+   The printed shell command is the product.  This is not a debug aid; it is
+   the reason the tool exists.  Every stage that touches execution must
+   preserve it.
+
+   - Build exactly one command object per action *before* doing anything.
+     The object is the single source of truth for both display and execution.
+   - Default (no =-r=/=--real=): use the tool's native dry-run mode when it has
+     one.  Render the dry-run variant, print it, and execute it, so the user
+     sees both the command and its intended action.  =rsync= gets
+     =--dry-run= and its itemized "what would transfer" output is shown.  If
+     the tool has no dry-run mode, render the real command, print it, and do
+     not execute it.  The displayed command is always the one that runs in
+     that mode, or the exact command =--real= will run when the mode is
+     print-only.
+   - =--real/-r=: render the real variant (without the dry-run switch), print
+     it, and execute it.  The command is still shown; only execution differs.
+   - The command object owns both variants: =render(real: bool)= and
+     =execute(real: bool)=.  They differ only by the tool's dry-run flag (and
+     any tool-specific read-only switch).  There is no second construction
+     path that can drift.
+   - Dry-run capability is explicit per tool; never pass an invented
+     =--dry-run= to a tool that does not support it.
+     | Tool                           | Dry-run switch          | Default behavior |
+     |--------------------------------+-------------------------+------------------|
+     | =rsync=                          | =--dry-run=               | execute it       |
+     | =ssh= / =scp=                      | none                    | print only       |
+     | =mysqldump= / =mysql=              | none                    | print only       |
+     | =git= (diff)                     | none                    | print only       |
+     | =pv=                             | none                    | print only       |
+     | =lando= / =ddev=                   | none documented         | print only       |
+     | remote =mkdir=/=mv=/=ln=/=touch= | none                    | print only       |
+     | =sink diff= (needs real rsync)   | =--dry-run= on rsync only | print only       |
+     The current =db.py= passes =--dry-run= to =mysqldump=; that is invalid and
+     is fixed by this table.
+   - =-q/--quiet= hides only the rendered shell command; the command's own
+     output (rsync itemized lines, git diff, mysql errors) and the success
+     line are still shown.  =--suppress-commands/-s= is the same behavior and
+     remains as an alias.
+   - =-qq= hides the render *and* the command's stdout/stderr *and* every
+     status/success/error line.  The exit code is the only signal; use it in
+     scripts.  =--silent= is an alias during the deprecation window.
+   - The rendered string must be valid POSIX shell: quote every argument with
+     =shlex.join= (or =shlex.quote= for fragments), use absolute paths where
+     the shell would otherwise resolve differently, and do not wrap lines with
+     backslash-newline unless that is valid shell.  Pasting it into a shell
+     must reproduce the executed command.
+   - Command kinds:
+     - *Argv*: the object stores =list[str]=.  Display is
+       =shlex.join(argv)=; execution is =argv= (equivalent to pasting).
+     - *Pipeline/redirection*: the object stores stages and redirections.
+       Display is =stage1 | stage2 > file 2>&1=; execution is a =Popen= chain
+       (or, if that is impossible, one audited =sh -c= of the already-quoted
+       render).  The displayed pipeline is the executed pipeline.
+     - *Remote*: the object stores the local =ssh= argv plus the remote
+       fragment.  Display quotes the fragment as one argument; execution
+       passes that exact fragment to the remote shell.
+   - Output styling separates the rendered command from its output.  Use the
+     current =ui.py= palette as inspiration, but every style goes through
+     =rich= (no =click.style= / =click.secho=):
+     | Element              | Style                                      | Stream |
+     |----------------------+--------------------------------------------+--------|
+     | rendered command     | yellow, dim, =+ = leader, wrapped as shell | stdout |
+     | command output       | terminal default, unstyled, indented       | stdout |
+     | success (real)       | white bold on green, =[Success]= label       | stdout |
+     | success (dry run)    | white bold on blue, =[Success (DRY RUN)]=    | stdout |
+     | warning              | yellow, =[Warning:]= label                   | stderr |
+     | error                | red, =[Error:]= label                        | stderr |
+     | notice / information | blue or cyan, =[Notice:]= label              | stderr |
+     A blank line separates the command block from its output; a dim rule or
+     blank line separates actions.  Never rely on color alone; labels always
+     include a word or symbol.
+   - Secrets are never rendered into the command.  The object carries the
+     secret out-of-band (environment or a =0600= credentials file), and the
+     display shows the environment reference or file path, not the value.
+     The executed command therefore matches the display; copy-paste works when
+     the same environment/credentials are present.  =--show-secrets= is an
+     explicit, documented escape hatch for debugging, never a default.
+   - Every stage verifies the contract with a test: render the object, split it
+     back with =shlex.split= (or run it in a stub shell), and assert it equals
+     the argv/pipeline that would execute.  Golden tests pin the exact text for
+     =file=, =db=, =deploy=, =check=, and =diff=.
+** Target layout
    #+begin_src text
-   sink/
-     __init__.py          # __version__ (single source)
-     __main__.py          # python -m sink
-     cli/                 # one Click module per command group
-       main.py db.py file.py ssh.py diff.py deploy.py check.py vm.py misc.py
-     config/
-       models.py          # frozen dataclasses / TypedDicts
-       loader.py          # load(path) -> Config, validation, migration
-       migrate.py         # v1 -> v2
-     shell.py             # typed subprocess wrapper (no shell=True)
-     errors.py            # SinkError hierarchy
-     logging.py           # logging setup
-     ... feature modules (rsync, db, ssh, check, deploy, actions, vm, ui)
-   tests/
+     src/sink/
+       __init__.py          # no version; importlib.metadata compatibility only
+       __main__.py          # python -m sink
+       cli/
+         __init__.py        # cli group, main(), base Group/Command, globals
+         db.py file.py ssh.py diff.py deploy.py check.py misc.py action.py
+       config/
+         models.py          # frozen dataclasses, no I/O
+         loader.py          # load(path) -> Config
+         migrate.py         # v1 -> v2 (deferred; Stage 11)
+       completions.py       # static bash generator
+       errors.py            # SinkError hierarchy
+       logging.py           # rich.logging.RichHandler setup
+       runtime.py           # Runtime: config, console, output level
+       shell.py             # Argv/Pipeline/RemoteCommand: render + execute
+       ui.py                # rich console, status, redaction
+       rsync.py db.py ssh.py check.py deploy.py actions.py applications.py
+     tests/
+     docs/
    #+end_src
 
-* Risk register
-  | Risk                                     | Mitigation                                   |
-  |------------------------------------------+----------------------------------------------|
-  | uv migration changes lock/venv tooling   | Do it first, in isolation, before refactors  |
-  | ty is Alpha and may mis-type/regress     | Pin ty; keep strict mypy config as fallback  |
-  | Refactor breaks dry-run output contract  | Golden-string tests for every command        |
-  | Config v2 migration loses users' data    | Read-v1 transparently + explicit migrate cmd |
-  | Shell-out rewrite alters remote behavior | Integration tests marked and run manually    |
+* Stage 0 - Baseline and safety net                                             :stage_0:
+** Goal
+Freeze the current behavior so the refactor is bisectable and every
+later change can be compared against a known state.  No product code
+changes in this stage.
 
-* Workstreams
-** WS0 Poetry to uv migration (do first, blocking)                         :uv:
-   - [ ] Delete =poetry.lock=; commit a regenerated =uv.lock= (one is
-         already present but untracked/stale).
-   - [ ] Rewrite =pyproject.toml= as PEP 621 =[project]=: =name=,
-         =version= (or =dynamic=["version"]=), =requires-python = ">=3.13"=,
-         =dependencies=, =[project.scripts] sink = "sink.sink:sink"=.
-         Remove all =[tool.poetry.*]= sections.
-   - [ ] Move =ipython= to =[dependency-groups] dev = [...] =
-         (PEP 735, natively supported by uv).
-   - [ ] Switch build backend to hatchling:
-         =[build-system] requires=["hatchling"] build-backend="hatchling.build"=.
-         If zero churn is preferred, keep
-         =requires=["poetry-core"] build-backend="poetry.core.masonry.api"=;
-         uv can drive either.
-   - [ ] Verify the wheel contains =sink/resources/Vagrantfile= (=uv build=,
-         then inspect the archive).
-   - [ ] Recreate the in-project venv with uv: =uv sync=. Confirm uv manages
-         =./.venv= and that =uv run sink -h= works.
-   - [ ] Add =.venv/= (and =__pycache__/=, =*.egg-info/= if missing) to
-         =.gitignore=.
-   - [ ] Update docs/commands: =poetry run X= -> =uv run X=,
-         =poetry install= -> =uv sync=, =poetry build= -> =uv build=.
-   - [ ] CI uses =astral-sh/setup-uv= with =uv sync --frozen= then
-         =uv run ...=.
-   - [ ] Remove the "Poetry is the source of truth / do not switch to uv"
-         guidance in =AGENTS.md= once migration lands (it contradicts this).
+** Tasks
+- [ ] Create a branch and an annotated tag for the baseline; record
+      =git rev-parse HEAD=, =uv --version=, and =python --version= in
+      the stage log.
+- [ ] Capture =sink -h= and =sink <command> -h= for every command into
+      =tests/fixtures/help/= (plain text, ANSI stripped).
+- [ ] Capture dry-run output for =file put=, =file pull=, =db pull=,
+      =db put=, =diff=, =deploy= (all methods), and =check= against a
+      throwaway project.
+- [ ] Add the reproduction snippets from this plan to
+      =tests/fixtures/bugs/= as =xfail= tests (or documented skipped
+      tests) so each fix flips a test.
+- [ ] Confirm the repository is clean apart from =app-base.org= and
+      commit the baseline artifacts.
 
-** WS1 Project hygiene and tooling                                      :tooling:
-   - [ ] Remove =setup.py=; make =pyproject.toml= the only manifest.
-   - [ ] Single-source version: =sink/__init__.py:__version__=; read with
-         =importlib.metadata.version("sink")= for =--version=; delete the
-         duplicate in =sink/sink.py:49=; stop hardcoding the wheel name in
-         =README.org:3=.
-   - [ ] Add Ruff, ty, pytest, pytest-cov, pre-commit config.
-   - [ ] Add =.github/workflows/ci.yml= (matrix 3.13/3.14).
-   - [ ] Ensure =sink/resources/Vagrantfile= ships in the wheel.
+** Exit criteria
+- Baseline help and command fixtures are committed.
+- Every "confirmed" defect in this plan has a reproduction file or a
+  test marked =xfail=.
+- =git status= is clean; no source behavior has changed.
 
-** WS2 Typed configuration layer                                      :config:
-   The root smell is that one object is simultaneously the *data store*, the
-   *loader*, and a *mutable global*.  Split those three roles, then inject
-   the result explicitly.
+* Stage 1 - uv, hatchling, src layout, and single-source version                :stage_1:
+** Goal
+Replace Poetry and the legacy =setup.py= with =uv= + =hatchling=, move
+the package under =src/=, and make =pyproject.toml= the only manifest.
+This is the one stage that touches every path; keep it mechanical and
+commit it in small steps.
 
-*** Principle
-    Separate /what the data is/ (model) from /how it is obtained/ (loader)
-    from /who owns its lifecycle/ (composition root).  Load once at the CLI
-    entrypoint and pass it down.  Consumers depend on the narrow slice they
-    need, not the whole blob.
+** Tasks
+- [ ] Delete =poetry.lock= and =setup.py=.
+- [ ] Rewrite =pyproject.toml= as PEP 621 =[project]= with the metadata,
+      dependencies, =[project.scripts]=, =[project.urls]=, and
+      =license = "GPL-2.0-only"= +
+      =license-files = ["LICENSE", "NOTICE"]=.
+      Remove every =[tool.poetry.*]= section.
+- [ ] Add =[build-system]= with =hatchling= and an explicit =packages=
+      entry for =src/sink=.
+- [ ] Move =sink/= to =src/sink/=; keep the package name and all
+      =sink.*= imports unchanged.
+- [ ] Add =src/sink/__main__.py= with
+      =from sink.cli import main; raise SystemExit(main())=.
+- [ ] Delete =__version__= from =sink/sink.py=; delete the duplicate
+      version logic from =setup.py= (deleted).  Add
+      =@click.version_option(package_name="sink", prog_name="sink")=.
+- [ ] Set =requires-python = ">=3.15"= (D1) and add =.python-version=.
+      Run =uv python install 3.15=, delete the broken =.venv=, and
+      =uv sync --all-groups=.
+- [ ] Regenerate =uv.lock= and commit it; verify =uv lock --check=.
+- [ ] Update =.gitignore= for =src/= build artifacts, =.venv/=,
+      =__pycache__/=, caches, coverage, =docs/_build/=, =dist/=,
+      =build/=, =*.egg-info/=, while keeping =uv.lock= and
+      =.python-version= tracked.
+- [ ] Rename =README.org= to =README.md= and set =readme = "README.md"= in
+      =pyproject.toml= (D5).  Convert the install section to =uv= now;
+      the full rewrite is Stage 12, but the commands must not be broken
+      in the meantime.
+- [ ] Keep =plumbum= for now so =command.py= still imports; it is removed
+      in Stage 4 together with =command.py= (D4).  Do not leave a
+      half-migrated dependency.
+- [ ] Delete the obsolete =vm= group (D7): =sink vm build=, =sink vm
+      check=, =vm.py=, the =Vagrant= class, and
+      =sink/resources/Vagrantfile=.  Update the CLI registration and
+      TODO.org.  This removes B4/N4/N5 and the Vagrant packaging concern
+      before the shell refactor.
+- [ ] License (D10): =LICENSE= is GPLv2, =pyproject.toml= says
+      =GPL-2.0-only=, and the copyright line is in README/NOTICE.
+      The =jb <fuckyou@fuckoff.com>= identity was confirmed as Sheldon
+      on 2026-11-25; commit =.mailmap= and =CONTRIBUTORS.md= so the
+      history is normalized and the attestation is recorded.  Existing
+      releases remain GPLv3; note the relicensing in =CHANGELOG.md=.
+- [ ] Add a minimal =Makefile= with =help=, =sync=, =build=, =clean=,
+      and placeholders for the Stage 2 targets.
 
-*** Models - =sink/config/models.py= (pure, no I/O, immutable)
-    #+begin_src python
-    @dataclass(frozen=True, slots=True)
-    class SSHConfig:
-        name: str | None
-        username: str
-        server: str
-        key: Path | None
-        port: int | None
+** Exit criteria
+- =uv sync= creates a working =./.venv=; =uv run sink -h= works.
+- =uv run python -m sink -h= works.
+- =uv build= produces a wheel that contains =LICENSE= and =NOTICE= and no
+  stray =.secrets.org=, =*.org= docs, or obsolete =resources/= data.
+- =uv lock --check= passes; =poetry.lock= and =setup.py= are gone.
+- =sink --version= matches =pyproject.toml= exactly.
+- After the hatchling switch, wheel metadata is PEP 639-clean:
+  =License-Expression: GPL-2.0-only=, =License-File: LICENSE= and
+  =NOTICE=, and no legacy =License:= field or deprecated
+  =License ::= classifier.  (The pre-migration poetry-core build emits
+  the legacy =License: GPL-2.0-only= form, which is valid but not PEP 639.)
+- =README.md= exists and is the packaged readme.  =plumbum= remains
+  temporarily and is scheduled for removal in Stage 4.
+- =sink vm= and =sink vm build= no longer exist; =vm.py= and
+  =resources/Vagrantfile= are gone.
 
-    @dataclass(frozen=True, slots=True)
-    class DatabaseConfig:
-        db: str
-        username: str
-        password: str
-        hostname: str | None = None
-        port: int = 3306
+* Stage 2 - Quality gates, CI, and secret hygiene                               :stage_2:
+** Goal
+Make every later change provable: Ruff, ty, pytest, coverage reporting,
+a native gitleaks hook, and GitHub workflows.
 
-    @dataclass(frozen=True, slots=True)
-    class Server:
-        name: str
-        root: Path
-        deploy_root: Path | None
-        ssh: tuple[SSHConfig, ...]
-        databases: tuple[DatabaseConfig, ...]
-        urls: tuple[URLConfig, ...]
-        actions: Mapping[str, str]
+** Tasks
+- [ ] Add the Ruff configuration from "Target standards"; run
+      =ruff format= as an isolated commit, then =ruff check= with a
+      curated, named ignore list.  Every suppression names its rule.
+- [ ] Add the =ty= rules from =app-base.org=; remove any mypy references
+      and do not add a mypy fallback.
+- [ ] Add pytest + coverage configuration.  Start with a measured
+      baseline and a low =fail_under= (the ratchet table is in Stage 10);
+      the final gate is 90% branch coverage.
+- [ ] Add the full =Makefile=: =fmt=, =fmt-check=, =lint=, =lint-check=,
+      =type=, =test=, =check=, =ci=, =secrets=, =hooks=, =build=,
+      =install=, =uninstall=, =upgrade=, =clean=, plus =docs=/=man= for
+      the confirmed man-page + HTML documentation (D2).
+- [ ] Add =.githooks/pre-commit= exactly as specified in
+      =app-base.org= (gitleaks >= 8.19, no auto-install, no network,
+      =--staged --redact --no-banner --verbose=).  Make =make hooks=
+      set =core.hooksPath=.  Scan the full history with
+      =gitleaks git --redact --no-banner= *before* installing it; triage
+      and rotate anything real.
+- [ ] Add =.github/workflows/ci.yml= (checkout with
+      =fetch-depth: 0=, pinned =astral-sh/setup-uv@v10.3.3=,
+      =uv sync --locked --all-groups=, =make check=, install pinned
+      gitleaks, =make secrets=).
+- [ ] Add =.github/workflows/codeql.yml= and =.github/dependabot.yml=.
+- [ ] Add =.github/CODEOWNERS= with the real owner (needs user input;
+      do not guess).
+- [ ] Ask before changing repository settings (Dependabot alerts,
+      secret scanning, push protection, code scanning, Pages, rulesets).
 
-    @dataclass(frozen=True, slots=True)
-    class Config:
-        project: Project
-        servers: Mapping[str, Server]
-    #+end_src
-    Frozen + slots + tuples/immutable mappings kills the =default_project=
-    mutation bug (B5) by construction; use =dataclasses.replace()= when a
-    variant is needed.
+** Exit criteria
+- =make check= runs fmt-check, lint, type, and tests without modifying
+      source.
+- CI is green on a no-op pull request.
+- The gitleaks hook rejects a staged dummy secret and passes a clean
+      commit.
+- The history scan is clean or every finding is triaged and documented.
 
-*** Loader - =sink/config/loader.py= (only module that touches disk)
-    #+begin_src python
-    def load(path: Path) -> Config:
-        """Parse, validate, migrate. Raise ConfigError. No sys.exit, no cache."""
-    #+end_src
-    - [ ] Implement =load(path: Path) -> Config= as a pure function.
-    - [ ] Validate explicitly and raise =ConfigError= (no =sys.exit= in the
-          loader); keep =Configuration= as a temporary shim during migration.
-    - [ ] Stop mutating class-level defaults: build fresh objects
-          (=config.py:267=, =_server= at =config.py:356=).
-    - [ ] Replace =Dict2obj= (=config.py:71=) with the dataclasses; delete
-          the dead =to_dict= and =syncpoint= stubs.
-    - [ ] Add =Config.resolve_server(name) -> Server= (cached, raising on
-          unknown) instead of re-reading =self.data= each call.
+* Stage 3 - Test harness and characterization tests                             :stage_3:
+** Goal
+Build the safety net the original code never had, before the behavioral
+refactors.  Tests must be hermetic: no real home directory, network, rsync, ssh,
+or mysql.
 
-*** Composition root - =sink/cli/main.py=
-    Own the one lifetime. A =Runtime= dataclass carries config plus run
-    flags so there is a single cohesive dependency instead of several
-    globals.
-    #+begin_src python
-    @dataclass(frozen=True, slots=True)
-    class Runtime:
-        config: Config
-        real: bool = False
-        log: logging.Logger = ...
+** Tasks
+- [ ] =tests/conftest.py=: a temporary project fixture that writes a
+      =sink.yaml=, sets =HOME=, =XDG_CONFIG_HOME=, and =XDG_DATA_HOME=
+      to =tmp_path=, and provides a Click =CliRunner=.
+- [ ] Add stub executables for =rsync=, =ssh=, =scp=, =mysql=,
+      =mysqldump=, =pv=, =git=, and =lando=/=ddev= that record argv and
+      exit 0.  The rsync stub must record whether =--dry-run= was present
+      so the default and =--real= variants can be asserted.  Put them at
+      the front of =PATH= per test.
+- [ ] Help tests: =-h= and =--help= for the root and every command,
+      exit 0, no ANSI, no required arguments.
+- [ ] Meta tests: =--version=, =--config=, =--completions=,
+      =--color=, and the "not in a project" error.
+- [ ] Golden tests for generated commands (normalize the project path,
+      temp dir names, and terminal width).
+- [ ] Loader tests: valid config, missing keys, unknown keys, bad YAML,
+      relative paths, ssh key resolution, =${ENV_VAR}=.
+- [ ] Mark =integration= tests for anything that needs real binaries or
+      a network; skip them by default.
+- [ ] Keep the Stage 0 =xfail= tests; each later stage removes the
+      marker when it fixes the bug.
 
-    @click.pass_context
-    def sink(ctx: click.Context) -> None:
-        ctx.obj = Runtime(config=load(find_config()))
-    #+end_src
-    - [ ] Pass =Runtime= (or just =Config=) through =click.Context.obj=
-          instead of the global singleton (gradual).
-    - [ ] Make =get_servers= completion (=sink/sink.py:52=) read from
-          =ctx.obj=, not reload config on every keystroke.
+** Exit criteria
+- =uv run pytest= passes on the unmodified code (expected failures are
+      explicit =xfail=).
+- No test reads the real home directory or network.
+- Coverage is measured and reported; the ratchet baseline is recorded.
 
-*** Consumption rules
-    - Inject via =ctx.obj= only as the composition root; do not re-export it
-      as a module global. Thread =Runtime= / =Config= / =Server= into pure
-      functions and methods.
-    - Prefer the narrow slice: =def pull(cfg: Config, server: Server, *,
-      real: bool)=, not =def pull(cfg: Config)=.
-    - Feature modules may import =sink.config.models= only; never
-      =sink.config.loader= or the old global.
-    - No import-time side effects: delete =config = Configuration()=
-      (=config.py:486=). Instantiate in =main()=.
+* Stage 4 - Execution layer and secret handling                                 :stage_4:
+** Goal
+Remove =shell=True= and remove secrets from command lines, logs, and process
+tables, while preserving the command-transparency contract: one object renders
+the displayed command and executes it.
 
-*** Singleton policy
-    A global is acceptable *only if immutable and initialized without I/O*.
-    If a single instance is unavoidable, expose a provider
-    (=@lru_cache def get_config()=) that tests can override; never a mutable
-    module-level object.
+** Tasks
+- [ ] Add =src/sink/shell.py= with:
+      - =Argv=, =Pipeline=, and =RemoteCommand= dataclasses.  Each has
+        =render(real: bool) -> str= and =execute(real: bool) -> Result=.
+      - A =dry_run_argv= / =dry_run_flag= field for tools with a native
+        dry-run mode (=rsync --dry-run=).  Tools without one leave it
+        =None=; the command must then print and not spawn.
+      - =render()= uses =shlex.join= / =shlex.quote= and shell
+        redirection syntax; =execute()= consumes the same object (argv,
+        Popen chain, or ssh argv).  There is no second construction path.
+      - =run(command, *, real, env, cwd, capture, check)= selects the
+        variant: =real=True= prints and executes the real argv; otherwise
+        it prints and executes the dry-run variant when one exists, or
+        prints only when it does not.
+      - =ssh_argv(server, remote_fragment, *, tty, port, key)= and
+        =scp_argv(...)= builders; the remote fragment is quoted as one
+        argument and is exactly what the remote shell receives.
+- [ ] Implement D4 as confirmed: the module uses only the standard
+      library; delete =sink/command.py= and remove =plumbum= from
+      =pyproject.toml=.  Do not keep both implementations.
+- [ ] Route every subprocess call through =shell.py= (=db.py=,
+      =rsync.py=, =ssh.py=, =check.py=, =actions.py=, and
+      =command.py=).  Replace the local action execution in =actions.py=
+      with =shell.py=, then delete =command.py=.  After this stage,
+      =grep -r "shell=True" src= must be empty.
+- [ ] Database secrets:
+      - Local: =MYSQL_PWD= in the child environment, never
+        =--password=.
+      - Remote: write a =0600= =--defaults-extra-file= through stdin
+        with a =trap= that removes it, or support a configured
+        =login_path=.  Never put the password in the remote command.
+      - =mysqlpump --watch-progress= is opt-in (TODO).
+- [ ] Add redaction to =ui.display_cmd= and to error rendering; pass the
+      config's secret values and the =${ENV_VAR}= values.
+- [ ] Support =${ENV_VAR}= interpolation in =sink.yaml=; fail with a
+      clear =ConfigError= when a referenced variable is missing.
+- [ ] TLS: =check.py= verifies certificates by default; =--insecure= is
+      the explicit opt-out.
+- [ ] Make dry-run the default for every command that runs a shell
+      command.  Native dry-run tools execute their dry-run variant;
+      the rest print only.  =--real/-r= prints and executes the real
+      variant.  =--suppress-commands= hides only the render.  Document
+      the behavior in =CHANGELOG.md=.  Do not invent a =--dry-run= flag
+      for a tool that lacks one.
+- [ ] Record the dry-run capability next to each command builder so the
+      choice is explicit and testable, not inferred from a global boolean.
+- [ ] Provide an explicit =--print-only= escape hatch for users who want
+      the command without the network round-trip.  (Optional, but it keeps
+      offline use possible once rsync dry-run executes.)
 
-*** Testing
-    - =tests/conftest.py= builds a =Config= fixture directly (or from a temp
-      =sink.yaml= via =load()=) and injects it; no global reset, no
-      monkeypatching of =sink.config=.
-    - Keep one thin test that =load()= against a golden =sink.yaml= equals a
-      hand-built =Config=.
+** Exit criteria
+- Zero =shell=True= sites in =src/=.
+- Every action has exactly one command object; a test proves the
+  renderer and executor share it.
+- =shlex.split(render(argv)) == argv= for argv commands; pipeline and
+  remote renders match the stages/fragment that execute.
+- =rsync= commands include =--dry-run= by default and omit it with
+  =--real=; both printed variants equal what executes.
+- No tool receives a dry-run flag it does not support (notably
+  =mysqldump=).
+- Commands without a native dry-run print only and spawn nothing; they
+  work on a machine with no =ssh=/=mysql=.
+- No generated command, log line, or argv contains a password or key.
+- Golden tests pin the exact copy-pasteable text for every command.
 
-*** Enforcement
-    - [ ] Add =import-linter= (=[tool.importlinter]= in pyproject) with a
-          layering contract: =sink.cli= -> =sink.config.models=;
-          feature modules -> =sink.config.models=; nothing except
-          =sink.cli= -> =sink.config.loader=.
-    - [ ] Fail CI on contract violations.
+* Stage 5 - Typed config and composition root                                   :stage_5:
+** Goal
+Replace the mutable global =config= and =Dict2obj= with immutable
+dataclasses, a pure loader, and a single injected =Runtime=.
 
-** WS3 Shell execution and security                                    :security:
-   - [ ] Add =sink/shell.py=: =run(argv: Sequence[str], *, dry_run: bool,
-         env: Mapping[str,str] | None, cwd: Path | None, capture: bool) ->
-         CompletedProcess[str]=. Never =shell=True=.
-   - [ ] Route every =subprocess.run/Popen/check_output= through it
-         (=db.py=, =rsync.py=, =ssh.py=, =check.py=, =command.py=).
-   - [ ] Pass DB passwords via =env={"MYSQL_PWD": ...}=, never on the
-         command line or in =sink.yaml= interpolated strings.
-   - [ ] Add secret redaction to =ui.display_cmd= (=ui.py:52=): accept a
-         =redact= collection and mask values before echo.
-   - [ ] Support =${ENV_VAR}= interpolation in =sink.yaml= for secrets.
-   - [ ] Make TLS verification in =check.py= opt-in, not the default.
+** The problem
+The current =Configuration= object is the locator (=find_config=), the
+loader (=load_config=), the data store (=data=, =project_root=), and a
+process-wide singleton.  It exists in a half-initialized state before
+=load_config()= runs, so every consumer must know the call order.  The
+circular case — "I need info to build the config, but I need the config to
+get the info" — comes from mixing *bootstrap inputs* with
+*config-derived values*.
 
-** WS4 Bug fixes                                                     :bugs:
-   (details in Bug catalog; each gets a regression test)
-   - [ ] B1 deploy init order          - [ ] B2 deploy _rsync args
-   - [ ] B3 excluded() name vs object  - [ ] B4 vm Dict2obj subscript
-   - [ ] B5 mutable config defaults    - [ ] B8 db nested-quote command
-   - [ ] B6/B7/B9-B23 (lower severity)
+** Principle: bootstrap inputs are not config values
+Only these are available before any config is read:
+- the working directory (=cwd=);
+- CLI arguments (=--color=, and a path selector if one is ever added);
+- environment variables (=HOME=, =XDG_*=, =${ENV_VAR}=);
+- stdout/stderr, for the console.
 
-** WS5 Architecture and CLI                                            :arch:
-   - [ ] Split =sink/sink.py= (571 lines) into =sink/cli/*.py=; register
-         commands in =sink/cli/main.py=.
-   - [ ] Add =sink/__main__.py= so =python -m sink= works.
-   - [ ] Define =sink/errors.py= (=SinkError=, =ConfigError=,
-         =CommandError=, =TransferError=) + top-level handler.
-   - [ ] Introduce =logging=; map =-v/--verbose=, =-q/--quiet=,
-         =--silent= to levels; reconcile the current overlapping
-         =quiet=/=silent= flags.
-   - [ ] Replace =Spinner= thread (=config.py:27=) with =rich.progress= /
-         a context manager.
-   - [ ] Consider adopting =rich-click= (already a dependency) for
-         consistent help output.
+Everything else is derived: config path -> project root -> servers ->
+SSH keys, databases, URLs.  Never source a bootstrap input from the
+config.  Resolve relative paths against the config file's parent
+(=path.parent=), never against a value inside the config.
 
-** WS6 Test strategy                                                   :tests:
-   - [ ] =tests/conftest.py=: fixtures for a tmp =sink.yaml= and a
-         =CliRunner=.
-   - [ ] Unit tests for the config loader/validator and v1->v2 migration.
-   - [ ] Golden-string tests asserting generated commands for db/file/
-         deploy (dry-run contract).
-   - [ ] =integration= marker for suites needing real rsync/ssh/mysql;
-         excluded from CI.
-   - [ ] Raise a coverage gate (start 60%, ratchet upward).
+If a real cycle remains (for example, a profile name stored in the config
+that selects which config to load), move the selector to argv/env or do a
+deliberately documented two-pass read.  Do not make two-pass the default.
 
-** WS7 Config schema v2 and migration                                 :schema:
-   - [ ] Add optional =version: 2=; infer legacy v1 when absent.
-   - [ ] Rename =mysql: -> databases:=, drop =servername= (=name= is
-         canonical), group deploy settings under =deploy:=.
-   - [ ] Add =sink misc config migrate=; keep the v1 reader for one release
-         cycle.
+** Models - =src/sink/config/models.py= (pure, no I/O)
+#+begin_src python
+@dataclass(frozen=True, slots=True)
+class Project:
+    name: str
+    root: Path
+    pulls_dir: Path | None
+    cache_dir: Path | None
+    log_dir: Path | None
+    rsync_binary: str
+    difftool: str | None
+    exclude: tuple[str, ...]
+    actions: Mapping[str, str]
 
-** WS8 Documentation                                                     :docs:
-   - [ ] Update =README.org= (drop legacy setup.py flow, Python floor, uv
-         commands).
-   - [ ] Regenerate =MODERNIZE.plan.org= checkboxes as work completes.
-   - [ ] Refresh =AGENTS.md= (uv commands, target version, tests).
+@dataclass(frozen=True, slots=True)
+class Server:
+    name: str
+    root: Path
+    deploy_root: Path | None
+    warn: bool
+    default: bool
+    automatic: bool
+    group: str | None
+    user: str | None
+    ssh: tuple[SSHConfig, ...]
+    databases: tuple[Database, ...]
+    urls: tuple[URL, ...]
+    actions: Mapping[str, str]
+    exclude: tuple[str, ...]
 
-* Bug catalog
-  | #   | Location             | Problem                                               | Fix                                       | Sev  |
-  |-----+----------------------+-------------------------------------------------------+-------------------------------------------+------|
-  | B1  | deploy.py:34,107     | stamp computed before self.ssh exists -> AttributeErr | assign self.ssh first / lazy stamp        | High |
-  | B2  | deploy.py:83,161     | _rsync args misaligned (name passed as action)        | pass Action.PUT and server=...            | High |
-  | B3  | rsync.py:220         | excluded(Dict2obj) instead of server name -> KeyError | pass server name                          | High |
-  | B4  | vm.py:64-66,207      | Dict2obj indexed with [] -> TypeError                 | attribute access / typed models           | High |
-  | B5  | config.py:267        | default_project mutated across calls                  | dataclass / deepcopy                      | High |
-  | B8  | db.py:249            | nested quotes in remote MYSQL_PWD command             | argv list, env-based secret               | High |
-  | B6  | config.py:232        | warns with undefined servername on missing servers    | guard message                             | Med  |
-  | B7  | config.py:243-253    | find_config mutates class attr; recursion             | loop + instance-local + cache             | Med  |
-  | B10 | ssh.py:96-112        | result unbound if check_output raises and no exit     | explicit error path                       | Med  |
-  | B16 | sink.py:132          | file server arg required though help says optional    | required=False + default resolution       | Med  |
-  | B17 | sink.py:168-183      | single requires a default server though it scans all  | don't resolve server in Transfer.__init__ | Med  |
-  | B21 | db.py:90-108,213-229 | broad except AttributeError masks config errors       | precise checks / typed models             | Med  |
-  | B22 | config.py:356        | _server mutates raw yaml data in place                | build objects, don't mutate source        | Med  |
-  | B9  | db.py:176            | unused Dict2obj(db)                                   | delete                                    | Low  |
-  | B11 | actions.py:35        | exit(1) builtin instead of sys.exit                   | raise CommandError                        | Low  |
-  | B12 | command.py:42-48     | SSHCommand.execute returns None                       | return result                             | Low  |
-  | B13 | deploy.py:419        | stale loop variable d in warning                      | use current item                          | Low  |
-  | B14 | deploy.py:439-449    | unbounded recursive choose_letter                     | while loop                                | Low  |
-  | B15 | check.py:53-144      | leaked/stale vars, broad excepts                      | tidy scopes                               | Low  |
-  | B18 | config.py:280-282    | pulls_dir None/absent handling confusing              | explicit validation                       | Low  |
-  | B19 | rsync.py:165-166     | f-string backslash-newline in diff command            | build argv                                | Low  |
-  | B20 | config.py:457        | dead syncpoint()/dead 'sync points' key               | delete                                    | Low  |
-  | B23 | rsync.py:298         | error_code() KeyError + unused                        | delete or mapping.get()                   | Low  |
+@dataclass(frozen=True, slots=True)
+class Config:
+    path: Path
+    project: Project
+    servers: Mapping[str, Server]
+    default_server: str | None
+    raw: Mapping[str, object]      # for `misc api` only
+
+    def server(self, name: str | None = None) -> Server:
+        key = name or self.default_server
+        if key is None:
+            raise NoDefaultServer()
+        try:
+            return self.servers[key]
+        except KeyError:
+            raise UnknownServer(key, sorted(self.servers)) from None
+#+end_src
+
+- Frozen + slots + tuples/immutable mappings.  A =Server= is a stable
+  value; use =dataclasses.replace(server, warn=False)= for variants
+  instead of mutating it.
+- =Config.server()= is a dict lookup with a clear error; no re-scan and no
+  mutation of the raw YAML.
+- Keep =Config.raw= only for the =misc api= escape hatch; feature modules
+  never read it.
+- =servername= is not stored separately from =name=.
+
+** Loader - =src/sink/config/loader.py= (the only module that reads YAML)
+#+begin_src python
+def find_config(start: Path) -> Path | None:
+    for directory in (start, *start.parents):
+        candidate = directory / "sink.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
+
+def load(path: Path) -> Config:
+    """Parse, validate, resolve paths.  Raise ConfigError.  No cache."""
+#+end_src
+
+- Validate types explicitly; raise =ConfigError= with the file and key
+  (and the YAML mark when available).
+- Resolve =project.root=, =pulls_dir=, cache/log dirs, and SSH keys
+  against =path.parent=; store absolute =Path= values.
+- Merge defaults into fresh objects; never mutate class-level dicts or
+  the parsed mapping.
+- Choose the default server exactly once; more than one is an error.
+- Unknown keys warn and are ignored (existing-config rule).
+- =${ENV_VAR}= substitution; a missing variable is a =ConfigError=.
+- No =sys.exit=, no printing, no caching, no =Configuration= instance.
+
+** Runtime and Click - =src/sink/runtime.py= and =src/sink/cli/__init__.py=
+#+begin_src python
+@dataclass(slots=True)
+class Runtime:
+    console: Console
+    err_console: Console
+    cwd: Path
+    quiet: int = 0
+    _config: Config | None = None
+
+    @property
+    def config(self) -> Config:
+        if self._config is None:
+            path = find_config(self.cwd)
+            if path is None:
+                raise NotInProject(self.cwd)
+            self._config = load(path)
+        return self._config
+
+    @property
+    def suppress_commands(self) -> bool:
+        return self.quiet >= 1
+#+end_src
+
+#+begin_src python
+@click.group(cls=AppGroup, no_args_is_help=True)
+@click.option("-q", "--quiet", count=True)
+@click.option("--color", type=click.Choice(["auto", "always", "never"]),
+              default="auto")
+@click.pass_context
+def cli(ctx: click.Context, quiet: int, color: str) -> None:
+    ctx.obj = Runtime.create(quiet=quiet, color=color)
+
+@cli.command()
+@click.argument("server")
+@click.option("--real", "-r", is_flag=True)
+@click.pass_obj
+def db_pull(rt: Runtime, server: str, real: bool) -> None:
+    cfg = rt.config
+    pull(cfg.project, cfg.server(server), real=real, ui=rt.ui)
+#+end_src
+
+- =Runtime.config= is lazy and cached, so =-h=, =--version=, =--config=,
+  and =--completions= work outside a project, and a command that needs the
+  project loads it exactly once.
+- =Runtime= is thin: config provider, consoles, output flags.  No feature
+  logic on it; do not create a new god object.
+- =ctx.obj= is the Runtime.  Nested groups (for example =deploy=) put
+  their own options in =ctx.meta=, never overwrite =ctx.obj=.
+- =-q=/=-qq= and =--color= are parsed before the Runtime is created.
+
+** Consumption rules
+- Feature modules import =sink.config.models= and =sink.errors= only.
+  Only =runtime.py= imports =loader.py=.
+- Pass the narrowest slice: =pull(project: Project, server: Server, *,
+  real: bool, ui: UI)=, not =pull(config: Config)=.
+- Constructors take values, not the container:
+  =Transfer(project, server)=, =DB(project, server)=,
+  =SSH(server)=.  They cannot call back into a config object.
+- =single()= takes =Config= because it iterates every automatic server;
+  it constructs one transfer per server rather than using a default.
+- =misc init= takes CLI inputs and defaults, not a config.  =misc api=
+  uses =cfg.raw= (with redaction).  =info= uses =cfg.path=.
+- No module-level config instance and no import-time I/O.
+
+** Cycle checklist
+| Current shape                                      | New shape                                |
+|----------------------------------------------------+------------------------------------------|
+| =Configuration= is locator + loader + data           | =find_config= + =load= + immutable =Config=    |
+| =find_config= mutates =config_file=/=project_root=     | pure loop returning a =Path=               |
+| =project()= needs =project_root= and mutates defaults  | loader builds =Project= once               |
+| =server()= needs =project_root= to resolve ssh keys    | loader resolves keys; =Server= is complete |
+| =Transfer.__init__= calls =config.project()/server() | =Transfer(project, server)=                |
+| =SSH.__init__= calls =config.server()=                 | =SSH(server)=                              |
+| =DB.pull()= calls =config.project()= at method time    | =DB(project, server)=                      |
+| =config= imports =ui= for error output                 | loader raises; Runtime/CLI renders       |
+| =misc init= needs a config to create a config        | =Init(names, defaults)=                    |
+| =deploy= group overwrites =ctx.obj=                    | deploy method in =ctx.meta=                |
+
+** If a cycle remains: make the bootstrap explicit
+#+begin_src python
+@dataclass(frozen=True, slots=True)
+class Bootstrap:
+    cwd: Path
+    config_path: Path | None      # from --config or discovery
+    env: Mapping[str, str]
+
+def bootstrap(cwd: Path, env: Mapping[str, str]) -> Bootstrap: ...
+def load(bootstrap: Bootstrap) -> Config: ...
+#+end_src
+
+=Bootstrap= is built from process inputs only; =Config= is built from
+=Bootstrap=.  Nothing in =Config= is needed to build =Bootstrap=.  Use
+this only for a genuine selector-inside-the-config case.
+
+** Migration tasks
+- [ ] Add =src/sink/config/models.py= (=Project=, =Server=,
+      =SSHConfig=, =DatabaseConfig=, =URLConfig=, =ActionConfig=,
+      =Config=; all =frozen=True, slots=True=).
+- [ ] Add =src/sink/config/loader.py= (=find_config=, =load=, validation,
+      path/ssh-key resolution, =${ENV_VAR}=, default-server selection).
+- [ ] Add =src/sink/errors.py= (=SinkError=, =ConfigError=,
+      =CommandError=, =TransferError=, =DeployError=, =NotFoundError=,
+      =NoDefaultServer=, =UnknownServer=, =NotInProject=).
+- [ ] Add =src/sink/runtime.py= (=Runtime=, lazy cached =config=,
+      consoles, =quiet=, =suppress_commands=).
+- [ ] Keep a temporary =Configuration= adapter around =Config= while
+      commands are converted; delete it before the stage exits.
+- [ ] Convert command modules to =@click.pass_obj= and narrow feature
+      arguments; use =ctx.meta= for nested group options.
+- [ ] Delete =Dict2obj=, the =config= singleton, =to_dict=,
+      =syncpoint=, and every =config.load_config()= call.
+- [ ] Make =excluded()= return =tuple[str, ...]=; make =server.databases=
+      and =server.ssh= tuples.
+- [ ] Add =import-linter= with the layering contract: =sink.cli= ->
+      =sink.runtime=; feature modules -> =sink.config.models=; only
+      =sink.runtime= -> =sink.config.loader=.
+- [ ] Add loader tests (valid, invalid, missing, unknown keys, env vars,
+      relative paths, ssh keys, default server) and Runtime tests.
+- [ ] Add a test that builds a =Config= literal and injects it through
+      =CliRunner(obj=...)=; no global reset or monkeypatching.
+
+** Exit criteria
+- Zero =Dict2obj= references; no module-level config instance; no
+  import-time I/O.
+- All commands read config through =Runtime=; =-h=, =--version=,
+  =--config=, and =--completions= work outside a project.
+- =Transfer=, =DB=, and =SSH= constructors take =Project=/=Server=, not
+  the container.
+- The temporary =Configuration= adapter is deleted.
+- Loader and Runtime tests pass; =import-linter= passes; =make check= is
+  green.
+
+* Stage 6 - CLI structure and output contract                                   :stage_6:
+** Goal
+Split the 571-line =sink/sink.py= into thin command modules, adopt the app-base
+help/color/completion contract, and settle the quiet/silent behavior from
+TODO.org.
+
+** Tasks
+- [ ] Create =src/sink/cli/=; one module per command group; register
+      them in =cli/__init__.py=.  Keep command and option names stable
+      except where a fix is explicitly listed.
+- [ ] Add =AppGroup=/=AppCommand= base classes so =-h= works on the
+      root and every subcommand; root uses =no_args_is_help=True=.
+- [ ] Add root options: =--color [auto|always|never]=, =--config=,
+      =--completions=, =--suppress-commands=, =--version=, and the
+      output flags.  All machine options are eager and work outside a
+      project.
+- [ ] =--config= prints only the absolute path of the discovered
+      =sink.yaml=; it does not create or modify anything and emits no
+      ANSI.  Do not add =--config-file= or an environment override
+      unless the user asks.
+- [ ] Rewrite =src/sink/ui.py= on =rich=: a stdout console and a stderr
+      console, =rich.markup.escape()= on every dynamic value, status
+      labels that include words (not color alone), plain output for
+      =--version=/=--config=/=--completions=/=--json=, and no
+      module-level console with =force_terminal=True=.  Implement the
+      palette from "Command transparency": yellow/dim for the rendered
+      command, default foreground for its output, green success, yellow
+      warning, red error, blue/cyan notice.  A blank line separates the
+      command block from the output.  Remove every =click.style= and
+      =click.secho= call.
+- [ ] Render long commands as shell-valid text.  Do not wrap in a way
+      that changes an argument: a test asserts
+      =shlex.split(display) == argv= for every golden command, including
+      quoting, spaces, and backslashes.
+- [ ] Output modes (D8 confirmed):
+      - default: rendered command + command output + success line;
+      - =-q/--quiet=: hide the rendered command only; keep the command's
+        output and the success line;
+      - =-qq=: hide the render, the command's stdout/stderr, and all
+        status/success/error lines; the exit code is the only signal.
+      Suppressing output must never change the exit code.
+      Implement as a root count option
+      (=@click.option("-q", "--quiet", count=True)=).  Keep
+      =-s/--suppress-commands= as an alias for the =-q= render-hiding
+      behavior, and add a root =--silent= alias for =-qq= for one release.
+      Keep the existing per-command =--silent= as a deprecated alias for
+      =-qq=.  Remove the per-command =-q/--quiet= flags: rename the
+      filename-only behavior of =db --quiet= to =--filename-only= and the
+      itemized-output switch of =deploy new --quiet= to
+      =--no-itemize=.  Define the success formats from TODO.org:
+      =[Success] SERVER: upload complete=, =...: sql upload complete=,
+      =...: <path>=.
+- [ ] Command display is on by default for both dry-run and =--real=.
+      In either mode the command is printed before execution (native
+      dry-run or real), and the output/success/error follows it.
+      =--suppress-commands= or =-q= is the only way to hide the command;
+      neither mode hides it implicitly.
+- [ ] Normalize the execution flag across the CLI: every command that
+      runs a shell command defaults to dry-run and accepts =--real/-r=.
+      Remove the inverse =sink ssh --dry-run/-d=, and add =--real= to
+      =diff= and =check=, which currently execute unconditionally.
+      Read-only commands that run no shell command (=info=, =misc api=,
+      =misc init=, =misc settings=) are unaffected.
+- [ ] Add =-v/--verbose= (count) and =logging= with
+      =rich.logging.RichHandler=; diagnostics go to stderr, data to
+      stdout.
+- [ ] Implement =--completions= per =app-base.org=: destination
+      precedence (BASH_COMPLETION_USER_DIR, XDG_DATA_HOME,
+      ~/.local/share), =APP.bash=, atomic write, bash >= 4.4 check,
+      static script, tests with real bash.
+- [ ] Follow D3 literally: remove =shell_complete=get_servers= and the
+      =get_servers= callback entirely.  The static script completes
+      commands, options, choices, and file paths but *not* server names.
+      Document the limitation in =--completions= output, README, and the
+      man page.
+- [ ] Fix =sink info -e= by passing a string path to =click.edit= (the
+      bug is version-dependent: confirmed on Click 8.2–8.4, absent on
+      8.1 and 8.5).
+- [ ] Make =misc api= JSON-only and ANSI-free; make =misc pack= print a
+      plain, =shlex.quote()=d command.  Redact passwords, keys, and
+      tokens by default in =misc api= and =misc settings=; add an
+      explicit =--show-secrets= flag to print the values (D9).  =info=
+      still shows the raw =sink.yaml=, because viewing your own config is
+      the point of that command.
+
+** Exit criteria
+- Every command importable from its own module; =sink.py= is gone.
+- Help tests pass for =-h= and =--help= on every command; no ANSI.
+- =--config=, =--completions=, and =--version= work outside a project.
+- Server names are no longer tab-completed; the limitation is documented
+  and covered by a completion test.
+- =-q= hides only the rendered command; =-qq= emits nothing at all
+      (including child output); both preserve the exit code.  Covered by
+      golden tests.
+- =python -m sink -h= works.
+
+* Stage 7 - Transfers: file, single, diff, ssh                                  :stage_7:
+** Goal
+Repair the transfer commands and remove the last shell-string construction.
+Dry-run output remains the contract.
+
+** Tasks
+- [ ] Fix =single= (confirmed broken): pass the loop's server object,
+      not =remote.name=; resolve each server's own root and ssh; do not
+      require a default server; emit nothing when no server is
+      automatic (or a clear notice under =-v=).
+- [ ] Fix =_locations=: take the target =Server= explicitly; reject
+      files outside =project.root= with a clear error instead of
+      building an absolute remote path (confirmed for =file pull=).
+- [ ] Fix B3: pass the server *name* to =excluded()=, or accept a
+      =Server= after the Stage 5 refactor.
+- [ ] Fix =file= server ambiguity (confirmed: help says the server is
+      optional, Click requires it).  Recommended: accept
+      =SERVER [FILENAME]= as before but resolve a single trailing token
+      as a server name when it matches, otherwise as a filename with the
+      default server; add tests for both.
+- [ ] Remove =diff= from the =file= action choices (confirmed: it is
+      advertised and silently does nothing), or implement it by
+      delegating to =sink diff=.
+- [ ] Fix =diff=: point =--compare-dest= at the correct directory,
+      propagate the git exit status (do not pipe through =less= when
+      stdout is not a TTY), honor =--ignore-whitespace= (currently the
+      command always adds =--ignore-all-space=), and quote the difftool
+      arguments.
+- [ ] Build rsync argv as a list: =--rsh= is one argument with the
+      key/port, excludes come from =excluded()= as a tuple, and
+      =--link-dest= is a single argument.  No shell string.
+- [ ] Fix =ssh=: key existence and port handling, =BatchMode= and
+      =ConnectTimeout= on non-interactive commands, =cd= to the server
+      root for interactive sessions, and return the result from
+      =SSHCommand.execute=.
+- [ ] Preserve =--real= semantics and the success messages from Stage 6.
+      The dry-run rendering of an =rsync= command includes =--dry-run=;
+      the real rendering omits it.  Each rendering is what executes in
+      its own mode.
+- [ ] Make =sink diff= print its rsync and git commands by default.  The
+      rsync side has a native dry-run, but the git diff needs the
+      downloaded file, so the default is print-only; =--real= performs
+      the transfer and shows the diff.
+
+** Exit criteria
+- =single= works with two automatic servers and no default server.
+- =file= help and behavior agree; =file pull= of a path outside the
+      project root fails with a clear error.
+- =diff= reports git failures correctly and produces a usable diff in a
+      TTY and a clean no-op in a pipe.
+- Golden tests cover put/pull/diff/single/ssh, and no test needs a real
+      binary.
+- For =rsync= commands, the default argv contains =--dry-run= and the
+      =--real= argv does not; both printed strings equal the argv that
+      executes.
+
+* Stage 8 - Database                                                            :stage_8:
+** Goal
+Make database pull/put safe, testable, and honest about progress and filenames.
+
+** Tasks
+- [ ] Fix B8: no nested quotes, no password in argv.  Use the Stage 4
+      remote credentials helper for =mysqldump= and =mysql=.
+- [ ] Validate the input up front: exists, readable, gzip magic or
+      =.sql.gz= suffix, and the target server has a database.  Reject
+      non-gzip files instead of failing midway through =gunzip=.
+- [ ] Implement =pv= support from TODO.org: detect =pv= locally, make
+      the progress flag opt-in in =sink.yaml=, and fall back to a plain
+      pipe when it is absent.  Do not require =pv=.
+- [ ] Add =mysqlpump --watch-progress= as an opt-in remote alternative;
+      document the difference in output.
+- [ ] Use timezone-aware timestamps for the pull filename and the
+      =LATEST-<server>.sql.gz= symlink; keep the human-readable local
+      time format.
+- [ ] Route lando/ddev commands through =shell.py= and preserve their
+      stderr conventions without discarding real errors.
+- [ ] Keep the TODO MAYBE items (custom filename tokens, extended info,
+      pre-pull) out of scope unless separately approved; add them to
+      the backlog table instead.
+
+** Exit criteria
+- Golden argv tests for local, remote, lando, and ddev pulls and puts.
+- The displayed pipeline is exactly the executed pipeline (stages,
+      redirections, quoting).  Database tools have no native dry-run, so
+      the default prints the pipeline and spawns nothing; =--real= prints
+      the same text and executes it.
+- No secret appears in output, argv, or logs.
+- A fake =mysqldump=/=mysql= stub proves the pipeline works with and
+      without =pv=.
+- =db put= rejects a non-gzip file before touching the server.
+
+* Stage 9 - Deploy and check                                                    :stage_9:
+** Goal
+Make the broken deploy and check commands usable again and close the
+TODO.org items that belong to them.
+
+** Tasks
+- [ ] Deploy B1 (confirmed): create =SSH= before computing the remote
+      timestamp in both =DeployViaRename= and =DeployViaSymlink=.
+- [ ] Deploy B2 (code-confirmed): pass =Action.PUT= and the server name
+      to =Transfer._rsync= in the right positions; after Stage 5 use the
+      typed transfer API instead.
+- [ ] Deploy init must honor =--real=: =sink.py= currently hardcodes
+      =real=True= for rename/symlink, and =DeployViaLocal.init_deploy=
+      creates =dist/= without =--real= (confirmed).  Dry-run only prints.
+- [ ] Put =DEPLOY-INFO.yaml= in the site root (TODO) and exclude it from
+      normal file transfers.
+- [ ] Deduplicate the =warn: true= confirmation prompts (TODO) so a
+      single inspect/put asks once.
+- [ ] Fix =DeployViaLocal.change_current= path resolution (confirmed:
+      =display_choices= joins =dist= relative to CWD, so switching from a
+      subdirectory finds no deploys).  Anchor everything at
+      =Config.project.root=.
+- [ ] Replace =choose_letter= recursion with a loop (B14); fix the stale
+      loop variable in the warning (B13); parse deploy dates with an
+      explicit format/timezone.
+- [ ] Keep the local deploy =--link-dest= design from TODO.org; do not
+      add git-tag coupling or automatic DB snapshots in this stage.
+- [ ] Remove =os.chdir= from the remaining code paths (=db.cd= and the
+      local deploy helpers); pass =cwd= to the command object.
+- [ ] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
+      =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
+      a stable table.  Verify TLS by default (Stage 4) and add a
+      timeout.  Replace the =Spinner= thread with =rich= status.
+- [ ] Check: add =--real/-r= and default to dry-run, printing every
+      ssh/mysql/url probe it would run.  =--real= prints the same probes
+      and executes them.
+
+** Exit criteria
+- =deploy init/new/switch= run to completion in dry-run against a
+      fixture, and none of them create files without =--real=.
+- No =os.chdir= remains in the deploy or database paths.
+- =check= reports all TODO.org fields and never leaks a password.
+- Every deploy/check action prints exactly the command it executes:
+      the rsync dry-run variant includes =--dry-run= and the real variant
+      omits it; ssh/check print the same text in both modes because they
+      have no native dry-run.
+- Regression tests exist for B1, B2, B13, B14, N7, N8.
+
+* Stage 10 - Bug sweep, strict typing, and the coverage ratchet                 :stage_10:
+** Goal
+Close every remaining known defect, annotate the whole codebase, and
+raise the coverage gate to the app-base floor.
+
+** Tasks
+- [ ] Fix B6, B7, B9–B23 and the new N-items in the catalog below; each
+      gets a regression test and removes an =xfail=.
+- [ ] Annotate every module end to end; enable Ruff =ANN= fully and the
+      =ty= strict rules.  Use only =# ty: ignore[rule]= with a reason;
+      no blanket =# type: ignore=.
+- [ ] Replace remaining =os.path= and =os.chdir= with =pathlib.Path= and
+      =cwd=; make all datetimes timezone-aware (DTZ).
+- [ ] Delete dead code: =syncpoint=, =error_code=, =test_project= stubs,
+      =DeployViaRename.change_current= (pass), =Command.runp=, and the
+      =Spinner=.  (The =vm= group and =Vagrant= are already gone from
+      Stage 1.)
+- [ ] Coverage ratchet (record each step in the stage log):
+      Stage 3 baseline -> 40% after Stage 4 -> 60% after Stage 6 ->
+      75% after Stage 9 -> 85% after the bug sweep -> 90% final gate.
+      Do not lower the final 90% branch target.
+- [ ] Run a full =ruff check=, =ty check=, and =pytest= with no
+      suppressions that are not individually justified.
+
+** Exit criteria
+- All catalogued bugs are fixed or explicitly deferred with a reason.
+- =ty check= and =ruff check= are clean; coverage is >= 90% branch.
+- No =os.chdir=, no naive datetimes, no =Dict2obj=, no =shell=True=.
+
+* Stage 11 - DEFERRED: config schema v2 and migration                           :stage_11:
+** Goal
+Not part of this project (D6 confirmed: defer).  The modernization ships
+on the v1 =sink.yaml= schema.  This stage is kept as the reference design
+for a separate, later release, because it is a breaking change and should
+not block the modernization.
+
+** Tasks
+- [ ] Add =version: 2=; infer v1 when absent.
+- [ ] Rename =mysql: -> databases:=, drop the synthesized =servername=
+      key (=name= is canonical), group deploy settings under =deploy:=,
+      and normalize URLs/SSH.
+- [ ] Add =sink misc config migrate= (or =sink misc migrate=) that
+      writes a v2 file with a =.bak= backup and prints a diff.
+- [ ] Keep the v1 reader for one release cycle; warn once per run.
+- [ ] Update =Init=, docs, fixtures, and tests; add a round-trip test.
+
+** Exit criteria
+- v1 configs still load and warn; the migration is idempotent and
+      lossless; the generated template is v2.
+
+* Stage 12 - Documentation, release, and cutover                                :stage_12:
+** Goal
+Ship a documented, installable release and remove every trace of the
+Poetry/setup.py era.
+
+** Tasks
+- [ ] Finish the =README.md= conversion (D5 confirmed).  Cover
+      requirements, =uv= install, quick start, command reference link,
+      =sink.yaml=, =--config=, =--completions=, man page, development
+      targets, license, and repository links.  State =GPL-2.0-only=,
+      link =LICENSE=, include the copyright line, and note that prior
+      releases were GPLv3.  Do not generate the README from Sphinx.
+- [ ] Add the confirmed documentation level (D2): man page + HTML.
+      Add =docs/conf.py=, =docs/index.md=, =docs/cli.md=, MyST,
+      =sphinx-click=, Furo; =man_pages= from =docs/cli.md=; =make docs=,
+      =make docs-serve=, =make man=, =make install-man=.
+      Do not add the GitHub Pages workflow or Pages deployment.
+- [ ] Verify the man page with =man -l= or =groff -man -z=.
+- [ ] Update =AGENTS.md=: uv commands, =src= layout, Python floor,
+      =make check=, test layout, and remove the false "uv.lock
+      untracked" / "Poetry is the source of truth" claims.
+- [ ] Update =TODO.org=: close the items completed by Stages 7–9, move
+      the MAYBE items to the backlog table, and keep the DONT-DO items
+      as decisions.
+- [ ] Update =MODERNIZE.plan.org= checkboxes and the stage log as work
+      lands.
+- [ ] Add =CHANGELOG.md=; add =CONTRIBUTING.md= and =SECURITY.md= if the
+      repository is public.  Keep =CONTRIBUTORS.md= and =.mailmap= in the
+      release so the authorship attestation travels with the source.
+- [ ] Final packaging check: clean clone -> =make sync= ->
+      =make check= -> =make install=; =uv build=; inspect the wheel and
+      sdist for =LICENSE=, =NOTICE=, and the absence of =.secrets.org=,
+      =.org= docs, obsolete =resources/=, =poetry.lock=, and =setup.py=.
+- [ ] Smoke every command against a temporary project: =-h=,
+      =--version=, =--config=, =--completions=, =file=, =single=,
+      =diff=, =db=, =deploy= (dry-run), =check=, =misc=.  Confirm
+      =sink vm= and =vm build= no longer exist.
+- [ ] Tag =v0.3.0=; publish only with explicit approval.
+
+** Exit criteria
+- A clean clone can sync, check, build, install, and run.
+- CI (including the secret scan) is green.
+- README, docs, man page, AGENTS.md, and TODO.org describe the shipped
+      behavior, not the old one.
+
+* Verified bug catalog
+  Severity: High = data loss, crash, or security; Med = wrong behavior or
+  misleading output; Low = cleanup.  "Confirmed" means reproduced at runtime;
+  "code-confirmed" means proven by reading the code.
+
+  | #   | Location                              | Problem                                                                                                                                                   | Fix                                                                    | Sev  | Status         |
+  |-----+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------+------+----------------|
+  | B1  | deploy.py:34,107                      | =self.ssh= used in =__init__= before assignment -> =AttributeError=                                                                                             | assign =self.ssh= first; lazy stamp                                      | High | Confirmed      |
+  | B2  | deploy.py:83,161                      | =_rsync= gets a server name as =action=, =Action.PUT= as flags                                                                                                  | pass =Action.PUT= and =server==                                            | High | Code-confirmed |
+  | B3  | rsync.py:220                          | passes a server object to =excluded(name)=                                                                                                                  | pass =server.name=                                                       | High | Code-confirmed |
+  | B4  | vm.py:64-66,207                       | =Dict2obj= subscript -> =TypeError=                                                                                                                           | removed with the =vm= group (D7)                                         | High | Obsolete       |
+  | B5  | config.py:267                         | =default_project= mutated on every call                                                                                                                     | frozen dataclasses                                                     | High | Code-confirmed |
+  | B6  | config.py:232                         | unbound =servername= in the missing-servers warning                                                                                                         | guard the message                                                      | Med  | Code-confirmed |
+  | B7  | config.py:243-253                     | =find_config= mutates a class attr and recurses                                                                                                             | loop + local path + cache                                              | Med  | Code-confirmed |
+  | B8  | db.py:249                             | nested quotes in the remote password command                                                                                                              | argv + credentials helper                                              | High | Confirmed      |
+  | B9  | db.py:176                             | unused =Dict2obj= wrapper                                                                                                                                   | delete                                                                 | Low  | Confirmed      |
+  | B10 | ssh.py:96-112                         | =result= unbound if =check_output= raises                                                                                                                     | explicit error path                                                    | Med  | Code-confirmed |
+  | B11 | actions.py:35                         | builtin =exit(1)= instead of an exception                                                                                                                   | raise =CommandError=                                                     | Low  | Code-confirmed |
+  | B12 | command.py:42-48                      | =SSHCommand.execute= returns =None=                                                                                                                           | return the result                                                      | Low  | Code-confirmed |
+  | B13 | deploy.py:419                         | stale loop variable =d= in the warning                                                                                                                      | use the current item                                                   | Low  | Code-confirmed |
+  | B14 | deploy.py:439-449                     | unbounded recursive =choose_letter=                                                                                                                         | while loop                                                             | Low  | Code-confirmed |
+  | B15 | check.py:53-144                       | leaked/stale variables, broad excepts                                                                                                                     | tidy scopes                                                            | Low  | Code-confirmed |
+  | B16 | sink.py:132                           | =file= server required; help says optional (confirmed)                                                                                                      | resolve rest args; test both                                           | Med  | Confirmed      |
+  | B17 | sink.py:168-183                       | =single= requires a default server; passes =remote.name=                                                                                                      | per-server transfer                                                    | High | Confirmed      |
+  | B18 | config.py:280-282                     | =pulls_dir= None/absent handling is confusing                                                                                                               | explicit validation                                                    | Low  | Code-confirmed |
+  | B19 | rsync.py:165-166                      | backslash-newline inside the diff f-string                                                                                                                | build argv                                                             | Low  | Confirmed      |
+  | B20 | config.py:457                         | dead =syncpoint()= / "sync points" key                                                                                                                      | delete                                                                 | Low  | Code-confirmed |
+  | B21 | db.py:90-108,213-229                  | broad =except AttributeError= masks config errors                                                                                                           | typed models; precise checks                                           | Med  | Code-confirmed |
+  | B22 | config.py:356                         | =_server= mutates the raw YAML data                                                                                                                         | build objects                                                          | Med  | Code-confirmed |
+  | B23 | rsync.py:298                          | =error_code()= KeyError and unused                                                                                                                          | delete                                                                 | Low  | Code-confirmed |
+  | N1  | rsync.py:41-50                        | =single= uses the default server's root for every server; the fallback error handler crashes on a list                                                      | fix as B17                                                             | High | Confirmed      |
+  | N2  | sink.py:226,273                       | =click.edit(filename=Path)= breaks on Click 8.2–8.4                                                                                                         | pass =str(path)=                                                         | Med  | Confirmed      |
+  | N3  | actions.py:23-26                      | =action local= with no project actions -> =AttributeError=                                                                                                    | default =actions= to an empty mapping                                    | Med  | Confirmed      |
+  | N4  | sink.py:332-372                       | =vm= help says =SERVER IP HOSTNAME=, docs say =HOSTNAME IP=                                                                                                     | removed with the =vm= group (D7)                                         | Med  | Obsolete       |
+  | N5  | vm.py:148-164                         | =check_hosts= grep pattern is reversed                                                                                                                      | removed with the =vm= group (D7)                                         | Low  | Obsolete       |
+  | N6  | rsync.py:157-174                      | =--ignore-all-space= is always added; =--compare-dest= is wrong; =less= hides git's exit status                                                                 | build the argv, fix the compare target, no pager in a pipe             | High | Confirmed      |
+  | N7  | deploy.py:387                         | =display_choices= joins =dist= relative to CWD                                                                                                                | anchor at project root                                                 | Med  | Confirmed      |
+  | N8  | deploy.py:263-278; sink.py:407,410    | =deploy init= writes =dist/= and forces =real=True=                                                                                                             | honor =--real=                                                           | High | Confirmed      |
+  | N9  | actions.py:37-41                      | =action local= executes without =--real=                                                                                                                      | honor dry-run                                                          | High | Confirmed      |
+  | N10 | config.py:94-97                       | =Dict2obj.__iter__= leaks a =raw= row into action listings                                                                                                    | typed models                                                           | Low  | Confirmed      |
+  | N11 | sink.py:131,162-165                   | =file diff= is offered but has no branch                                                                                                                    | implement or remove                                                    | Low  | Confirmed      |
+  | N12 | rsync.py:183-186                      | pulling a path outside the project root builds an absolute remote path                                                                                    | reject or map explicitly                                               | High | Confirmed      |
+  | N13 | rsync.py:285; db.py:135; check.py:164 | dry-run is one global boolean: rsync's valid =--dry-run= is not modelled, =db= passes =--dry-run= to =mysqldump= (invalid), and ssh/check execute unconditionally | per-tool dry-run capability; rsync executes dry-run, others print only | High | Confirmed      |
+  | N14 | sink.py:86                            | help shows literal =[red]Use[/]= because rich-click is off                                                                                                  | remove markup                                                          | Low  | Confirmed      |
+  | N15 | config.py:27-68                       | non-daemon =Spinner= thread; =stop()= sleeps                                                                                                                  | =rich= status context manager                                            | Low  | Code-confirmed |
+  | N16 | sink.py:80-88                         | =sink -s= with no command exits 2                                                                                                                           | require a command / show help                                          | Low  | Confirmed      |
+  | N17 | pyproject.toml                        | stale "Other/Proprietary" license classifier                                                                                                              | PEP 639 metadata                                                       | Low  | Confirmed      |
+  | N18 | sink/sink.py                          | no =__main__= guard; =python -m sink= prints nothing                                                                                                          | add =__main__.py=                                                        | Med  | Confirmed      |
+  | N19 | repo                                  | broken =.venv=, missing Poetry, stub =uv.lock=                                                                                                                | Stage 1                                                                | High | Confirmed      |
+  | N20 | AGENTS.md                             | false claims about =uv.lock= and Poetry                                                                                                                     | rewrite in Stage 12                                                    | Low  | Confirmed      |
+  | N21 | db.py:172-183,239-251                 | =db put= accepts a non-gzip file and gunzips remotely                                                                                                       | validate input                                                         | Med  | Confirmed      |
+  | N22 | check.py:106,122-125                  | password in argv; TLS verification disabled by default                                                                                                    | Stage 4                                                                | High | Code-confirmed |
+  | N23 | applications.py                       | passwords printed to the terminal by =misc settings=                                                                                                        | redact by default; explicit show flag                                  | Med  | Confirmed      |
+  | N24 | sink.py:189-195,198-222               | =ssh= defaults to real with inverse =-d=; =diff= and =check= never dry-run                                                                                        | one =--real/-r= contract everywhere                                      | Med  | Confirmed      |
 
 * Security catalog
-  | #  | Location                                                     | Issue                                                  | Fix                                        | Sev      |
-  |----+--------------------------------------------------------------+--------------------------------------------------------+--------------------------------------------+----------|
-  | S1 | db.py:116,236,244,249; check.py:106                          | DB passwords on command line and echoed by display_cmd | env vars + redaction                       | Critical |
-  | S2 | db.py/rsync.py/ssh.py/check.py/command.py (shell=True sites) | shell injection via config/user values                 | argv lists, no shell, shlex only if forced | Critical |
-  | S3 | rsync.py:208; ssh.py:50-63,74; check.py:152                  | unquoted key paths / --rsh nested quoting              | argv + quoted Path                         | High     |
-  | S7 | db.py:236                                                    | --password= leaked in process table                    | MYSQL_PWD / defaults-extra-file            | High     |
-  | S4 | check.py:122-125                                             | TLS verification disabled by default                   | opt-in flag                                | Med      |
-  | S5 | vm.py:75-82; applications.py                                 | secrets written to Vagrantfile / printed to terminal   | document + redact                          | Med      |
-  | S6 | .secrets.org                                                 | present locally; ensure never packaged/committed       | keep gitignored, exclude from wheel        | Low      |
+  | #   | Location                                 | Issue                                                                                          | Fix                                              | Sev      |
+  |-----+------------------------------------------+------------------------------------------------------------------------------------------------+--------------------------------------------------+----------|
+  | S1  | db.py:116,236,244,249; check.py:106      | DB passwords in argv and in echoed commands                                                    | env/defaults file + redaction                    | Critical |
+  | S2  | 10 =shell=True= sites                      | shell injection via config/user values                                                         | argv-only execution layer                        | Critical |
+  | S3  | rsync.py:208; ssh.py:50-74; check.py:152 | unquoted key paths and nested =--rsh= quoting                                                    | argv + =shlex.quote=                               | High     |
+  | S4  | check.py:122-125                         | TLS verification disabled by default                                                           | verify by default; =--insecure= opt-in             | Med      |
+  | S5  | applications.py                          | secrets printed by =misc settings=                                                               | redact by default; explicit show flag            | Med      |
+  | S6  | .secrets.org                             | local secret file; must never be packaged/committed                                            | keep ignored; gitleaks scan                      | Low      |
+  | S7  | db.py:236                                | =--password= leaks into the process table                                                        | Stage 4 credentials helper                       | High     |
+  | S8  | actions.py:37-41                         | =action local= runs without =--real=                                                               | honor dry-run                                    | High     |
+  | S9  | deploy.py:263-278; sink.py:407,410       | =deploy init= mutates without =--real=                                                             | honor =--real=                                     | High     |
+  | S10 | rsync.py:285; db.py:135; check.py:164    | one global dry-run boolean: invalid =--dry-run= for mysqldump; ssh/check execute unconditionally | per-tool capability; only rsync executes dry-run | High     |
 
-* Roadmap
-** Phase 0 - uv migration + safety net                                :phase_0:
-   - [ ] WS0 complete: poetry -> uv, pyproject rewritten, =.venv=
-         recreated, wheel verified, docs updated.
-   - [ ] WS1 complete (Ruff/ty/pytest/CI/pre-commit, version single-source).
-   - [ ] =ruff check= and =ty check= run, initially with a curated ignore
-         list; smoke test =uv run sink -h= in CI.
-   - [ ] Commit the baseline so refactors are bisectable.
-** Phase 1 - Security and high-severity bugs                           :phase_1:
-   - [ ] WS3 core: =sink/shell.py= + migrate db/rsync/ssh/check subprocess
-         calls; secret env + redaction.
-   - [ ] Fix B1-B5, B8 with regression tests.
-** Phase 2 - Typed architecture                                        :phase_2:
-   - [ ] WS2 typed config models + loader + errors; replace Dict2obj.
-   - [ ] WS5 split CLI, =python -m sink=, logging levels.
-** Phase 3 - Full type coverage and remaining bugs                     :phase_3:
-   - [ ] Add hints across all modules; enable =ty= strict and Ruff =ANN=.
-   - [ ] Fix B6,B7,B9-B23.
-** Phase 4 - Schema v2 and docs                                        :phase_4:
-   - [ ] WS7 migration + =sink misc config migrate=.
-   - [ ] WS8 docs, man page, AGENTS refresh.
-** Phase 5 - Test ratchet                                              :phase_5:
-   - [ ] Expand unit/golden/integration tests; raise coverage gate.
+* TODO.org mapping
+  Every open TODO is either planned, already done, or explicitly deferred.
 
-* Verification
-   - =uv run ruff check .= and =uv run ruff format --check .=.
-   - =uv run ty check=.
-   - =uv run pytest= (CI); =uv run pytest -m integration= manually.
-   - Smoke: =uv run sink -h=, =uv run sink <group> -h= for each group, and a
-     dry-run of every command against a temp =sink.yaml=.
+  | TODO item                              | Disposition                                                                       |
+  |----------------------------------------+-----------------------------------------------------------------------------------|
+  | Quiet/silent flags                     | Stage 6 (D8)                                                                      |
+  | Success messages                       | Stage 6 output contract                                                           |
+  | Multiple files per upload (DONT-DO)    | No action; keep the documented shell loop                                         |
+  | Server-specific exclusions             | Works today; add regression test in Stage 7                                       |
+  | Multiple servers at once (DONT-DO)     | No action                                                                         |
+  | =sink info -e= validation                | Works, but =click.edit= bug fixed in Stage 6 (N2)                                   |
+  | Path validity before rsync             | Stage 7 (=_locations= and input checks)                                             |
+  | Platform rsync binary                  | Keep; validate in Stage 9                                                         |
+  | SSH cd to server root                  | Keep; test in Stage 7                                                             |
+  | =sink info -e= crash                     | Stage 6 (N2)                                                                      |
+  | DEPLOY-INFO.yaml in site root          | Stage 9                                                                           |
+  | Exclude DEPLOY-INFO from transfers     | Stage 9                                                                           |
+  | Deploy warnings repeated               | Stage 9                                                                           |
+  | Check more values                      | Stage 9                                                                           |
+  | =sink build-vm=                          | Dropped: the =vm= group is removed (D7)                                             |
+  | Use plumbum                            | Superseded: stdlib wrapper; plumbum removed in Stage 4 (D4)                       |
+  | Virtualenv/Poetry                      | Superseded by uv in Stage 1                                                       |
+  | Test/run setup.py                      | Superseded; =setup.py= deleted in Stage 1                                           |
+  | Diff one file/all servers              | Deferred (canceled in TODO.org)                                                   |
+  | Diff temp dir name                     | Keep; covered by Stage 7 tests                                                    |
+  | Git diff/difftool settings             | Keep; fix quoting in Stage 7                                                      |
+  | Progress bar                           | Stage 8 (=pv= detection, opt-in)                                                    |
+  | =pv= flag in sink.yaml                   | Stage 8                                                                           |
+  | Check for =pv= locally                   | Stage 8                                                                           |
+  | DB overwrite (DONT-DO)                 | No action                                                                         |
+  | Tab completion on macOS                | Stage 6 (=--completions=; bash >= 4.4; zsh unsupported; server names not completed) |
+  | External exclusion files (MAYBE)       | Backlog                                                                           |
+  | DB download details (MAYBE)            | Backlog                                                                           |
+  | Help colors (MAYBE)                    | Superseded by =--color= in Stage 6                                                  |
+  | click-option-group (MAYBE)             | Rejected; not needed                                                              |
+  | click-plugin Laravel Forge (MAYBE)     | Out of scope                                                                      |
+  | Bashrc upload on ssh (MAYBE)           | Backlog                                                                           |
+  | Custom db pull filename (MAYBE)        | Backlog                                                                           |
+  | No-files-to-transfer notice (DONT-DO)  | No action                                                                         |
+  | Diff report for all files (DONT-DO)    | No action                                                                         |
+  | Diff multiple files                    | Works; covered by Stage 7 tests                                                   |
+  | DB put tab completion (DONT-DO)        | Static completions offer file paths in Stage 6                                    |
+  | Pre-pull before put (MAYBE)            | Backlog                                                                           |
+  | Actions in the project section (MAYBE) | Intended today; fixed in Stage 9 (N3)                                             |
+  | Local deploy (MAYBE)                   | Stage 9 (existing local deploy repaired)                                          |
+  | Multiple ssh accounts                  | Works; only the first is used by rsync/actions; document                          |
 
-* Open questions
-  1. Build backend: hatchling (modern default) or poetry-core (least churn)?
-  2. Adopt =rich-click= for help output, or keep plain Click?
-  3. Keep the =--real= naming, or add an inverse =--dry-run= default?
-  4. Is =ty= acceptable at Alpha, or should CI use =mypy --strict= until ty
-     stabilizes?
-  5. Should secrets move to OS keyring (optional extra), or is
-     =${ENV_VAR}= interpolation sufficient?
-  6. Confirm we may rename =mysql:= -> =databases:= in v2 (breaking).
+* app-base.org conformance
+  | app-base rule                     | Sink decision                                                | Stage |
+  |-----------------------------------+--------------------------------------------------------------+-------|
+  | uv + committed lock               | Adopt; regenerate =uv.lock=                                    |     1 |
+  | =requires-python= + =.python-version= | Adopt =>=3.15= (D1 confirmed)                                  |     1 |
+  | Click + thin CLI + exit codes     | Adopt; =cli/main.py=, =main() -> int=                            |  1, 6 |
+  | Rich for human output             | Adopt; replace =click.style/secho=                             |     6 |
+  | Do not add rich-click             | Adopt; remove the dependency                                 |     1 |
+  | ty only, existing-project rules   | Adopt; no mypy                                               |     2 |
+  | Ruff, ANN/PGH003/PYI, no preview  | Adopt; line length 80, target py315                          | 2, 10 |
+  | pytest + 90% branch coverage      | Adopt; ratchet to 90                                         | 2, 10 |
+  | Makefile targets                  | Adopt; add docs/man per D2                                   | 2, 12 |
+  | Static =--completions=              | Adopt literally (D3): commands/options only; no server names |     6 |
+  | =-h= and =--help= everywhere          | Adopt via =AppGroup=/=AppCommand=                              |     6 |
+  | =--config= prints a path only       | Adapt: print the discovered =sink.yaml= path                   |     6 |
+  | XDG =config.toml=                   | Not adopted: project config remains =sink.yaml=                |     5 |
+  | README.md                         | Adopt (D5): convert =README.org= to =README.md=                  | 1, 12 |
+  | Static version in =[project]=       | Adopt; remove =__version__=                                    |     1 |
+  | =--color auto/always/never=         | Adopt                                                        |     6 |
+  | Sphinx docs + man page            | Adopt (D2): man page + HTML; no GitHub Pages                 |    12 |
+  | GPL-2.0-only if no license        | Adopt (D10): changed from GPL-3.0-only on 2026-11-25         |     1 |
+  | gitleaks native hook + CI scan    | Adopt                                                        |     2 |
+  | GitHub workflows + dependabot     | Adopt; settings need approval                                |     2 |
+  | =src/PACKAGE= layout                | Adopt                                                        |     1 |
+  | .gitignore/scaffolding            | Adopt                                                        |     1 |
 
-* Appendix - command quick reference
+* Risks and mitigations
+  | Risk                                                       | Mitigation                                                                           |
+  |------------------------------------------------------------+--------------------------------------------------------------------------------------|
+  | The src move + formatter churn makes history hard to read  | Separate mechanical commits; tag each stage                                          |
+  | rsync dry-run still needs network/ssh                      | Keep it; add =--print-only= for offline use; clear errors                              |
+  | Renderer and executor drift apart                          | One command object; round-trip tests; per-mode argv compare                          |
+  | Remote credential files leak or are left behind            | =trap= cleanup, 0600, tests, prefer =login_path=                                         |
+  | =ty= finds hundreds of errors on 3,128 untyped lines         | Annotate per stage; targeted =# ty: ignore[rule]= only                                 |
+  | 90% coverage is unrealistic on day one                     | Ratchet per stage; final gate stays 90                                               |
+  | Click 8.2–8.4 breaks =info -e=                               | Fix by passing =str=; pin =click>=8.5=                                                   |
+  | No rsync/mysql in the dev environment                      | Stub executables; integration tests opt-in                                           |
+  | Schema v2 migration loses data                             | Deferred (D6); not part of this project                                              |
+  | GitHub settings need admin/billing                         | Ask first; do not enable paid security products silently                             |
+  | =--completions= cannot know project server names             | Accepted (D3); document that server names are typed manually                         |
+  | GPLv3 -> GPLv2-only needs every copyright holder's consent | Resolved 2026-11-25: =jb= confirmed as Sheldon; =.mailmap= + =CONTRIBUTORS.md= attestation |
+
+* Definition of done
+  - =uv sync=, =make check=, =make ci=, and =make build= pass from a clean
+    clone.
+  - =ruff check=, =ruff format --check=, =ty check=, and =pytest= are clean;
+    branch coverage is >= 90%.
+  - No =shell=True=, no =Dict2obj=, no global config, no naive datetimes, no
+    =os.chdir=.
+  - No known High-severity bug or security finding remains.
+  - =-h=, =--help=, =--version=, =--config=, =--completions=, and =--color=
+    behave as specified outside a project.
+  - Every command builds one command object.  By default it uses the tool's
+    native dry-run when one exists (=rsync=) and prints only otherwise.
+    =--real= prints and executes the real variant.  Copy-pasting either
+    printed command reproduces that mode's action.
+  - README, docs, man page, AGENTS.md, and TODO.org match the shipped behavior.
+  - The repository history is clean of secrets and CI enforces it.
+
+* Appendix A - Commands
   #+begin_src bash
-  uv sync                 # create/update .venv from uv.lock
+  uv python install 3.15
+  uv sync --all-groups
   uv run sink -h
+  uv run python -m sink -h
   uv run ruff check .
   uv run ruff format --check .
   uv run ty check
   uv run pytest
-  uv build                # -> dist/sink-<version>-py3-none-any.whl
-  uv pip install --force-reinstall dist/sink-*-py3-none-any.whl
+  uv run pytest -m integration      # needs real rsync/ssh/mysql
+  uv build
+  uv tool install --editable --force .
+  make check
+  make ci
+  make secrets
+  make hooks
+  #+end_src
+
+* Appendix B - Stage log
+  Append one line per completed stage: date, commit, commands run, and any
+  deviation from this plan.
+
+  #+begin_src text
+  Stage 0  | TODO | baseline tag:            | fixtures:
+  Stage 1  | TODO | uv/hatchling commit:     | wheel:
+  Stage 2  | TODO | CI run:                  | gitleaks:
+  Stage 3  | TODO | test count:              | coverage:
+  Stage 4  | TODO | shell=True sites: 0      | secrets test:
+  Stage 5  | TODO | Dict2obj refs: 0         | loader tests:
+  Stage 6  | TODO | commands split:          | help tests:
+  Stage 7  | TODO | transfer tests:          | single repro:
+  Stage 8  | TODO | db tests:                | pv:
+  Stage 9  | TODO | deploy/check tests:      | TODO items closed:
+  Stage 10 | TODO | ty/ruff clean:           | coverage:
+  Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
+  Stage 12 | TODO | release tag:             | wheel sha256:
   #+end_src

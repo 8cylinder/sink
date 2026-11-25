@@ -1,0 +1,7 @@
+# Normalize the author identities used across sink's history.
+# Canonical identity: Sheldon McGrandle <developer@8cylinder.com>
+Sheldon McGrandle <developer@8cylinder.com> <sheldon@8cylinder.com>
+Sheldon McGrandle <developer@8cylinder.com> <sheldon.mcgrandle@mc2design.com>
+Sheldon McGrandle <developer@8cylinder.com> sheldon <sheldon.mcgrandle@mc2design.com>
+Sheldon McGrandle <developer@8cylinder.com> sheldon <developer@8cylinder.com>
+Sheldon McGrandle <developer@8cylinder.com> <fuckyou@fuckoff.com>
