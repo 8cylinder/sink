@@ -109,6 +109,30 @@ def test_diff_honors_ignore_whitespace(project_factory) -> None:
     assert "--ignore-all-space" in unwrap(combined(result))
 
 
+def test_file_put_directory_is_recursive(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("file", "put", "dev", "project")
+
+    assert result.exit_code == 0, combined(result)
+    rsync = commands_named(project.stub_log, "rsync")
+    assert rsync
+    assert "--recursive" in rsync[0].args
+    assert f"{project.path}/project/" in rsync[0].args
+
+
+def test_file_pull_directory_is_recursive(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("file", "pull", "dev", "project/sub")
+
+    assert result.exit_code == 0, combined(result)
+    rsync = commands_named(project.stub_log, "rsync")
+    assert rsync
+    assert "--recursive" in rsync[0].args
+    assert "deploy@example.com:/var/www/demo/sub/" in rsync[0].args
+
+
 def test_diff_compare_dest_is_the_project_directory(project_factory) -> None:
     project = project_factory()
 

@@ -10,6 +10,8 @@ from helpers import combined
 
 from sink.cli import cli
 from sink.cli import info as info_module
+from sink.cli.misc import _config_secrets
+from sink.config.loader import load
 
 
 def test_color_always_emits_ansi(project_factory) -> None:
@@ -99,6 +101,53 @@ def test_misc_settings_redacts_by_default(project_factory) -> None:
 
     assert result.exit_code == 0, combined(result)
     assert "secret" not in combined(result)
+
+
+def test_misc_settings_redacts_ssh_password(project_factory) -> None:
+    project = project_factory(
+        server_overrides={
+            "ssh": [
+                {
+                    "name": "deploy",
+                    "username": "deploy",
+                    "server": "example.com",
+                    "password": "sshsecret",
+                }
+            ]
+        }
+    )
+
+    result = project.invoke("misc", "settings", "filezilla")
+
+    assert result.exit_code == 0, combined(result)
+    assert "sshsecret" not in combined(result)
+
+
+def test_config_secrets_collects_all_password_fields(project_factory) -> None:
+    project = project_factory(
+        server_overrides={
+            "ssh": [
+                {
+                    "name": "deploy",
+                    "username": "deploy",
+                    "server": "example.com",
+                    "password": "sshsecret",
+                }
+            ],
+            "urls": [
+                {
+                    "url": "https://example.test",
+                    "password": "urlsecret",
+                    "htpassword": "htsecret",
+                }
+            ],
+        }
+    )
+    config = load(project.path / "sink.yaml")
+
+    secrets = set(_config_secrets(config))
+
+    assert {"sshsecret", "urlsecret", "htsecret"} <= secrets
 
 
 def test_misc_pack_prints_a_plain_command(project_factory) -> None:

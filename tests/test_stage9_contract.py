@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import urllib.error
+from email.message import Message
 from pathlib import Path
 
+import pytest
 from helpers import combined, commands_named
 
 
@@ -51,6 +54,55 @@ def test_check_runs_url_probes(project_factory, monkeypatch) -> None:
     assert result.exit_code == 0, combined(result)
     assert "URL(https://example.test)" in combined(result)
     assert project.stub_log.read_text() != ""
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(
+            urllib.error.HTTPError(
+                "https://example.test", 503, "down", Message(), None
+            ),
+            "HTTPError: 503",
+            id="http-error",
+        ),
+        pytest.param(
+            urllib.error.URLError("no route"),
+            "URLError: no route",
+            id="url-error",
+        ),
+        pytest.param(TimeoutError(), "Timeout", id="timeout"),
+        pytest.param(ValueError("bad"), "Not a valid URL", id="value-error"),
+        pytest.param(
+            AttributeError("bad"), "AttributeError?", id="attribute-error"
+        ),
+    ],
+)
+def test_check_reports_url_probe_errors(
+    project_factory, monkeypatch, error: Exception, expected: str
+) -> None:
+    project = project_factory(urls=[{"url": "https://example.test"}])
+
+    def fail(*_args, **_kwargs):
+        raise error
+
+    monkeypatch.setattr("sink.check.urllib.request.urlopen", fail)
+
+    result = project.invoke("check", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert expected in combined(result)
+
+
+def test_check_filters_to_the_requested_servers(project_factory) -> None:
+    project = project_factory(extra_servers={"prod": {"root": "/var/www/prod"}})
+
+    result = project.invoke("check", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    text = combined(result)
+    assert "\ndev\n" in text
+    assert "prod" not in text
 
 
 def test_check_uses_a_unicode_cross_for_failures(project_factory) -> None:
