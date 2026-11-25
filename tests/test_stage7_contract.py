@@ -120,6 +120,21 @@ def test_single_uses_each_automatic_servers_root(project_factory) -> None:
     assert "deploy@prod.example.com:/var/www/prod/index.html" in destinations
 
 
+def test_diff_reports_a_real_git_error(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke(
+        "diff",
+        "dev",
+        "project/index.html",
+        "--real",
+        env={"STUB_EXIT_GIT": "2"},
+    )
+
+    assert result.exit_code != 0
+    assert "git diff failed" in combined(result)
+
+
 def test_diff_does_not_use_a_pager_in_a_pipe(project_factory) -> None:
     project = project_factory()
 

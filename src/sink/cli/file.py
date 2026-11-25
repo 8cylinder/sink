@@ -13,7 +13,7 @@ from sink.ui import ui
 FILE_ACTIONS = (Action.PUT.value, Action.PULL.value)
 
 
-def _resolve_target(rt, action, server, filename):
+def _resolve_target(rt, server, filename):
     """Resolve the optional SERVER/FILENAME tokens.
 
     ``sink file put dev`` means the whole project.  A single token that is
@@ -54,7 +54,7 @@ def files(rt, action, filename, server, real, silent, extra_flags):
         ui.quiet = max(ui.quiet, 2)
 
     cfg = rt.config
-    target, filename = _resolve_target(rt, action, server, filename)
+    target, filename = _resolve_target(rt, server, filename)
     if filename and action == Action.PUT.value and not os.path.exists(filename):
         ui.error(f"Path does not exist: {filename}")
 

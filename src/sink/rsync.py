@@ -241,12 +241,18 @@ class Transfer:
                 stages.append(Argv(("less",)))
             pipeline = Pipeline(tuple(stages))
             result = run(pipeline, real=self.real, capture=False)
-            if self.real and result.returncode:
-                raise TransferError(
-                    f"git diff failed with exit code {result.returncode}"
-                )
             if self.real:
-                ui.echo("Files are the same.")
+                # git diff uses 0 for "same" and 1 for "different"; values
+                # above 1 are real failures.  Propagate the difference status
+                # so scripts can use it, without calling differences errors.
+                if result.returncode == 0:
+                    ui.echo("Files are the same.")
+                elif result.returncode > 1:
+                    raise TransferError(
+                        f"git diff failed with exit code {result.returncode}"
+                    )
+                else:
+                    raise SystemExit(1)
 
     def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
         """Build the configured GUI difftool command."""
