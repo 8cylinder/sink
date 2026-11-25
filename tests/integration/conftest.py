@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 import socket
 import subprocess
@@ -129,6 +128,25 @@ class Sandbox:
             )
         return result
 
+    def copy_to(
+        self,
+        service: str,
+        source: Path,
+        destination: str,
+    ) -> None:
+        """Copy a local file into a Compose service."""
+        result = self.compose_run(
+            "cp",
+            str(source),
+            f"{service}:{destination}",
+            check=False,
+        )
+        if result.returncode:
+            raise RuntimeError(
+                f"docker compose cp to {service}:{destination} failed "
+                f"({result.returncode}):\n{result.stdout}{result.stderr}"
+            )
+
     def exec(
         self,
         service: str,
@@ -199,13 +217,17 @@ class LiveProject:
 
     def remote_write(self, name: str, content: str) -> None:
         """Write a file on the server as the deploy user."""
+        local = self.path / f".remote-{uuid.uuid4().hex}"
+        local.write_text(content)
+        try:
+            self.sandbox.copy_to("server", local, self.remote_path(name))
+        finally:
+            local.unlink(missing_ok=True)
         self.sandbox.exec(
             "server",
-            "sh",
-            "-c",
-            f"cat > {shlex.quote(self.remote_path(name))}",
-            input=content,
-            user="deploy",
+            "chown",
+            "deploy:deploy",
+            self.remote_path(name),
         )
 
     def remote_read(self, name: str) -> str:
@@ -315,8 +337,45 @@ def sandbox(
 
         _wait_for(db_ready, description="MySQL")
 
-        public_key = key.with_suffix(".pub").read_text()
+        public_key = key.with_suffix(".pub")
         install = _run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "server",
+                "install",
+                "-d",
+                "-m",
+                "700",
+                "-o",
+                "deploy",
+                "-g",
+                "deploy",
+                "/home/deploy/.ssh",
+            ],
+            env=env,
+        )
+        if install.returncode:
+            raise RuntimeError(
+                f"could not create the SSH directory:\n"
+                f"{install.stdout}{install.stderr}"
+            )
+        copy_key = _run(
+            [
+                *compose,
+                "cp",
+                str(public_key),
+                "server:/home/deploy/.ssh/authorized_keys",
+            ],
+            env=env,
+        )
+        if copy_key.returncode:
+            raise RuntimeError(
+                f"could not copy the test key:\n"
+                f"{copy_key.stdout}{copy_key.stderr}"
+            )
+        fix_key = _run(
             [
                 *compose,
                 "exec",
@@ -324,27 +383,30 @@ def sandbox(
                 "server",
                 "sh",
                 "-c",
-                "install -d -m 700 -o deploy -g deploy /home/deploy/.ssh "
-                "&& cat > /home/deploy/.ssh/authorized_keys "
-                "&& chown deploy:deploy /home/deploy/.ssh/authorized_keys "
+                "chown deploy:deploy /home/deploy/.ssh/authorized_keys "
                 "&& chmod 600 /home/deploy/.ssh/authorized_keys",
             ],
             env=env,
-            input=public_key,
         )
-        if install.returncode:
+        if fix_key.returncode:
             raise RuntimeError(
-                f"could not install the test key:\n{install.stdout}{install.stderr}"
+                f"could not set SSH key permissions:\n"
+                f"{fix_key.stdout}{fix_key.stderr}"
             )
 
         ssh_probe = [
             "ssh",
+            "-vvv",
             "-i",
             str(key),
             "-p",
             str(port),
             "-o",
             "BatchMode=yes",
+            "-o",
+            "IdentitiesOnly=yes",
+            "-o",
+            "PreferredAuthentications=publickey",
             "-o",
             "StrictHostKeyChecking=no",
             "-o",
@@ -354,6 +416,7 @@ def sandbox(
             "deploy@127.0.0.1",
             "true",
         ]
+        last_ssh: list[subprocess.CompletedProcess[str]] = []
 
         def ssh_ready() -> bool:
             result = subprocess.run(
@@ -362,9 +425,44 @@ def sandbox(
                 capture_output=True,
                 check=False,
             )
+            last_ssh.append(result)
             return result.returncode == 0
 
-        _wait_for(ssh_ready, description="SSH key authentication")
+        try:
+            _wait_for(ssh_ready, description="SSH key authentication")
+        except RuntimeError as error:
+            logs = _run(
+                [*compose, "logs", "--no-color", "server"],
+                env=env,
+            )
+            inspect = _run(
+                [
+                    *compose,
+                    "exec",
+                    "-T",
+                    "server",
+                    "sh",
+                    "-c",
+                    "id deploy 2>&1; "
+                    "ls -ld /home/deploy /home/deploy/.ssh "
+                    "/home/deploy/.ssh/authorized_keys 2>&1; "
+                    "wc -c /home/deploy/.ssh/authorized_keys 2>&1; "
+                    "head -c 80 /home/deploy/.ssh/authorized_keys 2>&1; "
+                    "echo; cat /proc/1/comm 2>&1; "
+                    "/usr/sbin/sshd -T 2>&1 | head -n 20",
+                ],
+                env=env,
+            )
+            ssh_debug = last_ssh[-1] if last_ssh else None
+            ssh_text = ""
+            if ssh_debug is not None:
+                ssh_text = ssh_debug.stderr[-4000:]
+            raise RuntimeError(
+                f"{error}\n"
+                f"--- last ssh ---\n{ssh_text}\n"
+                f"--- server logs ---\n{logs.stdout}{logs.stderr}\n"
+                f"--- diagnostics ---\n{inspect.stdout}{inspect.stderr}"
+            ) from error
 
         scan = subprocess.run(
             ["ssh-keyscan", "-p", str(port), "127.0.0.1"],
