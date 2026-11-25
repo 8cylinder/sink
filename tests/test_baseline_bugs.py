@@ -15,18 +15,6 @@ def rendered(result: Result) -> str:
     return " ".join(result.output.replace("\\", " ").split())
 
 
-def test_single_uses_the_configured_servers(project_factory):
-    project = project_factory()
-    result = project.invoke("single", "project/index.html")
-    assert result.exit_code == 0, result.output
-
-
-def test_single_does_not_require_a_default_server(project_factory):
-    project = project_factory(default=False)
-    result = project.invoke("single", "project/index.html")
-    assert result.exit_code == 0, result.output
-
-
 def test_file_put_uses_the_default_server(project_factory):
     project = project_factory()
     result = project.invoke("file", "put")

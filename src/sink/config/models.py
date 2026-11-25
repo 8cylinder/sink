@@ -96,6 +96,7 @@ class Server:
     server_type: str | None = None
     warn: bool = False
     default: bool = False
+    # Legacy setting from the removed ``single`` command; accepted but unused.
     automatic: bool = False
     group: str | None = None
     user: str | None = None

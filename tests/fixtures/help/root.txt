@@ -12,7 +12,6 @@ Options:
 Commands:
   db      Overwrite a db with a gzipped sql file.
   file    Send files to and fro.
-  single  Send a single file to any server marked as automatic.
   ssh     SSH into a server.
   diff    Diff a local and remote file.
   info    View or edit the config file.

@@ -22,7 +22,7 @@ def test_check_reports_project_and_server_fields(project_factory) -> None:
     assert "log_dir" not in text
     assert "cache_dir" not in text
     assert "warn" in text
-    assert "automatic" in text
+    assert "automatic" not in text
     assert project.stub_log.read_text() != ""
 
 

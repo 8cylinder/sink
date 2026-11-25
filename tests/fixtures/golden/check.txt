@@ -6,7 +6,6 @@ Local dirs
 dev
 [✓] root: /var/www/demo
 [✓] warn: False
-[✓] automatic: True
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com exit
 [✓] ssh login good (deploy).
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'

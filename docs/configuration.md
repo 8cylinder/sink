@@ -27,7 +27,6 @@ servers:
   dev:
     root: /var/www/example
     default: yes
-    automatic: no
     warn: no
     exclude:
       - storage/logs

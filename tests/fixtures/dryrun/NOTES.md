@@ -23,7 +23,6 @@ $ sink <args>
 | `file-put-root.txt` | `file put dev` | 0 | Renders `rsync --dry-run`. |
 | `file-put-file.txt` | `file put dev project/index.html` | 0 | Renders `rsync --dry-run`. |
 | `file-pull.txt` | `file pull dev index.html` | 0 | Renders `rsync --dry-run`; remote path is derived from the local absolute path (see `test_file_pull_outside_the_project_root`). |
-| `single.txt` | `single project/index.html` | 1 | **Crash (B17).** The filename is passed as a server name: `KeyError: 'index.html'` then `AttributeError: 'list' object has no attribute 'username'` in `sink/config.py:347`. Traceback in the fixture file. |
 | `db-pull.txt` | `db pull dev` | 0 | **Known bug (N13).** Rendered `mysqldump` includes `--dry-run`, which `mysqldump` does not support. Timestamp in the generated filename is captured at run time. |
 | `db-put.txt` | `db put dev project/index.html` | 0 | Renders `pv ... \| ssh ... gunzip -c \| mysql`. |
 | `diff.txt` | `diff dev project/index.html` | 0 | Renders `rsync --compare-dest` then `git diff \| less`. Temp dir name is random per run. |

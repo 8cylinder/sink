@@ -108,16 +108,13 @@ def test_file_missing_path(project_factory) -> None:
     assert "Path does not exist" in combined(result)
 
 
-def test_file_and_single_silent_aliases(project_factory) -> None:
+def test_file_silent_alias(project_factory) -> None:
     project = project_factory()
 
-    file_result = project.invoke("file", "put", "dev", "--silent")
-    single_result = project.invoke("single", "project/index.html", "--silent")
+    result = project.invoke("file", "put", "dev", "--silent")
 
-    assert file_result.exit_code == 0, combined(file_result)
-    assert single_result.exit_code == 0, combined(single_result)
-    assert file_result.output == ""
-    assert single_result.output == ""
+    assert result.exit_code == 0, combined(result)
+    assert result.output == ""
 
 
 def test_db_put_without_sql_file(project_factory) -> None:

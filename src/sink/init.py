@@ -65,10 +65,6 @@ class Init:
               root:
               # This will warn you when putting files or a db to this server.
               warn: no
-              # If this is set to yes, then this server will
-              # will be included in the list of servers that
-              # the automatic command sends a single file to.
-              automatic: no
               # If you want the group and user to be changed when uploading
               # set group and user to the desired names.  This assumes you have
               # permission to run chown.

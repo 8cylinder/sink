@@ -47,24 +47,6 @@ class Transfer:
         values = {*self.project.exclude, *self.server.exclude}
         return tuple(sorted(value for value in values if value))
 
-    def single(self, filename: str | Path) -> None:
-        """Send a file to this transfer's server."""
-        xfer = Transfer(
-            self.project,
-            self.server,
-            real=self.real,
-            verbose=self.verbose,
-            silent=self.silent,
-            quiet=self.quiet,
-        )
-        locations = xfer._locations(filename)
-        xfer._rsync(
-            locations["local"],
-            locations["remote"],
-            Action.PUT,
-            single=True,
-        )
-
     def put(
         self,
         filename: str | Path,
@@ -228,7 +210,6 @@ class Transfer:
         remotef: str | Path,
         action: Action,
         extra_flags: str | Sequence[str] | None = (),
-        single: bool = False,
         compare_to: str | Path | None = None,
         native_dry_run: bool = True,
     ) -> None:
@@ -242,7 +223,7 @@ class Transfer:
             compare_to=compare_to,
             native_dry_run=native_dry_run,
         )
-        self.run(command, single, action, self.server, remotef, localf)
+        self.run(command, action, self.server, remotef)
 
     def _rsync_command(
         self,
@@ -329,15 +310,13 @@ class Transfer:
     def run(
         self,
         command: Argv,
-        single: bool,
         action: Action,
         server: Server,
         remotef: str | Path,
-        localf: str | Path,
     ) -> None:
         """Confirm, execute, and report an rsync command."""
         doit = True
-        if not single and action == Action.PUT and server.warn and self.real:
+        if action == Action.PUT and server.warn and self.real:
             doit = False
             msg = (
                 f" WARNING: You are about to overwrite the {server.name} "
@@ -354,10 +333,6 @@ class Transfer:
             ui.output(result.stdout)
         if result.returncode:
             ui.error(f"\n{result.stderr}")
-        elif single:
-            ui.display_success(
-                self.real, server=server.name, message=str(localf)
-            )
         else:
             message = (
                 "upload complete"

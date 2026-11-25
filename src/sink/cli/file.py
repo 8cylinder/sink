@@ -1,4 +1,4 @@
-"""The ``sink file`` and ``sink single`` commands."""
+"""The ``sink file`` command."""
 
 from pathlib import Path
 
@@ -82,24 +82,3 @@ def files(
         xfer.pull(f, extra_flags)
     elif action == Action.PUT.value:
         xfer.put(f, extra_flags)
-
-
-@cli.command("single", context_settings=CONTEXT_SETTINGS, cls=AppCommand)
-@click.argument("filename", type=click.Path(), required=True)
-@click.option("--real", "-r", is_flag=True)
-@click.option("--silent", is_flag=True, help="Deprecated alias for -qq.")
-@click.pass_obj
-def automatic(rt: Runtime, filename: str, real: bool, silent: bool) -> None:
-    """Send a single file to any server marked as automatic.
-
-    Send a single file to any server that has been designated as
-    automatic.  This is primarily designed for scripting from a text
-    editor."""
-    if silent:
-        rt.quiet = max(rt.quiet, 2)
-        ui.quiet = max(ui.quiet, 2)
-    cfg = rt.config
-    f = Path(filename).resolve()
-    for target in cfg.servers.values():
-        if target.automatic:
-            Transfer(cfg.project, target, real=real).single(f)

@@ -8,6 +8,9 @@
   (`deploy.py`, `cli/deploy.py`), the `coolname` dependency, deploy tests,
   fixtures, and the `deploy_root` model field. Legacy `deploy_root` keys in
   existing `sink.yaml` files are accepted and ignored.
+- Removed the obsolete `single` command. Use `sink file put` or
+  `sink file pull` with the desired server instead. The legacy `automatic`
+  setting is still accepted but is no longer used or shown by `sink check`.
 
 ### Changed
 
@@ -45,7 +48,6 @@
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.
-- `single` runs one transfer per automatic server using each server's root.
 - `diff` compares against the local directory, honors `--ignore-whitespace`,
   avoids a pager when stdout is not a terminal, and reports git/difftool
   failures with a non-zero exit code.

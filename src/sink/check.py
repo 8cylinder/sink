@@ -86,7 +86,6 @@ class TestConfig:
                         "ok" if s.root else "not configured",
                     ),
                     ("warn", str(s.warn), "ok"),
-                    ("automatic", str(s.automatic), "ok"),
                 ]
             )
 

@@ -94,7 +94,6 @@ reports them as warnings so misspelled Sink keys are still visible. Secrets are 
 | Command | Purpose |
 |---|---|
 | `sink file put\|pull [SERVER] [FILENAME]` | Sync a file, directory, or the whole project. |
-| `sink single FILENAME` | Send a file to every automatic server. |
 | `sink diff SERVER [FILENAME]` | Compare a local file with its remote copy. |
 | `sink db pull\|put SERVER [SQL-GZ]` | Pull or push a gzipped MySQL dump. |
 | `sink ssh SERVER [USER]` | Print or open an interactive ssh session. |

@@ -4,29 +4,6 @@ from __future__ import annotations
 
 from helpers import combined, commands_named, unwrap
 
-EXTRA_SERVER = {
-    "prod": {
-        "root": "/var/www/prod",
-        "default": False,
-        "automatic": True,
-        "warn": False,
-        "exclude": [],
-        "ssh": [
-            {
-                "username": "deploy",
-                "server": "prod.example.com",
-                "key": "id_rsa",
-                "port": 2222,
-            }
-        ],
-        "mysql": [],
-        "urls": [],
-        "actions": {},
-        "hosting": {},
-        "control_panel": {},
-    }
-}
-
 
 def test_file_put_single_token_filename_uses_default(project_factory) -> None:
     project = project_factory()
@@ -91,32 +68,6 @@ def test_file_pull_rejects_a_path_outside_the_project(project_factory) -> None:
     assert result.exit_code != 0
     assert str(project.path / "project") in combined(result)
     assert "deploy@example.com" not in combined(result)
-
-
-def test_single_without_automatic_servers_does_nothing(
-    project_factory,
-) -> None:
-    project = project_factory(automatic=False)
-
-    result = project.invoke("single", "project/index.html")
-
-    assert result.exit_code == 0, combined(result)
-    assert combined(result) == ""
-    assert project.stub_log.read_text() == ""
-
-
-def test_single_uses_each_automatic_servers_root(project_factory) -> None:
-    project = project_factory(extra_servers=EXTRA_SERVER)
-
-    result = project.invoke("single", "project/index.html")
-
-    assert result.exit_code == 0, combined(result)
-    destinations = [
-        command.args[-1]
-        for command in commands_named(project.stub_log, "rsync")
-    ]
-    assert "deploy@example.com:/var/www/demo/index.html" in destinations
-    assert "deploy@prod.example.com:/var/www/prod/index.html" in destinations
 
 
 def test_diff_reports_a_real_git_error(project_factory) -> None:
