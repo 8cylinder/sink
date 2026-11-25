@@ -3,6 +3,7 @@
 import errno
 import os
 import shlex
+from pathlib import Path
 
 from sink.config.models import Server
 from sink.errors import CommandError
@@ -13,7 +14,9 @@ from sink.ui import ui
 class SSH:
     """Run ssh, scp, and remote commands for one server."""
 
-    def __init__(self, server: Server, user=None, dry_run=False):
+    def __init__(
+        self, server: Server, user: str | None = None, dry_run: bool = False
+    ) -> None:
         self.dry_run = dry_run
         self.server = server
         if user:
@@ -29,11 +32,11 @@ class SSH:
             self.ssh = server.ssh[0]
 
     @property
-    def real(self):
+    def real(self) -> bool:
         """Whether this session executes commands."""
         return not self.dry_run
 
-    def visit_ssh(self):
+    def visit_ssh(self) -> None:
         """Open or print an interactive ssh session."""
         fragment = ""
         if self.server.root:
@@ -41,19 +44,19 @@ class SSH:
         command = remote_command(self.ssh, fragment, tty=True)
         run(command, real=self.real, capture=False)
 
-    def scp_put(self, localfile):
+    def scp_put(self, localfile: str | Path) -> None:
         """Upload one file with scp."""
         remote = f"{self.ssh.username}@{self.ssh.server}"
         argv = scp_argv(self.ssh, str(localfile), remote)
         run(Argv(argv), real=self.real, capture=False)
 
-    def scp_pull(self, remotefile, dest):
+    def scp_pull(self, remotefile: str | Path, dest: str | Path) -> None:
         """Download one file with scp."""
         remote = f"{self.ssh.username}@{self.ssh.server}:{remotefile}"
         argv = scp_argv(self.ssh, remote, str(dest))
         run(Argv(argv), real=self.real, capture=False)
 
-    def run(self, remote_cmd):
+    def run(self, remote_cmd: str) -> str:
         """Run a remote shell fragment and return its output."""
         command = remote_command(
             self.ssh,
@@ -66,11 +69,11 @@ class SSH:
             raise CommandError(result.stderr.strip() or "remote command failed")
         return result.stdout
 
-    def get_key(self):
+    def get_key(self) -> str:
         """Return the identity argument for the configured key."""
         if not self.ssh.key:
             identity = ""
-        elif os.path.exists(self.ssh.key):
+        elif Path(self.ssh.key).exists():
             identity = f'-i "{self.ssh.key}"'
         else:
             raise FileNotFoundError(

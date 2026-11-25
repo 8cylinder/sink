@@ -77,6 +77,11 @@ select = [
   "RUF",
   "PGH003",
   "PYI",
+  "ANN",
+  "PTH",
+  "DTZ",
+  "RET",
+  "ARG",
 ]
 ignore = [
   "E501",    # long legacy strings and comments; formatter handles code
@@ -86,7 +91,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S603", "S607"]
+"tests/**" = [
+  "S101",  # asserts are the test mechanism
+  "S603",  # subprocess calls exercise the hook
+  "S607",  # partial paths in test subprocesses
+  "ANN",   # pytest fixtures and test parameters are dynamic
+]
 "src/sink/**" = [
   "S603",  # subprocess call: confined to shell.py
   "S607",  # partial executable path: rsync/ssh/scp/mysql names
@@ -99,17 +109,6 @@ dynamic-function-decorator-return = "error"
 missing-type-argument = "error"
 possibly-unresolved-reference = "warn"
 unsound-return = "error"
-# Legacy code: restore these to "error" in Stage 10 after the typed config
-# refactor.  They are named here so the downgrade is explicit, not a blanket
-# suppression.
-invalid-assignment = "warn"
-invalid-argument-type = "warn"
-missing-attribute = "warn"
-missing-union-attribute = "warn"
-no-matching-overload = "warn"
-not-callable = "warn"
-not-subscriptable = "warn"
-parameter-already-assigned = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -123,7 +122,7 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 78
+fail_under = 90
 show_missing = true
 
 [tool.importlinter]

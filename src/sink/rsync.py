@@ -3,6 +3,7 @@
 import shlex
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 import click
@@ -22,11 +23,11 @@ class Transfer:
         self,
         project: Project,
         server: Server,
-        real=False,
-        verbose=False,
-        silent=False,
-        quiet=False,
-    ):
+        real: bool = False,
+        verbose: bool = False,
+        silent: bool = False,
+        quiet: bool = False,
+    ) -> None:
         """Transfer files to and from a server with rsync
 
         verbose: adds --verbose to rsync
@@ -46,7 +47,7 @@ class Transfer:
         values = {*self.project.exclude, *self.server.exclude}
         return tuple(sorted(value for value in values if value))
 
-    def single(self, filename):
+    def single(self, filename: str | Path) -> None:
         """Send a file to this transfer's server."""
         xfer = Transfer(
             self.project,
@@ -64,7 +65,12 @@ class Transfer:
             single=True,
         )
 
-    def put(self, filename, extra_flags, dest_override=None):
+    def put(
+        self,
+        filename: str | Path,
+        extra_flags: str | Sequence[str] | None,
+        dest_override: str | Path | None = None,
+    ) -> None:
         """Upload a file or directory."""
         locations = self._locations(filename)
         local = locations["local"]
@@ -78,7 +84,9 @@ class Transfer:
             remote = dest_override
         self._rsync(local, remote, Action.PUT, self._flags(extra_flags))
 
-    def pull(self, filename, extra_flags):
+    def pull(
+        self, filename: str | Path, extra_flags: str | Sequence[str] | None
+    ) -> None:
         """Download a file or directory."""
         locations = self._locations(filename)
         local = locations["local"]
@@ -91,7 +99,9 @@ class Transfer:
         self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
 
     @staticmethod
-    def _flags(extra_flags):
+    def _flags(
+        extra_flags: str | Sequence[str] | None,
+    ) -> tuple[str, ...]:
         """Normalize extra rsync flags."""
         if not extra_flags:
             return ()
@@ -99,16 +109,13 @@ class Transfer:
             return tuple(shlex.split(extra_flags))
         return tuple(extra_flags)
 
-    def diff_multiple_servers(self, local_file, servers):
-        # for server in servers:
-        #   create a dir
-        #   download file
-        # vimdiff all
-        # remove temp dirs
-        """Placeholder for comparing several servers."""
-        ...
-
-    def diff(self, local_file, ignore=False, word_diff=None, difftool=False):
+    def diff(
+        self,
+        local_file: str | Path,
+        ignore: bool = False,
+        word_diff: str | None = None,
+        difftool: bool = False,
+    ) -> None:
         """Download a file and show or print the diff."""
         server_name = self.server.name
         local_file = Path(local_file)
@@ -140,9 +147,7 @@ class Transfer:
                 tmp_file_fixed = diffdir
 
             if difftool:
-                command = self._difftool_command(
-                    tmp_file_fixed, local_file, diffdir
-                )
+                command = self._difftool_command(tmp_file_fixed, local_file)
                 result = run(command, real=self.real, capture=False)
                 if self.real and result.returncode:
                     raise TransferError(
@@ -188,17 +193,17 @@ class Transfer:
                 else:
                     raise SystemExit(1)
 
-    def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
+    def _difftool_command(self, tmp_file_fixed: str, local_file: Path) -> Argv:
         """Build the configured GUI difftool command."""
         gui = self.project.difftool
         if not gui:
-            ui.error("No difftool program defined in sink.yaml")
+            raise TransferError("No difftool program defined in sink.yaml")
         command = gui.format(
             remote=f'"{tmp_file_fixed}"', local=f'"{local_file}"'
         )
         return Argv(tuple(shlex.split(command)))
 
-    def _locations(self, filename):
+    def _locations(self, filename: str | Path) -> dict[str, Path]:
         """Map a local path to its remote path."""
         local = Path(filename)
         # A relative remote path is derived from the local path.  Reject a
@@ -211,21 +216,22 @@ class Transfer:
                 f"Path is outside the project root "
                 f"({self.project.root}): {local}"
             ) from None
-        if self.server.root is None:
-            ui.error(f"Server has no root ({self.server.name}).")
-        remote = Path(self.server.root, relative)
+        root = self.server.root
+        if root is None:
+            raise TransferError(f"Server has no root ({self.server.name}).")
+        remote = Path(root, relative)
         return {"local": local, "remote": remote}
 
     def _rsync(
         self,
-        localf,
-        remotef,
-        action,
-        extra_flags=(),
-        single=False,
-        compare_to=None,
-        native_dry_run=True,
-    ):
+        localf: str | Path,
+        remotef: str | Path,
+        action: Action,
+        extra_flags: str | Sequence[str] | None = (),
+        single: bool = False,
+        compare_to: str | Path | None = None,
+        native_dry_run: bool = True,
+    ) -> None:
         """Build and run one rsync action."""
         command = self._rsync_command(
             localf,
@@ -240,15 +246,15 @@ class Transfer:
 
     def _rsync_command(
         self,
-        localf,
-        remotef,
-        action,
-        server,
+        localf: str | Path,
+        remotef: str | Path,
+        action: Action,
+        server: Server,
         *,
-        extra_flags=(),
-        compare_to=None,
-        native_dry_run=True,
-    ):
+        extra_flags: Sequence[str] = (),
+        compare_to: str | Path | None = None,
+        native_dry_run: bool = True,
+    ) -> Argv:
         """Build the rsync argv for one action."""
         if not server.ssh:
             ui.error(f"Server has no ssh settings ({server.name}).")
@@ -320,7 +326,15 @@ class Transfer:
             dry_run_flag="--dry-run" if native_dry_run else None,
         )
 
-    def run(self, command, single, action, server, remotef, localf):
+    def run(
+        self,
+        command: Argv,
+        single: bool,
+        action: Action,
+        server: Server,
+        remotef: str | Path,
+        localf: str | Path,
+    ) -> None:
         """Confirm, execute, and report an rsync command."""
         doit = True
         if not single and action == Action.PUT and server.warn and self.real:
@@ -351,29 +365,3 @@ class Transfer:
                 else "download complete"
             )
             ui.display_success(self.real, server=server.name, message=message)
-
-    def error_code(self, code):
-        """Return the rsync error description for a code."""
-        code = str(code)
-        codes = {
-            "1": "Syntax or usage error",
-            "2": "Protocol incompatibility",
-            "3": "Errors selecting input/output files, dirs",
-            "4": "Requested  action  not  supported: an attempt was made to manipulate 64-bit files on a platform that cannot support them; or an option was specified that is supported by the client and not by the server.",
-            "5": "Error starting client-server protocol",
-            "6": "Daemon unable to append to log-file",
-            "10": "Error in socket I/O",
-            "11": "Error in file I/O",
-            "12": "Error in rsync protocol data stream",
-            "13": "Errors with program diagnostics",
-            "14": "Error in IPC code",
-            "20": "Received SIGUSR1 or SIGINT",
-            "21": "Some error returned by waitpid()",
-            "22": "Error allocating core memory buffers",
-            "23": "Partial transfer due to error",
-            "24": "Partial transfer due to vanished source files",
-            "25": "The --max-delete limit stopped deletions",
-            "30": "Timeout in data send/receive",
-            "35": "Timeout waiting for daemon connection",
-        }
-        return codes[code]

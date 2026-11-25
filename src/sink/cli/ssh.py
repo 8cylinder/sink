@@ -3,6 +3,7 @@
 import click
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
+from sink.runtime import Runtime
 from sink.ssh import SSH
 
 
@@ -13,7 +14,7 @@ from sink.ssh import SSH
     "--real", "-r", is_flag=True, help="Open an interactive ssh session."
 )
 @click.pass_obj
-def ssh(rt, server, user, real):
+def ssh(rt: Runtime, server: str, user: str | None, real: bool) -> None:
     """SSH into a server."""
     target = rt.config.server(server)
     SSH(target, user=user, dry_run=not real).visit_ssh()

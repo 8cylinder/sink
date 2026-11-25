@@ -4,14 +4,14 @@
 class Init:
     """Build the starter YAML template."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.server_names = None
 
-    def servers(self, names: tuple[str, ...]):
+    def servers(self, names: tuple[str, ...]) -> None:
         """Set the server names to include."""
         self.server_names = names
 
-    def create(self):
+    def create(self) -> str:
         """Return the rendered template."""
         blank_config = """
           # -*- make-backup-files: nil; -*-
@@ -140,6 +140,4 @@ class Init:
             )
 
         # remove the leading spaces
-        blank_config = blank_config.split("\n")
-        blank_config = "\n".join([i[10:] for i in blank_config])
-        return blank_config
+        return "\n".join([i[10:] for i in blank_config.split("\n")])

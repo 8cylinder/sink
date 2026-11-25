@@ -11,6 +11,7 @@ from sink.applications import Applications
 from sink.cli import CONTEXT_SETTINGS, AppCommand, AppGroup, cli
 from sink.config.models import Config
 from sink.init import Init
+from sink.runtime import Runtime
 from sink.ui import ui
 
 SENSITIVE = ("password", "passwd", "secret", "token")
@@ -34,7 +35,7 @@ def _config_secrets(config: Config) -> tuple[str, ...]:
     return tuple(secrets)
 
 
-def _redact_value(value, show_secrets: bool):
+def _redact_value(value: object, show_secrets: bool) -> object:
     """Recursively mask secret-looking values."""
     if show_secrets:
         return value
@@ -55,7 +56,7 @@ def _redact_value(value, show_secrets: bool):
 
 
 @cli.group(context_settings=CONTEXT_SETTINGS, cls=AppGroup)
-def misc():
+def misc() -> None:
     """[Group] Misc stuff."""
 
 
@@ -67,7 +68,7 @@ def misc():
     help="Print secret values instead of redacting them.",
 )
 @click.pass_obj
-def api(rt, keys, show_secrets):
+def api(rt: Runtime, keys: tuple[str, ...], show_secrets: bool) -> None:
     """Retrieve information from the config file.
 
     The data is always output as JSON.
@@ -96,7 +97,7 @@ def api(rt, keys, show_secrets):
         except ValueError:
             index = key
         try:
-            data = data[index]
+            data = data[index]  # ty: ignore[not-subscriptable] - JSON path
         except KeyError:
             ui.error(f'key "{key}" does not exist in config.')
         except IndexError as error:
@@ -109,9 +110,9 @@ def api(rt, keys, show_secrets):
 
 @misc.command(context_settings=CONTEXT_SETTINGS, cls=AppCommand)
 @click.pass_obj
-def pack(rt):
+def pack(rt: Runtime) -> None:
     """Display a command to gzip uncommitted files."""
-    now = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
+    now = datetime.datetime.now(datetime.UTC).strftime("%y-%m-%d-%H-%M-%S")
     tarname = f"changed-{rt.config.project.name}-{now}.tar.gz"
     command = f"git ls-files -mz | xargs -0 tar -czvf {shlex.quote(tarname)}"
     ui.echo(f"Run: {command}")
@@ -119,7 +120,7 @@ def pack(rt):
 
 @misc.command("init", context_settings=CONTEXT_SETTINGS, cls=AppCommand)
 @click.argument("servers", nargs=-1)
-def init_config(servers):
+def init_config(servers: tuple[str, ...]) -> None:
     """Create a blank config.
 
     The servers arg will create an entry for each server name given.
@@ -142,7 +143,7 @@ def init_config(servers):
     help="Print secret values instead of redacting them.",
 )
 @click.pass_obj
-def settings(rt, application, show_secrets):
+def settings(rt: Runtime, application: str | None, show_secrets: bool) -> None:
     """Output settings values for the requested application.
 
     For the requested application, output settings in a format thats

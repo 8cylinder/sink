@@ -120,7 +120,6 @@ def test_info_edit_passes_a_string_path(
 
     def fake_edit(filename):
         seen.append(filename)
-        return None
 
     monkeypatch.setattr(info_module.click, "edit", fake_edit)
 

@@ -5,9 +5,10 @@ import shutil
 import ssl
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from pathlib import Path
 
-from sink.config.models import Config
+from sink.config.models import Config, DatabaseConfig, SSHConfig
 from sink.credentials import remote_mysql_credentials
 from sink.shell import remote_command, run
 from sink.ui import ui
@@ -20,12 +21,14 @@ class TestConfig:
     bad = "[X]"
     timeout = 25
 
-    def __init__(self, config: Config, real=False, insecure=False):
+    def __init__(
+        self, config: Config, real: bool = False, insecure: bool = False
+    ) -> None:
         self.config = config
         self.real = real
         self.insecure = insecure
 
-    def test_project(self):
+    def test_project(self) -> None:
         """Check project dirs and the configured rsync binary."""
         ui.echo()
         ui.heading("Local dirs")
@@ -52,7 +55,7 @@ class TestConfig:
         )
         self.table(rows)
 
-    def test_requirements(self):
+    def test_requirements(self) -> None:
         """Print the local tool-version command."""
         required = ["ssh -V", "git --version", "rsync --version"]
         required = [f"'{i}'" for i in required]
@@ -63,7 +66,7 @@ class TestConfig:
         ui.echo("Run the following bash command:")
         ui.echo(cmd)
 
-    def test_servers(self, server_names=None):
+    def test_servers(self, server_names: tuple[str, ...] | None = None) -> None:
         """Check ssh, root, database, and URL access."""
         ui.echo()
         for s in self.config.servers.values():
@@ -118,7 +121,7 @@ class TestConfig:
                                 db.db,
                                 "--execute=exit",
                             ]
-                            cmd = shlex.join(argv) + ";"
+                            cmd = shlex.join(str(value) for value in argv) + ";"
                             good = (
                                 f"DB({db.db}): mysql username, password "
                                 "and db are good."
@@ -157,7 +160,7 @@ class TestConfig:
                         msg = f"{self.good} URL({u.url})"
                 self.out(msg, 2)
 
-    def table(self, rows):
+    def table(self, rows: Sequence[tuple[str, str, str]]) -> None:
         """Print a stable Setting/Value/Status table."""
         name_width = max(
             (len(name) for name, _value, _status in rows), default=8
@@ -178,12 +181,14 @@ class TestConfig:
                 2,
             )
 
-    def out(self, msg, spaces):
+    def out(self, msg: str, spaces: int) -> None:
         """Print an indented status line."""
         indent = " " * spaces
         ui.output(f"{indent}{msg}\n")
 
-    def run_cmd_on_server(self, ssh, cmd, good, bad):
+    def run_cmd_on_server(
+        self, ssh: SSHConfig, cmd: str, good: str, bad: str
+    ) -> bool:
         """Run one probe, printing the command and result."""
         command = remote_command(
             ssh,
@@ -204,8 +209,10 @@ class TestConfig:
         return True
 
 
-def _port(db):
+def _port(db: DatabaseConfig) -> int | None:
     """Return a database port as an integer, or ``None``."""
+    if db.port is None:
+        return None
     try:
         return int(db.port)
     except AttributeError, TypeError, ValueError:

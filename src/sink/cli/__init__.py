@@ -23,16 +23,19 @@ class AppCommand(click.Command):
 class AppGroup(click.Group):
     """Display commands in file order and render expected errors."""
 
-    def list_commands(self, ctx):
+    def list_commands(self, ctx: click.Context) -> list[str]:
         """Keep commands in their registration order."""
-        return self.commands.keys()
+        _ = ctx
+        return list(self.commands.keys())
 
-    def invoke(self, ctx):
+    def invoke(self, ctx: click.Context) -> int:
         """Render expected application errors without a traceback."""
         try:
-            return super().invoke(ctx)
+            result = super().invoke(ctx)
+            return int(result or 0)
         except SinkError as error:
             ui.error(f"{type(error).__name__}: {error}")
+            return 1
 
 
 def _version() -> str:
@@ -43,10 +46,12 @@ def _version() -> str:
         return "0.0.0"
 
 
-def _config_callback(ctx, param, value):
+def _config_callback(
+    ctx: click.Context, _param: click.Parameter, value: bool
+) -> None:
     """Print the discovered config path and exit."""
     if not value or ctx.resilient_parsing:
-        return None
+        return
     path = Runtime.discover_config(Path.cwd())
     if path is None:
         raise click.ClickException(
@@ -57,10 +62,12 @@ def _config_callback(ctx, param, value):
     ctx.exit()
 
 
-def _completions_callback(ctx, param, value):
+def _completions_callback(
+    ctx: click.Context, _param: click.Parameter, value: bool
+) -> None:
     """Install static bash completions and exit."""
     if not value or ctx.resilient_parsing:
-        return None
+        return
     path = install_bash_completion(cli, "sink", _version())
     click.echo(str(path))
     click.echo(
@@ -120,7 +127,7 @@ def _completions_callback(ctx, param, value):
 @click.version_option(package_name="sink", prog_name="sink")
 @click.pass_context
 def cli(
-    ctx,
+    ctx: click.Context,
     quiet: int,
     suppress_commands: bool,
     silent: bool,

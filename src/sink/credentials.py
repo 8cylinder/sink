@@ -11,7 +11,7 @@ from __future__ import annotations
 import shlex
 import tempfile
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,7 +84,7 @@ def remote_mysql_credentials(
     host: str | None = None,
     port: int | None = None,
     real: bool,
-) -> Iterator[RemoteCredentials]:
+) -> Generator[RemoteCredentials]:
     """Stage credentials remotely and always clean them up."""
     credentials = RemoteCredentials(
         ssh=ssh,

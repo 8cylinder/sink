@@ -1,12 +1,12 @@
 """The ``sink diff`` command."""
 
-import os
 from pathlib import Path
 
 import click
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
 from sink.rsync import Transfer
+from sink.runtime import Runtime
 
 
 @cli.command("diff", context_settings=CONTEXT_SETTINGS, cls=AppCommand)
@@ -29,8 +29,14 @@ from sink.rsync import Transfer
 )
 @click.pass_obj
 def diff_files(
-    rt, filename, server, ignore_whitespace, word_diff, difftool, real
-):
+    rt: Runtime,
+    filename: str | Path | None,
+    server: str,
+    ignore_whitespace: bool,
+    word_diff: str | None,
+    difftool: bool,
+    real: bool,
+) -> None:
     """Diff a local and remote file.
 
     \b
@@ -40,7 +46,7 @@ def diff_files(
 
     if not filename:
         filename = Path(cfg.project.root)
-    fx = Path(os.path.abspath(filename))
+    fx = Path(filename).resolve()
     xfer = Transfer(cfg.project, cfg.server(server), real=real)
     xfer.diff(
         fx, ignore=ignore_whitespace, word_diff=word_diff, difftool=difftool

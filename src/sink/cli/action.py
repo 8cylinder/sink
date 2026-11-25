@@ -4,6 +4,7 @@ import click
 
 from sink.actions import Actions
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
+from sink.runtime import Runtime
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS, cls=AppCommand)
@@ -11,7 +12,9 @@ from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
 @click.argument("action_name", required=False)
 @click.option("--real", "-r", is_flag=True)
 @click.pass_obj
-def action(rt, server, action_name, real):
+def action(
+    rt: Runtime, server: str, action_name: str | None, real: bool
+) -> None:
     """Run a pre defined command on the server.
 
     If a section named 'actions' is in sink.yaml, run the requested

@@ -1,19 +1,21 @@
 """The ``sink file`` and ``sink single`` commands."""
 
-import os
 from pathlib import Path
 
 import click
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
-from sink.config.models import Action
+from sink.config.models import Action, Server
 from sink.rsync import Transfer
+from sink.runtime import Runtime
 from sink.ui import ui
 
 FILE_ACTIONS = (Action.PUT.value, Action.PULL.value)
 
 
-def _resolve_target(rt, server, filename):
+def _resolve_target(
+    rt: Runtime, server: str | None, filename: str | None
+) -> tuple[Server, str | None]:
     """Resolve the optional SERVER/FILENAME tokens.
 
     ``sink file put dev`` means the whole project.  A single token that is
@@ -38,7 +40,15 @@ def _resolve_target(rt, server, filename):
 @click.option("--silent", is_flag=True, help="Deprecated alias for -qq.")
 @click.option("--extra-flags", help="extra flags to pass to rsync.")
 @click.pass_obj
-def files(rt, action, filename, server, real, silent, extra_flags):
+def files(
+    rt: Runtime,
+    action: str,
+    filename: str | None,
+    server: str | None,
+    real: bool,
+    silent: bool,
+    extra_flags: str | None,
+) -> None:
     """Send files to and fro.
 
     Push or pull a single file or directory from a remote server.
@@ -55,10 +65,10 @@ def files(rt, action, filename, server, real, silent, extra_flags):
 
     cfg = rt.config
     target, filename = _resolve_target(rt, server, filename)
-    if filename and action == Action.PUT.value and not os.path.exists(filename):
+    if filename and action == Action.PUT.value and not Path(filename).exists():
         ui.error(f"Path does not exist: {filename}")
 
-    f = Path(os.path.abspath(filename)) if filename else Path(cfg.project.root)
+    f = Path(filename).resolve() if filename else Path(cfg.project.root)
 
     xfer = Transfer(
         cfg.project,
@@ -79,7 +89,7 @@ def files(rt, action, filename, server, real, silent, extra_flags):
 @click.option("--real", "-r", is_flag=True)
 @click.option("--silent", is_flag=True, help="Deprecated alias for -qq.")
 @click.pass_obj
-def automatic(rt, filename, real, silent):
+def automatic(rt: Runtime, filename: str, real: bool, silent: bool) -> None:
     """Send a single file to any server marked as automatic.
 
     Send a single file to any server that has been designated as
@@ -89,7 +99,7 @@ def automatic(rt, filename, real, silent):
         rt.quiet = max(rt.quiet, 2)
         ui.quiet = max(ui.quiet, 2)
     cfg = rt.config
-    f = Path(os.path.abspath(filename))
+    f = Path(filename).resolve()
     for target in cfg.servers.values():
         if target.automatic:
             Transfer(cfg.project, target, real=real).single(f)

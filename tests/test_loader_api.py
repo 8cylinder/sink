@@ -96,9 +96,9 @@ def test_load_builds_frozen_models(tmp_path: Path) -> None:
     assert isinstance(server.databases, tuple)
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        config.project.name = "other"  # type: ignore[misc]
+        config.project.name = "other"  # ty: ignore[invalid-assignment] - frozen test
     with pytest.raises(TypeError):
-        config.servers["prod"] = server  # type: ignore[index]
+        config.servers["prod"] = server  # ty: ignore[invalid-assignment] - frozen mapping
 
 
 def test_relative_ssh_key_is_resolved(tmp_path: Path) -> None:
@@ -188,7 +188,9 @@ def test_environment_variables_expand(
     config = load(write_config(tmp_path, data))
 
     assert config.project.name == "expanded"
-    assert config.raw["project"]["name"] == "expanded"
+    project = config.raw["project"]
+    assert isinstance(project, dict)
+    assert project["name"] == "expanded"
 
 
 def test_missing_environment_variable_fails(
@@ -210,3 +212,163 @@ def test_missing_ssh_key_warns_and_is_not_fatal(tmp_path: Path) -> None:
 
     assert config.server().ssh[0].key is None
     assert any("gone" in warning for warning in config.warnings)
+
+
+def _copy_document() -> dict[str, Any]:
+    import copy
+
+    return copy.deepcopy(document())
+
+
+def test_loader_rejects_invalid_document_shapes(tmp_path: Path) -> None:
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    empty_path = empty / "sink.yaml"
+    empty_path.write_text("")
+    with pytest.raises(ConfigError):
+        load(empty_path)
+
+    list_path = tmp_path / "list"
+    list_path.mkdir()
+    (list_path / "sink.yaml").write_text("- one\n- two\n")
+    with pytest.raises(ConfigError):
+        load(list_path / "sink.yaml")
+
+    data = _copy_document()
+    data["project"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="project-list.yaml"))
+
+
+def test_loader_rejects_invalid_project_values(tmp_path: Path) -> None:
+    data = _copy_document()
+    data["project"]["root"] = 1
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="root-int.yaml"))
+
+    data = _copy_document()
+    data["project"]["root"] = "does-not-exist"
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="root-missing.yaml"))
+
+    data = _copy_document()
+    data["project"]["pulls_dir"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="pulls-list.yaml"))
+
+    data = _copy_document()
+    data["project"]["exclude"] = 1
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="exclude-int.yaml"))
+
+    data = _copy_document()
+    data["project"]["actions"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="actions-list.yaml"))
+
+
+def test_loader_rejects_invalid_server_values(tmp_path: Path) -> None:
+    data = _copy_document()
+    data["servers"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="servers-list.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="server-list.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["ssh"] = {}
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="ssh-map.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["ssh"] = [[]]
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="ssh-item-list.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["mysql"] = {}
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="mysql-map.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["mysql"] = [[]]
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="mysql-item-list.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["urls"] = {}
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="urls-map.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["urls"] = [[]]
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="urls-item-list.yaml"))
+
+
+def test_loader_rejects_invalid_scalar_values(tmp_path: Path) -> None:
+    data = _copy_document()
+    data["servers"]["dev"]["warn"] = "sometimes"
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="warn-invalid.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["ssh"][0]["port"] = "not-a-port"
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="port-invalid.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["type"] = 1
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="type-int.yaml"))
+
+    data = _copy_document()
+    data["servers"]["dev"]["hosting"] = []
+    with pytest.raises(ConfigError):
+        load(write_config(tmp_path, data, name="hosting-list.yaml"))
+
+
+def test_loader_resolves_keys_against_project_root(tmp_path: Path) -> None:
+    data = _copy_document()
+    data["servers"]["dev"]["ssh"][0]["key"] = "project/id_rsa"
+    path = write_config(tmp_path, data, name="project-key.yaml")
+    (path.parent / "project" / "id_rsa").write_text("key\n")
+
+    config = load(path)
+
+    assert config.server().ssh[0].key == str(
+        (path.parent / "project" / "id_rsa").resolve()
+    )
+
+
+def test_loader_expands_nested_env_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SINK_ROOT", "project")
+    data = _copy_document()
+    data["project"]["root"] = "${SINK_ROOT}"
+    data["project"]["exclude"] = ["${SINK_ROOT}"]
+    path = write_config(tmp_path, data, name="env-nested.yaml")
+
+    config = load(path)
+
+    assert config.project.root == (path.parent / "project").resolve()
+    assert config.project.exclude == ("project",)
+
+
+def test_loader_supports_platform_rsync_mapping(tmp_path: Path) -> None:
+    data = _copy_document()
+    data["project"]["rsync_binary"] = {"linux": "rsync", "osx": "rsync"}
+    path = write_config(tmp_path, data, name="rsync-map.yaml")
+
+    assert load(path).project.rsync_binary == "rsync"
+
+
+def test_config_excluded_rejects_unknown_server(tmp_path: Path) -> None:
+    config = load(write_config(tmp_path, _copy_document(), name="exclude.yaml"))
+
+    with pytest.raises(UnknownServer):
+        config.excluded("missing")

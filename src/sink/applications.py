@@ -1,12 +1,14 @@
 """Render copy-paste connection settings for common clients."""
 
+from collections.abc import Callable, Iterable, Sequence
+
 from sink.config.models import Config, Server, SSHConfig
 
 
 class Applications:
     """Generate connection settings for known applications."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.config = config
         self.apps = {
             "mysql": self._mysql,
@@ -14,24 +16,26 @@ class Applications:
             "nautilus": self._nautilus,
             "dbeaver": self._dbeaver,
         }
-        self.app = None
+        self.app: Callable[[], str] | None = None
 
-    def name(self, app_name):
+    def name(self, app_name: str | None) -> bool:
         """Select an application by name."""
         if app_name in self.apps:
             self.app = self.apps[app_name]
             return True
         return False
 
-    def app_settings(self):
+    def app_settings(self) -> str:
         """Render the selected application's settings."""
+        if self.app is None:
+            raise ValueError("No application selected")
         return self.app()
 
-    def known(self):
+    def known(self) -> str:
         """Return the comma-separated application names."""
         return ", ".join(list(self.apps))
 
-    def pretify(self, data):
+    def pretify(self, data: Iterable[Sequence[Sequence[object]]]) -> str:
         """Format labelled connection fields for display."""
         pretty = ""
         for section in data:
@@ -40,8 +44,7 @@ class Applications:
             for field_name, field_value in section:
                 if not field_value:
                     field_value = ""
-                field_value = str(field_value)
-                pretty += f"{field_name.ljust(18)} - {field_value}\n"
+                pretty += f"{str(field_name).ljust(18)} - {field_value}\n"
         return pretty
 
     @staticmethod
@@ -49,7 +52,7 @@ class Applications:
         """Return the first ssh config or an empty one."""
         return server.ssh[0] if server.ssh else SSHConfig()
 
-    def _mysql(self):
+    def _mysql(self) -> str:
         """Render MySQL client connection settings."""
         out = []
         p = self.config.project
@@ -71,7 +74,7 @@ class Applications:
                 out.append(connection)
         return self.pretify(out)
 
-    def _filezilla(self):
+    def _filezilla(self) -> str:
         """Render FileZilla site settings."""
         out = []
         p = self.config.project
@@ -92,7 +95,7 @@ class Applications:
             out.append(connection)
         return self.pretify(out)
 
-    def _nautilus(self):
+    def _nautilus(self) -> str:
         """Render Nautilus sftp URIs."""
         out = []
         for s in self.config.servers.values():
@@ -101,7 +104,7 @@ class Applications:
             out.append(connection)
         return "\n".join(out)
 
-    def _dbeaver(self):
+    def _dbeaver(self) -> str:
         """Render DBeaver connection settings."""
         out = []
         p = self.config.project

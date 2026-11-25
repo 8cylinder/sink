@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import shlex
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 
 import click
@@ -29,7 +30,7 @@ def _commands(
     return commands
 
 
-def _shell_words(values) -> str:
+def _shell_words(values: Iterable[object]) -> str:
     """Quote completion words for a bash ``compgen`` list."""
     return " ".join(shlex.quote(str(value)) for value in values)
 
@@ -98,14 +99,14 @@ def generate_bash(group: click.Group, prog_name: str, version: str) -> str:
     all_paths = set(groups) | {" ".join(path) for path, _command in commands}
     subcommands = {
         name: sorted(
-            child.name
+            child.name or ""
             for child in command.commands.values()
             if not child.hidden
         )
         for name, command in groups.items()
     }
     root_subs = sorted(
-        child.name for child in root.commands.values() if not child.hidden
+        child.name or "" for child in root.commands.values() if not child.hidden
     )
     subcommands[""] = root_subs
 
@@ -288,9 +289,9 @@ def install_bash_completion(
     try:
         with os.fdopen(descriptor, "w") as handle:
             handle.write(script)
-        os.chmod(temporary, 0o644)
-        os.replace(temporary, path)
+        Path(temporary).chmod(0o644)
+        Path(temporary).replace(path)
     finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        if Path(temporary).exists():
+            Path(temporary).unlink()
     return path

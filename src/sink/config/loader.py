@@ -13,7 +13,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import cast
 
 import yaml
 
@@ -121,7 +121,7 @@ def load(path: Path) -> Config:
     if not isinstance(document, Mapping):
         raise ConfigError(f"{path}: the top level must be a mapping")
 
-    expanded = _expand_env(document, path)
+    expanded = cast(Mapping[str, object], _expand_env(document, path))
     warnings: list[str] = []
     _check_unknown(expanded, TOP_LEVEL_KEYS, str(path), warnings)
 
@@ -146,7 +146,7 @@ def load(path: Path) -> Config:
     )
 
 
-def _expand_env(value: Any, path: Path) -> Any:
+def _expand_env(value: object, path: Path) -> object:
     """Recursively expand ``${NAME}`` references in YAML values."""
     if isinstance(value, Mapping):
         return {key: _expand_env(item, path) for key, item in value.items()}
@@ -168,7 +168,7 @@ def _expand_env(value: Any, path: Path) -> Any:
     return ENV_PATTERN.sub(replace, value)
 
 
-def _project(data: Any, path: Path, warnings: list[str]) -> Project:
+def _project(data: object, path: Path, warnings: list[str]) -> Project:
     """Build and validate the project section."""
     if not isinstance(data, Mapping):
         raise ConfigError(f"{path}: project section must be a mapping")
@@ -203,7 +203,7 @@ def _project(data: Any, path: Path, warnings: list[str]) -> Project:
 
 
 def _servers(
-    data: Any,
+    data: object,
     path: Path,
     project: Project,
     warnings: list[str],
@@ -226,7 +226,7 @@ def _servers(
 
 def _server(
     name: str,
-    data: Mapping[str, Any],
+    data: Mapping[str, object],
     path: Path,
     project: Project,
     warnings: list[str],
@@ -265,7 +265,7 @@ def _server(
 
 
 def _ssh_configs(
-    data: Any,
+    data: object,
     path: Path,
     project: Project,
     where: str,
@@ -304,7 +304,9 @@ def _ssh_configs(
     return tuple(configs)
 
 
-def _databases(data: Any, path: Path, where: str) -> tuple[DatabaseConfig, ...]:
+def _databases(
+    data: object, path: Path, where: str
+) -> tuple[DatabaseConfig, ...]:
     """Build the database list for one server."""
     if data is None:
         return ()
@@ -339,7 +341,7 @@ def _databases(data: Any, path: Path, where: str) -> tuple[DatabaseConfig, ...]:
     return tuple(databases)
 
 
-def _urls(data: Any, path: Path, where: str) -> tuple[URLConfig, ...]:
+def _urls(data: object, path: Path, where: str) -> tuple[URLConfig, ...]:
     """Build the URL list for one server."""
     if data is None:
         return ()
@@ -376,7 +378,7 @@ def _urls(data: Any, path: Path, where: str) -> tuple[URLConfig, ...]:
     return tuple(urls)
 
 
-def _actions(data: Any, path: Path, where: str) -> Mapping[str, str]:
+def _actions(data: object, path: Path, where: str) -> Mapping[str, str]:
     """Build an immutable action mapping."""
     if data is None:
         return MappingProxyType({})
@@ -391,7 +393,7 @@ def _actions(data: Any, path: Path, where: str) -> Mapping[str, str]:
 
 
 def _check_unknown(
-    data: Mapping[str, Any],
+    data: Mapping[str, object],
     allowed: set[str],
     where: str,
     warnings: list[str],
@@ -402,7 +404,7 @@ def _check_unknown(
             warnings.append(f'{where}: unknown key "{key}" was ignored')
 
 
-def _string(value: Any, path: Path, where: str) -> str | None:
+def _string(value: object, path: Path, where: str) -> str | None:
     """Validate an optional string value."""
     if value is None:
         return None
@@ -411,7 +413,7 @@ def _string(value: Any, path: Path, where: str) -> str | None:
     return value
 
 
-def _boolean(value: Any, path: Path, where: str) -> bool:
+def _boolean(value: object, path: Path, where: str) -> bool:
     """Validate YAML-style boolean values."""
     if value is None:
         return False
@@ -427,18 +429,18 @@ def _boolean(value: Any, path: Path, where: str) -> bool:
 
 
 def _optional_int(
-    value: Any, path: Path, where: str, default: int | None = None
+    value: object, path: Path, where: str, default: int | None = None
 ) -> int | None:
     """Validate an optional integer value."""
     if value is None or value == "":
         return default
     try:
-        return int(value)
+        return int(str(value))
     except TypeError, ValueError:
         raise ConfigError(f"{path}: {where} must be an integer") from None
 
 
-def _string_tuple(value: Any, path: Path, where: str) -> tuple[str, ...]:
+def _string_tuple(value: object, path: Path, where: str) -> tuple[str, ...]:
     """Validate a list of non-empty strings."""
     if value is None:
         return ()
@@ -455,7 +457,7 @@ def _string_tuple(value: Any, path: Path, where: str) -> tuple[str, ...]:
     return tuple(values)
 
 
-def _mapping(value: Any, path: Path, where: str) -> Mapping[str, object]:
+def _mapping(value: object, path: Path, where: str) -> Mapping[str, object]:
     """Validate and freeze a mapping value."""
     if value is None:
         return MappingProxyType({})
@@ -464,30 +466,30 @@ def _mapping(value: Any, path: Path, where: str) -> Mapping[str, object]:
     return MappingProxyType(dict(value))
 
 
-def _resolve_path(value: Any, path: Path, where: str) -> Path:
+def _resolve_path(value: object, path: Path, where: str) -> Path:
     """Resolve a path relative to the config file."""
     if not isinstance(value, (str, os.PathLike)):
         raise ConfigError(f"{path}: {where} must be a path")
-    candidate = Path(os.path.expanduser(str(value)))
+    candidate = Path(str(value)).expanduser()
     if not candidate.is_absolute():
         candidate = path.parent / candidate
     return candidate.resolve()
 
 
-def _optional_path(value: Any, path: Path, where: str) -> Path | None:
+def _optional_path(value: object, path: Path, where: str) -> Path | None:
     """Resolve an optional local path."""
     if value is None or value == "":
         return None
     return _resolve_path(value, path, where)
 
 
-def _optional_remote_path(value: Any, path: Path, where: str) -> Path | None:
+def _optional_remote_path(value: object, path: Path, where: str) -> Path | None:
     """Expand an optional remote path."""
     if value is None or value == "":
         return None
     if not isinstance(value, (str, os.PathLike)):
         raise ConfigError(f"{path}: {where} must be a path")
-    return Path(os.path.expanduser(str(value)))
+    return Path(str(value)).expanduser()
 
 
 def _resolve_key(
@@ -498,7 +500,7 @@ def _resolve_key(
     where: str,
 ) -> str | None:
     """Resolve an ssh key against the config and project roots."""
-    candidate = Path(os.path.expanduser(key))
+    candidate = Path(key).expanduser()
     # Try the path as written first, then relative to the config file, then
     # relative to the project root.  A missing key is a warning, not a fatal
     # error, so commands still render for inspection.
@@ -514,7 +516,7 @@ def _resolve_key(
     return None
 
 
-def _rsync_binary(value: Any, path: Path) -> str:
+def _rsync_binary(value: object, path: Path) -> str:
     """Select a platform-specific rsync binary name."""
     if isinstance(value, Mapping):
         if sys.platform.startswith("linux"):

@@ -25,7 +25,7 @@ lint-check:  ## Lint without changing files
 	uv run ruff check .
 
 type:  ## Type-check the project
-	uv run ty check --exit-zero-on-warning
+	uv run ty check
 
 arch:  ## Check import boundaries
 	uv run lint-imports

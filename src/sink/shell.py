@@ -128,6 +128,7 @@ class RemoteCommand:
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
         """Append the remote fragment as one ssh argument."""
+        _ = real
         return (*self.ssh_argv, self.fragment)
 
     def render(self, real: bool) -> str:
@@ -176,6 +177,7 @@ class Pipeline:
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
         """Pipelines have no single argv."""
+        _ = real
         raise TypeError("a pipeline has no single argv")
 
     def render(self, real: bool) -> str:
@@ -205,6 +207,8 @@ class Pipeline:
         stderr: IO[str] | None = None,
     ) -> Result:
         """Connect stages with pipes and apply redirections."""
+        # run() only calls execute() in real mode; keep the protocol argument.
+        _ = real
         return _execute_pipeline(
             self,
             env=env,
@@ -245,7 +249,7 @@ def _execute_argv(
         run_kwargs["stdout"] = None
         run_kwargs["stderr"] = None
 
-    completed = subprocess.run(**run_kwargs)
+    completed = subprocess.run(**run_kwargs)  # ty: ignore[no-matching-overload] - kwargs built for text mode
     return Result(
         returncode=completed.returncode,
         stdout=completed.stdout or "",
@@ -267,6 +271,7 @@ def _execute_pipeline(
     processes: list[subprocess.Popen[str]] = []
     previous: subprocess.Popen[str] | None = None
     output_file: IO[str] | None = None
+    error_file: IO[str] | None = None
 
     try:
         if stdout is not None:
@@ -274,15 +279,22 @@ def _execute_pipeline(
         elif pipeline.stdout_path is not None:
             output_file = pipeline.stdout_path.open("w")
             output = output_file
-        else:
+        elif capture:
             output = subprocess.PIPE
+        else:
+            output = None
 
         if pipeline.stderr_devnull:
             error_target: object = subprocess.DEVNULL
+        elif pipeline.stderr_path is not None:
+            error_file = pipeline.stderr_path.open("w")
+            error_target = error_file
         elif stderr is not None:
             error_target = stderr
-        else:
+        elif capture:
             error_target = subprocess.PIPE
+        else:
+            error_target = None
 
         for index, stage in enumerate(pipeline.stages):
             last = index == len(pipeline.stages) - 1
@@ -311,6 +323,8 @@ def _execute_pipeline(
     finally:
         if output_file is not None:
             output_file.close()
+        if error_file is not None:
+            error_file.close()
 
     for process in processes[:-1]:
         process.wait()

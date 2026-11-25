@@ -5,6 +5,7 @@ import click
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
 from sink.config.models import Action
 from sink.db import DB
+from sink.runtime import Runtime
 from sink.ui import ui
 
 
@@ -21,7 +22,15 @@ from sink.ui import ui
 @click.option("--real", "-r", is_flag=True)
 @click.option("--filename-only", is_flag=True, help="Return only the filename")
 @click.pass_obj
-def database(rt, db_action, sql_gz, server, real, filename_only, tag):
+def database(
+    rt: Runtime,
+    db_action: str,
+    sql_gz: str | None,
+    server: str,
+    real: bool,
+    filename_only: bool,
+    tag: str | None,
+) -> None:
     """Overwrite a db with a gzipped sql file.
 
     \b
@@ -47,6 +56,7 @@ def database(rt, db_action, sql_gz, server, real, filename_only, tag):
     if db_action == Action.PULL.value:
         db.pull(tag=tag)
     elif db_action == Action.PUT.value:
-        if not sql_gz:
+        if sql_gz is None:
             ui.error('When action is "put", SQL-GZ is required.')
+            return
         db.put(sql_gz)

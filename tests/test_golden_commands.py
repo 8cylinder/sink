@@ -11,7 +11,6 @@ import os
 import re
 from pathlib import Path
 
-import pytest
 from helpers import combined, commands_named, unwrap, write_gzip
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden"
@@ -166,7 +165,7 @@ def test_diff_golden(project_factory) -> None:
     assert_golden("diff", combined(result), project)
 
 
-def test_check_golden(project_factory, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_check_golden(project_factory) -> None:
     project = project_factory()
     result = project.invoke("check", "dev")
 

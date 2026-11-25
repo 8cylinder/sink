@@ -6,27 +6,28 @@ import click
 import yaml
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
+from sink.runtime import Runtime
 from sink.ui import ui
 
 
-def edit_config(path: Path):
+def edit_config(path: Path) -> None:
     """Edit and validate the config, offering a retry on YAML errors."""
     click.edit(filename=str(path))
     try:
-        with open(path) as stream:
+        with path.open() as stream:
             yaml.safe_load(stream)
     except yaml.YAMLError as error:
         if hasattr(error, "problem_mark"):
             msg = "There was an error while parsing the config file"
-            if error.context is not None:
+            if getattr(error, "context", None) is not None:
                 ui.error(
                     f"{msg}:\n{error.problem_mark}\n"
-                    f"{error.problem} {error.context}.",
+                    f"{getattr(error, 'problem', '')} {getattr(error, 'context', '')}.",
                     exit=False,
                 )
             else:
                 ui.error(
-                    f"{msg}:\n{error.problem_mark} {error.problem}.",
+                    f"{msg}:\n{error.problem_mark} {getattr(error, 'problem', '')}.",
                     exit=False,
                 )
         else:
@@ -44,7 +45,7 @@ def edit_config(path: Path):
     "--view/--edit", "-v/-e", default=True, help="View or edit config file."
 )
 @click.pass_obj
-def info(rt, view):
+def info(rt: Runtime, view: bool) -> None:
     """View or edit the config file.
 
     If edit, it will be opened in the default editor.

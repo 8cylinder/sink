@@ -69,7 +69,9 @@ def test_check_verifies_tls_by_default(
     project = project_factory(urls=[{"url": "https://example.test"}])
     contexts: list[ssl.SSLContext] = []
 
-    def fake_urlopen(url, timeout=None, context=None):
+    def fake_urlopen(_url, timeout=None, context=None):
+        _ = timeout
+        assert context is not None
         contexts.append(context)
         return object()
 

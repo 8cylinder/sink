@@ -2,6 +2,7 @@
 
 import os
 import sys
+from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
 
 import click
@@ -22,11 +23,11 @@ class ui:
     def configure(
         cls,
         *,
-        color="auto",
-        quiet=0,
-        verbose=0,
-        suppress=False,
-    ):
+        color: str = "auto",
+        quiet: int = 0,
+        verbose: int = 0,
+        suppress: bool = False,
+    ) -> None:
         """Configure colors and output levels for this invocation."""
         # quiet=1 hides rendered commands; quiet=2 hides every status/output
         # line.  ``suppress`` mirrors the legacy -s flag.
@@ -57,7 +58,7 @@ class ui:
 
     @classmethod
     @contextmanager
-    def status(cls, message):
+    def status(cls, message: str) -> Generator[object]:
         """Show a Rich status spinner unless output is fully suppressed."""
         if cls.quiet >= 2:
             yield None
@@ -66,7 +67,7 @@ class ui:
             yield status
 
     @staticmethod
-    def heading(msg, *, underline=False):
+    def heading(msg: str, *, underline: bool = False) -> None:
         """Print a section heading."""
         if ui.quiet >= 2:
             return
@@ -75,7 +76,7 @@ class ui:
         ui.console.print(text, soft_wrap=True)
 
     @staticmethod
-    def redact(text, secrets=()):
+    def redact(text: str, secrets: Iterable[str] = ()) -> str:
         """Mask known secret values in text."""
         for secret in secrets:
             if secret:
@@ -83,29 +84,29 @@ class ui:
         return text
 
     @staticmethod
-    def echo(msg="", nl=True):
+    def echo(msg: str = "", nl: bool = True) -> None:
         """Print plain text unless ``-qq`` is active."""
         if ui.quiet >= 2:
             return
         click.echo(msg, nl=nl)
 
     @staticmethod
-    def output(text):
+    def output(text: str) -> None:
         """Print command output verbatim unless -qq is active."""
         if ui.quiet >= 2 or not text:
             return
         click.echo(text, nl=False)
 
     @staticmethod
-    def msg(msg):
+    def msg(message: str) -> None:
         """Print a multi-line message."""
-        msg = [i.strip() for i in msg.split("\n")]
+        lines = [line.strip() for line in message.split("\n")]
         if ui.quiet >= 2:
             return
-        click.echo("\n".join(msg))
+        click.echo("\n".join(lines))
 
     @staticmethod
-    def notice(msg):
+    def notice(msg: str) -> None:
         """Print a notice to stderr."""
         if ui.quiet >= 2:
             return
@@ -114,7 +115,7 @@ class ui:
         )
 
     @staticmethod
-    def warn(msg, indent=""):
+    def warn(msg: str, indent: str = "") -> None:
         """Print a warning to stderr."""
         if ui.quiet >= 2:
             return
@@ -123,7 +124,12 @@ class ui:
         )
 
     @staticmethod
-    def error(msg, exit=True, indent=0, secrets=()):
+    def error(
+        msg: str,
+        exit: bool = True,
+        indent: int = 0,
+        secrets: Iterable[str] = (),
+    ) -> None:
         """Print an error and optionally exit non-zero."""
         msg = ui.redact(msg, secrets)
         distance = ""
@@ -138,7 +144,12 @@ class ui:
             sys.exit(1)
 
     @staticmethod
-    def display_cmd(cmd, indent=0, suppress_commands=False, secrets=()):
+    def display_cmd(
+        cmd: str,
+        indent: int = 0,
+        suppress_commands: bool = False,
+        secrets: Iterable[str] = (),
+    ) -> None:
         """Print a rendered command unless quiet or suppressed."""
         if ui.quiet >= 1 or ui.suppress or suppress_commands:
             return
@@ -152,7 +163,13 @@ class ui:
         )
 
     @staticmethod
-    def display_success(real, extra=None, *, server=None, message=None):
+    def display_success(
+        real: bool,
+        extra: str | None = None,
+        *,
+        server: str | None = None,
+        message: str | None = None,
+    ) -> None:
         """Print a success label with optional server/details."""
         if ui.quiet >= 2:
             return
@@ -171,7 +188,7 @@ class ui:
         ui.console.print(text)
 
     @staticmethod
-    def display_options(data):
+    def display_options(data: Mapping[str, object]) -> None:
         """Print aligned key/value options."""
         if ui.quiet >= 2:
             return
@@ -183,7 +200,7 @@ class ui:
             ui.console.print(text, soft_wrap=True)
 
     @staticmethod
-    def print_stack():
+    def print_stack() -> None:
         """Print a compact stack trace."""
         import traceback
 
