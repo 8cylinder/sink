@@ -96,13 +96,14 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =88d7baf= (Stage 6
-    CLI/output contract).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =d84bb7b= (Stage 7
+    transfer/diff/ssh fixes).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
-    (CLI structure and output contract).  Next: Stage 7 (transfers).
+    (CLI structure and output contract), Stage 7 (transfers).  Next:
+    Stage 8 (database).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -114,6 +115,8 @@
     (typed models, pure loader, Runtime migration).
   - Stage 6 commits: =9047477= (CLI/output contract tests), =88d7baf=
     (cli package, Rich output, completions, redaction).
+  - Stage 7 commit: =d84bb7b= (file ambiguity, root rejection, diff,
+    ssh, and transfer contract tests).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -126,8 +129,8 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 163 passed, 7 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 69.23%, =fail_under = 65=; =ty=
+  - Current test baseline: 183 passed, 4 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 69.87%, =fail_under = 68=; =ty=
     has 0 errors and 24 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
@@ -1168,49 +1171,98 @@ limitation remain Stage 12.
       golden tests.
 - =python -m sink -h= works.
 
-* Stage 7 - Transfers: file, single, diff, ssh                                  :stage_7:
+* DONE Stage 7 - Transfers: file, single, diff, ssh                             :stage_7:
 ** Goal
 Repair the transfer commands and remove the last shell-string construction.
 Dry-run output remains the contract.
 
 ** Tasks
-- [ ] Fix =single= (confirmed broken): pass the loop's server object,
+- [X] Fix =single= (confirmed broken): pass the loop's server object,
       not =remote.name=; resolve each server's own root and ssh; do not
       require a default server; emit nothing when no server is
       automatic (or a clear notice under =-v=).
-- [ ] Fix =_locations=: take the target =Server= explicitly; reject
+- [X] Fix =_locations=: take the target =Server= explicitly; reject
       files outside =project.root= with a clear error instead of
       building an absolute remote path (confirmed for =file pull=).
-- [ ] Fix B3: pass the server *name* to =excluded()=, or accept a
+- [X] Fix B3: pass the server *name* to =excluded()=, or accept a
       =Server= after the Stage 5 refactor.
-- [ ] Fix =file= server ambiguity (confirmed: help says the server is
+- [X] Fix =file= server ambiguity (confirmed: help says the server is
       optional, Click requires it).  Recommended: accept
       =SERVER [FILENAME]= as before but resolve a single trailing token
       as a server name when it matches, otherwise as a filename with the
       default server; add tests for both.
-- [ ] Remove =diff= from the =file= action choices (confirmed: it is
+- [X] Remove =diff= from the =file= action choices (confirmed: it is
       advertised and silently does nothing), or implement it by
       delegating to =sink diff=.
-- [ ] Fix =diff=: point =--compare-dest= at the correct directory,
+- [X] Fix =diff=: point =--compare-dest= at the correct directory,
       propagate the git exit status (do not pipe through =less= when
       stdout is not a TTY), honor =--ignore-whitespace= (currently the
       command always adds =--ignore-all-space=), and quote the difftool
       arguments.
-- [ ] Build rsync argv as a list: =--rsh= is one argument with the
+- [X] Build rsync argv as a list: =--rsh= is one argument with the
       key/port, excludes come from =excluded()= as a tuple, and
       =--link-dest= is a single argument.  No shell string.
-- [ ] Fix =ssh=: key existence and port handling, =BatchMode= and
+- [X] Fix =ssh=: key existence and port handling, =BatchMode= and
       =ConnectTimeout= on non-interactive commands, =cd= to the server
       root for interactive sessions, and return the result from
       =SSHCommand.execute=.
-- [ ] Preserve =--real= semantics and the success messages from Stage 6.
+- [X] Preserve =--real= semantics and the success messages from Stage 6.
       The dry-run rendering of an =rsync= command includes =--dry-run=;
       the real rendering omits it.  Each rendering is what executes in
       its own mode.
-- [ ] Make =sink diff= print its rsync and git commands by default.  The
+- [X] Make =sink diff= print its rsync and git commands by default.  The
       rsync side has a native dry-run, but the git diff needs the
       downloaded file, so the default is print-only; =--real= performs
       the transfer and shows the diff.
+
+
+** Result
+183 tests pass, 4 are strict =xfail=, and the integration test is
+deselected; branch coverage is 69.87% with =fail_under = 68=.  =make
+check= is green with 0 =ty= errors and 24 warnings; import-linter keeps
+all three contracts.
+
+=single= now constructs one =Transfer= per automatic server, so each
+transfer uses that server's own root and ssh settings.  It no longer
+requires a default server; if no server is automatic it emits nothing.
+The multi-server and no-automatic-server cases are covered.
+
+=file= now accepts =[SERVER] [FILENAME]=.  If only one token is given
+and it is not a configured server, it is treated as a filename on the
+default server; if it matches a server it selects that server and uses
+the whole project.  The help text matches the behavior, and =diff= was
+removed from the file action choices.  A no-token invocation uses the
+default server and the project root.
+
+=Transfer._locations= resolves the local path against =project.root=
+and raises =TransferError= for anything outside it.  This is applied to
+put as well as pull so a local absolute path can never become a remote
+absolute path.
+
+=diff= now uses the local file's parent directory for =--compare-dest=
+(a directory, not the file itself), only adds =--ignore-all-space= when
+=--ignore-whitespace= is passed, omits the =less= pager when stdout is
+not a TTY, and propagates difftool/git failures.  =Pipeline= reports
+the first non-zero stage, so a failing producer is no longer hidden by
+a successful =less=.  The default remains print-only; =--real= performs
+the transfer and diff.
+
+The rsync argv, single --rsh value, tuple excludes, and single
+=--link-dest= argument remain.  ssh tests cover the interactive =-t=,
+port/key, and =cd ...; bash= fragment plus =BatchMode=yes= and
+=ConnectTimeout=25= on non-interactive actions.  Goldens were updated
+for the corrected diff command and success labels.
+
+=tests/test_stage7_contract.py= covers the file ambiguity, outside-root
+rejections, file-action choices, single multi-server roots, no-automatic
+no-op, diff whitespace/compare-dest/no-pager/failure behavior, and ssh
+arguments.  The remaining xfails are Stage 8 database behavior
+(non-gzip input and lando/ddev failures) and Stage 9 =deploy init=.
+
+Deviation: the outside-root rule is applied to put as well as pull,
+which is stricter than the original report but prevents ambiguous
+remote paths.  A pager is still used when stdout is a TTY; only the
+non-TTY path is forced to be a clean no-op.
 
 ** Exit criteria
 - =single= works with two automatic servers and no default server.
@@ -1610,7 +1662,7 @@ Poetry/setup.py era.
   Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
   Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
   Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
-  Stage 7  | TODO | transfer tests:          | single repro:
+  Stage 7  | DONE 2026-11-25 | commit d84bb7b | 183 pass, 4 xfail, 1 deselected; coverage 69.87%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
   Stage 8  | TODO | db tests:                | pv:
   Stage 9  | TODO | deploy/check tests:      | TODO items closed:
   Stage 10 | TODO | ty/ruff clean:           | coverage:

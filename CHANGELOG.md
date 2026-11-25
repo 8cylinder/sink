@@ -4,6 +4,13 @@
 
 ### Changed
 
+- `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
+  as a filename on the default server. Paths outside `project.root` are
+  rejected instead of becoming remote absolute paths.
+- `single` runs one transfer per automatic server using each server's root.
+- `diff` compares against the local directory, honors `--ignore-whitespace`,
+  avoids a pager when stdout is not a terminal, and reports git/difftool
+  failures with a non-zero exit code.
 - The Click command tree now lives in `sink.cli`, with one module per command
   group and `sink.cli:main` as the console entry point. Root options include
   `--color`, `--config`, `--completions`, `-q/-qq`, `--silent`, `-s`, and
