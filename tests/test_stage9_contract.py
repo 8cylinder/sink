@@ -16,6 +16,8 @@ def test_check_reports_project_and_server_fields(project_factory) -> None:
     text = combined(result)
     assert "rsync_binary" in text
     assert "pulls_dir" in text
+    assert "log_dir" not in text
+    assert "cache_dir" not in text
     assert "warn" in text
     assert "automatic" in text
     assert project.stub_log.read_text() != ""

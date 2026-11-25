@@ -36,7 +36,7 @@ class TestConfig:
         ui.heading("Local dirs")
 
         rows = []
-        for name in ["pulls_dir", "log_dir", "cache_dir"]:
+        for name in ["pulls_dir"]:
             directory = getattr(self.config.project, name)
             if directory is None:
                 rows.append((name, "(not configured)", "not configured"))

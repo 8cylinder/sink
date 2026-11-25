@@ -1377,9 +1377,9 @@ Make =sink check= usable and remove the remaining directory-changing code.
 The deploy workflow was dropped (D11); there is no deploy command to repair.
 
 ** Tasks
-- [X] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
-      =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
-      a stable table.
+- [X] Check: validate =rsync_binary=, =pulls_dir=, =warn=, and
+      =automatic= per TODO.org; report each in a stable table.  The
+      unused =log_dir= and =cache_dir= settings are not shown.
 - [X] Check: report unknown config keys as warnings without failing normal
       commands.  Check always executes its probes; no dry-run switch.
 - [X] Check: verify TLS by default and add a timeout.

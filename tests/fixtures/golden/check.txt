@@ -1,8 +1,6 @@
 Local dirs
 Setting Value Status
 pulls_dir <CONFIG_DIR>/pulls [✓] ok
-log_dir (not configured) [X] not configured
-cache_dir (not configured) [X] not configured
 rsync_binary <CONFIG_DIR>/bin/rsync [✓] ok
 
 
