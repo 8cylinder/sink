@@ -1,4 +1,4 @@
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
-+ cat project/dump.sql.gz | ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o ConnectTimeout=25 deploy@example.com 'gunzip -c | mysql --defaults-extra-file=/tmp/<CREDS_FILE> demo'
++ cat project/dump.sql.gz | ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; gunzip -c | mysql --defaults-extra-file=/tmp/<CREDS_FILE> demo'
 [Success (DRY RUN)] dev: sql upload complete
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

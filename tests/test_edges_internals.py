@@ -169,6 +169,33 @@ def test_credentials_edges() -> None:
         pass
 
 
+def test_credentials_quote_option_file_values() -> None:
+    ssh = server().ssh[0]
+    credentials = RemoteCredentials(
+        ssh=ssh,
+        password='p#a"b\\c',  # noqa: S106 - test fixture
+        user="u#1",
+        host="h#1",
+    )
+
+    content = credentials.content
+
+    assert 'user="u#1"' in content
+    assert r'password="p#a\"b\\c"' in content
+    assert 'host="h#1"' in content
+
+
+def test_credentials_trap_removes_the_file_on_exit() -> None:
+    ssh = server().ssh[0]
+    credentials = RemoteCredentials(ssh=ssh, password="p")  # noqa: S106
+
+    guarded = credentials.trap_command("mysqldump demo")
+
+    assert guarded.startswith("trap ")
+    assert "rm -f " in guarded
+    assert guarded.endswith("mysqldump demo")
+
+
 def test_credentials_stage_failure(monkeypatch) -> None:
     ssh = server().ssh[0]
     monkeypatch.setattr(

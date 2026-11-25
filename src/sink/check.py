@@ -125,7 +125,9 @@ class TestConfig:
                                 db.db,
                                 "--execute=exit",
                             ]
-                            cmd = shlex.join(str(value) for value in argv) + ";"
+                            cmd = credentials.trap_command(
+                                shlex.join(str(value) for value in argv) + ";"
+                            )
                             label = _db_label(db)
                             good = (
                                 f"{label}: mysql username, password "

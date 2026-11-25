@@ -217,7 +217,7 @@ class DB:
                 db, credentials, mysqlpump=self.project.mysqlpump
             )
             if local:
-                fragment = shlex.join(dump_argv)
+                fragment = credentials.trap_command(shlex.join(dump_argv))
                 command = Pipeline(
                     (
                         remote_command(
@@ -229,7 +229,7 @@ class DB:
                 )
             else:
                 destination = shlex.quote(str(sqlfile))
-                fragment = (
+                fragment = credentials.trap_command(
                     f"{shlex.join(dump_argv)} | gzip -c | "
                     f"sudo tee {destination} >/dev/null"
                 )
@@ -372,11 +372,17 @@ class DB:
                 command = Pipeline(
                     (
                         self._source_stage(sqlfile),
-                        remote_command(ssh, f"gunzip -c | {mysql}", timeout=25),
+                        remote_command(
+                            ssh,
+                            credentials.trap_command(f"gunzip -c | {mysql}"),
+                            timeout=25,
+                        ),
                     )
                 )
             else:
-                fragment = f"zcat {shlex.quote(str(sqlfile))} | {mysql}"
+                fragment = credentials.trap_command(
+                    f"zcat {shlex.quote(str(sqlfile))} | {mysql}"
+                )
                 command = remote_command(ssh, fragment, timeout=25)
             result = run(command, real=self.real, capture=True)
             self._report_put(result)

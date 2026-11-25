@@ -2,8 +2,9 @@
 
 The password never appears in a rendered command, argv, or log.  A remote
 credentials file is created with mode 0600 by piping it over ssh stdin, then
-the command points at the file with ``--defaults-extra-file``.  A cleanup
-command removes it afterwards.
+the command points at the file with ``--defaults-extra-file``.  An EXIT trap
+in the command's remote shell removes it even when the command fails or the
+connection drops, and a separate cleanup command remains as a fallback.
 """
 
 from __future__ import annotations
@@ -20,6 +21,18 @@ from sink.errors import CommandError
 from sink.shell import RemoteCommand, remote_command, run
 
 DEFAULT_TIMEOUT = 25
+
+
+def _option_value(value: object) -> str:
+    """Quote one value for a MySQL option file.
+
+    MySQL treats ``#`` as a comment start even in the middle of a line, so
+    every value is double-quoted.  Backslashes and double quotes are escaped
+    so the option-file parser receives the original value.
+    """
+    text = str(value)
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,11 +55,11 @@ class RemoteCredentials:
         """Return the credentials file body."""
         lines = ["[client]"]
         if self.user:
-            lines.append(f"user={self.user}")
+            lines.append(f"user={_option_value(self.user)}")
         if self.password:
-            lines.append(f"password={self.password}")
+            lines.append(f"password={_option_value(self.password)}")
         if self.host:
-            lines.append(f"host={self.host}")
+            lines.append(f"host={_option_value(self.host)}")
         if self.port:
             lines.append(f"port={self.port}")
         return "\n".join(lines) + "\n"
@@ -73,6 +86,11 @@ class RemoteCredentials:
             batch=True,
             timeout=DEFAULT_TIMEOUT,
         )
+
+    def trap_command(self, fragment: str) -> str:
+        """Wrap a remote fragment with an EXIT trap for the credentials file."""
+        cleanup = f"rm -f {shlex.quote(self.path)}"
+        return f"trap {shlex.quote(cleanup)} EXIT; {fragment}"
 
 
 @contextmanager
