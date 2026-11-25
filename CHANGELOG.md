@@ -38,6 +38,10 @@
   exit non-zero.
 - Pipelines capture stderr from every stage, so a failing producer such as
   `mysqldump | gzip` reports its real error instead of `Command failed`.
+- Remote database credentials are quoted for MySQL option-file syntax,
+  preserving passwords containing `#` and other special characters. The
+  remote dump/import command installs an `EXIT` trap so the temporary `0600`
+  file is removed even when the command fails or the connection drops.
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.

@@ -140,8 +140,8 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 243 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 91.95%, =fail_under = 90=; =ty=
+  - Current test baseline: 245 passed, 0 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 91.97%, =fail_under = 90=; =ty=
     is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
     changes: unknown-key policy =422c7a3=, check execution =d339d65=,
     relative key locations =a0d5e52=, compact errors =3007243=.
@@ -1745,7 +1745,7 @@ The annotated release tag is `v0.3.0`.
   | The src move + formatter churn makes history hard to read  | Separate mechanical commits; tag each stage                                          |
   | rsync dry-run still needs network/ssh                      | Keep it; add =--print-only= for offline use; clear errors                              |
   | Renderer and executor drift apart                          | One command object; round-trip tests; per-mode argv compare                          |
-  | Remote credential files leak or are left behind            | =trap= cleanup, 0600, tests, prefer =login_path=                                         |
+  | Remote credential files leak or are left behind            | =trap= cleanup (done), 0600, tests, prefer =login_path=                                 |
   | =ty= finds hundreds of errors on 3,128 untyped lines         | Annotate per stage; targeted =# ty: ignore[rule]= only                                 |
   | 90% coverage is unrealistic on day one                     | Ratchet per stage; final gate stays 90                                               |
   | Click 8.2–8.4 breaks =info -e=                               | Fix by passing =str=; pin =click>=8.5=                                                   |
@@ -1816,4 +1816,5 @@ The annotated release tag is `v0.3.0`.
   Post-rel | DONE 2026-11-25 | commits 422c7a3, d339d65, a0d5e52 | unknown keys silent/relative; check probes always run; 238 pass; coverage 91.76%
   Check UI | DONE 2026-11-25 | commits 16bb825, 59fc02f, 9668d75, 3007243 | omit unused dirs; colored markers; key: value rows; compact errors; multi-entry DB labels; colon-free labels; 242 pass; coverage 91.90%
   Pipeline | DONE 2026-11-25 | commit e546db9 | capture stderr from every pipeline stage; 243 pass; coverage 91.95%
+  Creds    | DONE 2026-11-25 | commit 734ec23 | quote option-file values; EXIT-trap cleanup; 245 pass; coverage 91.97%
   #+end_src

@@ -1,308 +1,81 @@
-
 #+TITLE: Sink Todo
 
+Completed items and decisions live in MODERNIZE.plan.org and git history.
 
-* Todo
+* Current
 
-** Now [10/11]
-*** COMPLETE With 'single' make sure the correct rsync is being used
-CLOSED: [2020-11-08 Sun 18:56]
+** TODO Harden database credential handling
+   Current method: a random =0600= MySQL option file is staged over SSH
+   stdin, referenced with =--defaults-extra-file=, quoted/escaped, and
+   removed by a remote =EXIT= trap plus a fallback cleanup command.
 
-*** COMPLETE When using =single= ignore the "ask overwrite" yaml settings
-CLOSED: [2020-11-08 Sun 18:56]
+   Remaining options, roughly strongest first:
+   - [ ] Support passwordless =auth_socket= / =unix_socket= for databases
+         on the SSH host.  Skip credential staging for those entries.
+   - [ ] Support =mysql_config_editor --login-path= as an alternative to a
+         plaintext password.
+   - [ ] Support a persistent =0600= file passed with =--defaults-file=.
+   - [ ] Consider IAM database auth, TLS client certificates, or a secrets
+         manager for managed databases.
+   - [ ] Decide how these map onto =DatabaseConfig= without pre-empting the
+         deferred schema v2 work (D6).
+   - [ ] =db pull= / =db push= use =databases[0]=.  Add a way to select an
+         entry by username or index when several are configured.
 
-*** COMPLETE Quiet/silent flags
-CLOSED: [2026-11-25 Wed]
-Implemented as -q (hide render) and -qq (hide all output).
-- quiet: output "Succcess", server and base filename
-  - eg: Success, prod, index.twig
-  - eg: [Success] prod:.../dir/dir/index.twig
-  - eg: [Success] username@servername:/dir/dir/index.twig
-  - eg: [Success] PROD username@servername:/dir/dir/index.twig
-- silent: no output at all.
-- or use -q and -qq for quiet and silent.
+** TODO Restore server-name tab completion
+   Static completion intentionally omits project server names (D3).
+   Restoring it requires a =shell_complete= callback plus either a fully
+   dynamic Click script or a hybrid static script that queries =sink= for
+   server-name positions.
 
--q --no-command, -qq --no-output, -qqq both?
---silent -s, for both?
+** TODO Enable tab completion on macOS/zsh
+   =--completions= currently installs a bash-only script.  Bash 4.4 or
+   newer is required.
 
-*** COMPLETE Success messages
-CLOSED: [2026-11-25 Wed]
-Implemented [Success] SERVER: message labels.
-- file upload/download :: [Success] SERVER: upload complete
-- db put/pull :: [Success] SERVER: sql upload complete
-- single :: [Success] SERVER: <file path>
-- action ?
+* Future
 
-*** DONT-DO allow multiple files for file uploads
-CLOSED: [2020-11-07 Sat 12:28]
-Allow multiple args for file arg in file put/pull.
+** MAYBE Allow use of external exclusion files
+   - Use rsync's =--exclude-from=FILE=.
+   - Consider =.gitignore= or generated per-server exclusion files such as
+     =sink-prod.exclude= and =sink-stag.exclude=.
 
-Rsync doesn't allow multiple files to be sent to multiple
-destinations, which is what would be needed for this to work with a
-single instance of rsync.
+** MAYBE DB download details
+   Save extended information beside a dump:
+   : sink db pull --extended-info="Long descriptive text"
+   : sink db info [GZ-FILE]
 
-Instead use the shell for this:
+** MAYBE Custom db pull filename
+   Allow a token-based name:
 
-#+BEGIN_SRC bash
-for f in $(find -path '*some*criteria*php'); do
-    sink file put vagrant $f;
-done
-#+END_SRC
+   | token | field       |
+   |-------+-------------|
+   | =%u=  | user        |
+   | =%n=  | db name     |
+   | =%s=  | server name |
+   | =%d=  | short date  |
+   | =%D=  | long date   |
+   | =%t=  | tag         |
 
-*** COMPLETE Allow server specific exclusions
-CLOSED: [2020-11-07 Sat 11:51]
-*** DONT-DO Ability to send db or files to multiple servers at same time
-CLOSED: [2020-07-24 Fri 13:27]
-Don't do, limited use case for a lot of work, and a potentially
-destructive command.
-: sink db put stag:prod:dev <file>
-: sink file put stag:prod:dev <path>
+   Examples:
+   - =%n-%s-%d= -> =dbname-servername-20-01-30.sql.gz=
+   - =%n--%s:u--%D= -> =dbname--SERVERNAME--20-01-30-10:30:15.sql.gz=
 
-*** COMPLETE sink view -e should validate
-CLOSED: [2020-11-08 Sun 13:00]
-    When editing config, make temp version of config and validate
-    yaml after saving.
+** MAYBE Pre-pull before put
+   List files to pull before putting files.  Useful for project config
+   files, such as a Craft =project.yaml=, that should not be overwritten
+   by the local copy.
 
-*** COMPLETE check file path validity before passing to rsync
-CLOSED: [2020-07-19 Sun 20:10]
+** MAYBE Option to upload a bashrc file and execute it when sshing
+   For locked-down servers that do not allow editing =.bashrc=.
 
-*** COMPLETE platform specific rsync binary
-CLOSED: [2020-07-19 Sun 20:19]
-
-*** COMPLETE when ssh, cd to server root
-CLOSED: [2020-07-19 Sun 20:10]
-
-*** COMPLETE error with sink info -e:
-CLOSED: [2020-11-08 Sun 13:02]
-#+begin_src bash
-sink info -e
-Traceback (most recent call last):
-  File "/home/sm/.local/bin/sink", line 11, in <module>
-    load_entry_point('sink', 'console_scripts', 'sink')()
-  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 829, in __call__
-    return self.main(*args, **kwargs)
-  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 782, in main
-    rv = self.invoke(ctx)
-  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 1259, in invoke
-    return _process_result(sub_ctx.command.invoke(sub_ctx))
-  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 1066, in invoke
-    return ctx.invoke(self.callback, **ctx.params)
-  File "/home/sm/.local/lib/python3.8/site-packages/click/core.py", line 610, in invoke
-    return callback(*args, **kwargs)
-  File "/home/sm/projects/sink/sink/sink/sink.py", line 216, in info
-    click.edit(filename=config.config_file)
-  File "/home/sm/.local/lib/python3.8/site-packages/click/termui.py", line 588, in edit
-    editor.edit_file(filename)
-  File "/home/sm/.local/lib/python3.8/site-packages/click/_termui_impl.py", line 466, in edit_file
-    "{} {}".format(shlex_quote(editor), shlex_quote(filename)),
-  File "/usr/lib/python3.8/shlex.py", line 325, in quote
-    if _find_unsafe(s) is None:
-TypeError: expected string or bytes-like object
-#+end_src
-
-*** DONT-DO Put DEPLOY-INFO.yaml in site root
-CLOSED: [2026-11-25 Wed]
-The deploy workflow was removed (D11).
-
-*** DONT-DO Exclude DEPLOY-INFO.yaml when using normal file transfers
-CLOSED: [2026-11-25 Wed]
-The deploy workflow was removed (D11).
-
-*** DONT-DO Deploy warnings unnecessarily occur multiple times
-CLOSED: [2026-11-25 Wed]
-The deploy workflow was removed (D11).
-
-*** COMPLETE Check more values
-CLOSED: [2026-11-25 Wed]
-- rsync_binary
-- pulls_dir
-- show warn & automatic status for each server
-
-*** DONT-DO New command: build-vm
-CLOSED: [2026-11-25 Wed]
-The =vm= group was removed entirely; see MODERNIZE.plan.org D7.
-Build a vagrant vm to get a project running quickly.
-: sink build-vm
-- download boss
-- download Vagrantfile
-- Customize Vagrantfile variables
-
-
-- Info needed
-  - Vagrantfile
-    - title - tcrc
-    - ip address - 192.168.56.184
-    - host name - tcrc.local
-    - mount point - ./server
-  - Boss
-
-** Future [10/23]
-*** DONT-DO [#A] Use plumbum for shell commands
-CLOSED: [2026-11-25 Wed]
-Superseded by the stdlib argv execution layer in shell.py.
-
-*** COMPLETE [#A] Set up virtualenv
-CLOSED: [2022-11-11 Fri 12:22]
-Used Poetry
-
-**** CANCELED [#A] Test/run setup.py
-CLOSED: [2022-12-09 Fri 13:18]
-- +investigate flit :: https://flit.readthedocs.io/en/latest/index.html+
-- Flit not needed, Poetry does deploy to pypi.
-- Setup not used anymore.
-
-*** CANCELED Diff one file/all servers
-CLOSED: [2022-12-09 Fri 13:19]
-sink diff 'all' path...= compare one file on all servers at one time?
-or download all and group by differences:
-[A] LOCAL, dev, vagrant
-[B] stag
-[C] prod, mamp
-Compare LOCAL to [B, C]: ?
-
-~Don't do, the use case is to rare to make the effort worthwhile.~
-
-**** vimdiff
-#+BEGIN_SRC bash
-vimdiff fileA fileB ... -c TOhtml -c 'w! diff.html|qa!'
-#+END_SRC
-
-*** COMPLETE Diff name temp dir with server name if possible
-CLOSED: [2020-12-26 Sat 12:20]
-*** COMPLETE Use git diff & difftool settings
-CLOSED: [2020-12-26 Sat 12:22]
-Define difftool in sink.yaml
-
-*** COMPLETE progress bar
-CLOSED: [2026-11-25 Wed]
-**** COMPLETE Add flag for pv in sink.yaml so it can be used from the server
-CLOSED: [2026-11-25 Wed]
-=project.pv= and =project.mysqlpump= are opt-in.
-**** COMPLETE Check for pv locally before using
-CLOSED: [2026-11-25 Wed]
-Falls back to =cat= when =pv= is absent.
-
-*** DONT-DO When downloading db don't overwrite existing file
-CLOSED: [2020-12-26 Sat 12:27]
-
-_Not nessesary, the time is part if the filename._
-
-If the user is using a short date name for the db pull, and they pull
-more than once in one day, the filename will be the same.
-
-add time if file exists
-
-*** TODO Enable tab complete on osx
-Part of setup.py?
-Directions on how to setup .bashrc?
-
-*** MAYBE Allow use of external exclusion files
-- Use rsync's =--exclude-from=FILE=
-- Use .gitignore option
-- Generate on the fly from a exclusions stored in a single yaml
-  file?  hierarchical?
-- Store in separate files using a naming convention?
-  sink-prod.exclude, sink-stag.exclude?
-
-*** MAYBE DB download details
-Save extended info about a db download in a text file with same name
-as gziped file.
-: sink db pull --extended-info="Long descriptive text"
-: sink db info [GZ-FILE]
-
-*** MAYBE use click contrib: help-colors
-
-*** MAYBE use click contrib: click-option-group
-
-*** MAYBE use click contrib: click-plugin for laraval forge support
-
-*** MAYBE Option to upload a bashrc file and execute it when sshing
-For locked down servers that don't allow editing .bashrc.
-
-*** MAYBE Custom db pull filename
-Allow a custom name.
-| short | field       |
-|-------+-------------|
-| %u    | user        |
-| %n    | db name     |
-| %s    | server name |
-| %d    | short date  |
-| %D    | long date   |
-| %t    | tag         |
-Adding :u to tag will uppercase it and the extentions will be added by sink.
-- "%n-%s-%d" :: dbname-servername-20-01-30.sql.gz
-- "%n__%s:u__%d" :: dbname__SERVERNAME__20-01-30.sql.gz
-- "%n--%s:u--%D" :: dbname--SERVERNAME--20-01-30-10:30:15.sql.gz
-
-Optionally for the date, expose full python date string options..?
-
-*** DONT-DO If no files to transfer
-CLOSED: [2020-07-20 Mon 21:05]
-If there are no files to transfer, give an explicit notice to the user
-in the success notice.
-eg: =[Success (no files to transfer)]=
-Maybe there is a return code from rsync to determine this.
-
-*** DONT-DO Some kind of diff report for all files that are different
-CLOSED: [2020-07-20 Mon 20:45]
-Using info from rsync's itemize-changes?
-
-*** COMPLETE sink diff multiple files
-
-*** DONT-DO DB put, use tab completion for filename
-CLOSED: [2020-11-21 Sat 14:35]
-+Get list of files in the db dir+
-
-The command line completion is fine.
-
-*** MAYBE Pre pull before put
-A list of files to to pull before putting files.  The usecase is for
-something like craft's project config (project.yaml), where you want
-to keep it from getting overwritten from your local file since it's a
-definition of the database.
-
-*** COMPLETE Add actions to project
-CLOSED: [2026-11-25 Wed]
-Project actions are available as =sink action local [NAME]=.
-
-*** DONT-DO Local deploy
-CLOSED: [2026-11-25 Wed]
-The deploy workflow was removed (D11).
-
-Do a local deploy to a dist dir with rsync --link-dest to create a dir
-with numbered/dated hardlinked dirs.
-
-Settings:
-- dist dir
-- deploy dir
-
-Steps:
-1. dist dir
-   A dist dir is a clean deployable version of the working tree. Use
-   some script with npm/webpack/bash to create it
-2. =rsync --link-dest dist/ deploy/deploy-2020-10-15=
-3. Add a tag to the file name?
-   =deploy/deploy-2020-10-15--BUG-FIX-FOR-A-THING=
-4. Add a tag/info/description file?
-   Get the tag info from git's tags?
-   Require dist to come from a git commit that is tagged?
-5. DB snapshot
-   Automaticaly take snapshot of the server's db?
-   Ask user if they have taken a snapshot?
-
-#+BEGIN_SRC bash
-sink deploy  # use most recent?
-sink deploy rollback  # second last?
-sink deploy 2020-10-15
-sink deploy clean  # rsync --delete?
-#+END_SRC
-
-*** DONE Allow multiple ssh accounts
-CLOSED: [2022-11-11 Fri 10:29]
-Make the same as db, check each one, but only use the first one for actions
+** MAYBE click contrib helpers
+   - =help-colors=
+   - =click-option-group=
+   - Laravel Forge plugin integration
 
 * Backlog
-  Items that remain intentionally out of scope for the 0.3.0 modernization.
+
+  Intentionally out of scope for the 0.3.0 modernization.
 
   | Item | Notes |
   |------+-------|
