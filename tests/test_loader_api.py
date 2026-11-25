@@ -175,8 +175,17 @@ def test_unknown_keys_are_collected_for_check(tmp_path: Path) -> None:
     config = load(write_config(tmp_path, data))
 
     assert config.warnings == ()
-    assert any('"bogus"' in key for key in config.unknown_keys)
-    assert any('"other"' in key for key in config.unknown_keys)
+    assert config.unknown_keys == ("bogus", "project.other")
+
+
+def test_nested_unknown_key_uses_a_relative_location(tmp_path: Path) -> None:
+    data = document()
+    data["servers"]["dev"]["ssh"][0]["sudo"] = True
+
+    config = load(write_config(tmp_path, data))
+
+    assert "servers.dev.ssh[0].sudo" in config.unknown_keys
+    assert all(str(config.path) not in key for key in config.unknown_keys)
 
 
 def test_environment_variables_expand(

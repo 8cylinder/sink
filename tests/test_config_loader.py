@@ -98,8 +98,8 @@ def test_unknown_keys_are_silent_until_check(project_factory) -> None:
 
     checked = project.invoke("check", "dev")
     assert checked.exit_code == 0, combined(checked)
-    assert "unknown config key" in combined(checked)
-    assert "bogus" in combined(checked)
+    assert "unknown config key: bogus" in combined(checked)
+    assert str(project.path / "sink.yaml") not in combined(checked)
 
 
 def test_environment_variables_are_expanded(
