@@ -90,20 +90,22 @@
   | D8  | Quiet/silent flags         | =-q= hides the rendered command; =-qq= hides everything     |
   | D9  | Secret-displaying commands | Redact by default; explicit flag shows the values       |
   | D10 | License                    | GPL-2.0-only (approved 2026-11-25)                      |
+  | D11 | Deploy workflow            | Removed entirely; obsolete workflow, drop deploy,     |
+  |     |                            | =deploy.py=, =cli/deploy.py=, =coolname=, and its tests |
 
 * Decisions still open
   None.  All structural decisions are closed; remaining choices are ordinary
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =a15676b= (Stage 8
-    database safety).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =f7ebbbe= (deploy
+    workflow removal).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
     (CLI structure and output contract), Stage 7 (transfers), Stage 8
-    (database).  Next: Stage 9 (deploy and check).
+    (database), and the deploy removal.  Next: Stage 9 (check only).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -120,6 +122,8 @@
     git-failure status).
   - Stage 8 commits: =2fbecd7= (database contract tests and config
     keys), =a15676b= (gzip validation, pv/mysqlpump, lando/ddev errors).
+  - Deploy removal commits: =1617e59= (removal contract tests),
+    =f7ebbbe= (command/modules/dependency/tests removed).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -132,9 +136,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 206 passed, 1 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 71.51%, =fail_under = 70=; =ty=
-    has 0 errors and 24 warnings (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 195 passed, 0 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 77.14%, =fail_under = 75=; =ty=
+    has 0 errors and 16 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -340,7 +344,7 @@
        __main__.py          # python -m sink
        cli/
          __init__.py        # cli group, main(), base Group/Command, globals
-         db.py file.py ssh.py diff.py deploy.py check.py misc.py action.py
+         db.py file.py ssh.py diff.py check.py misc.py action.py
        config/
          models.py          # frozen dataclasses, no I/O
          loader.py          # load(path) -> Config
@@ -351,7 +355,7 @@
        runtime.py           # Runtime: config, console, output level
        shell.py             # Argv/Pipeline/RemoteCommand: render + execute
        ui.py                # rich console, status, redaction
-       rsync.py db.py ssh.py check.py deploy.py actions.py applications.py
+       rsync.py db.py ssh.py check.py actions.py applications.py
      tests/
      docs/
    #+end_src
@@ -785,7 +789,6 @@ deliberately documented two-pass read.  Do not make two-pass the default.
   class Server:
       name: str
       root: Path
-      deploy_root: Path | None
       warn: bool
       default: bool
       automatic: bool
@@ -1356,53 +1359,32 @@ are not part of this stage.
       without =pv=.
 - =db put= rejects a non-gzip file before touching the server.
 
-* Stage 9 - Deploy and check                                                    :stage_9:
+* Stage 9 - Check and cleanup                                                   :stage_9:
 ** Goal
-Make the broken deploy and check commands usable again and close the
-TODO.org items that belong to them.
+Make =sink check= usable and remove the remaining directory-changing code.
+The deploy workflow was dropped (D11); there is no deploy command to repair.
 
 ** Tasks
-- [ ] Deploy B1 (confirmed): create =SSH= before computing the remote
-      timestamp in both =DeployViaRename= and =DeployViaSymlink=.
-- [ ] Deploy B2 (code-confirmed): pass =Action.PUT= and the server name
-      to =Transfer._rsync= in the right positions; after Stage 5 use the
-      typed transfer API instead.
-- [ ] Deploy init must honor =--real=: =sink.py= currently hardcodes
-      =real=True= for rename/symlink, and =DeployViaLocal.init_deploy=
-      creates =dist/= without =--real= (confirmed).  Dry-run only prints.
-- [ ] Put =DEPLOY-INFO.yaml= in the site root (TODO) and exclude it from
-      normal file transfers.
-- [ ] Deduplicate the =warn: true= confirmation prompts (TODO) so a
-      single inspect/put asks once.
-- [ ] Fix =DeployViaLocal.change_current= path resolution (confirmed:
-      =display_choices= joins =dist= relative to CWD, so switching from a
-      subdirectory finds no deploys).  Anchor everything at
-      =Config.project.root=.
-- [ ] Replace =choose_letter= recursion with a loop (B14); fix the stale
-      loop variable in the warning (B13); parse deploy dates with an
-      explicit format/timezone.
-- [ ] Keep the local deploy =--link-dest= design from TODO.org; do not
-      add git-tag coupling or automatic DB snapshots in this stage.
-- [ ] Remove =os.chdir= from the remaining code paths (=db.cd= and the
-      local deploy helpers); pass =cwd= to the command object.
 - [ ] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
       =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
-      a stable table.  Verify TLS by default (Stage 4) and add a
-      timeout.  Replace the =Spinner= thread with =rich= status.
-- [ ] Check: add =--real/-r= and default to dry-run, printing every
+      a stable table.
+- [X] Check: verify TLS by default and add a timeout.
+- [X] Check: add =--real/-r= and default to dry-run, printing every
       ssh/mysql/url probe it would run.  =--real= prints the same probes
       and executes them.
+- [ ] Check: replace the =Spinner= thread with =rich= status.
+- [ ] Remove =os.chdir= from =db.cd= and pass =cwd= to command objects;
+      no deploy helper remains.
+- [ ] Add regression tests for the new check fields, dry-run no-spawn,
+      URL/TLS behavior, and password redaction.
 
 ** Exit criteria
-- =deploy init/new/switch= run to completion in dry-run against a
-      fixture, and none of them create files without =--real=.
-- No =os.chdir= remains in the deploy or database paths.
 - =check= reports all TODO.org fields and never leaks a password.
-- Every deploy/check action prints exactly the command it executes:
-      the rsync dry-run variant includes =--dry-run= and the real variant
-      omits it; ssh/check print the same text in both modes because they
-      have no native dry-run.
-- Regression tests exist for B1, B2, B13, B14, N7, N8.
+- No =os.chdir= remains in the database or check paths.
+- Every check probe prints exactly the command it executes; ssh/mysql/url
+  probes print the same text in both modes because they have no native
+  dry-run.
+- The removed deploy command and modules remain absent.
 
 * Stage 10 - Bug sweep, strict typing, and the coverage ratchet                 :stage_10:
 ** Goal
@@ -1410,16 +1392,16 @@ Close every remaining known defect, annotate the whole codebase, and
 raise the coverage gate to the app-base floor.
 
 ** Tasks
-- [ ] Fix B6, B7, B9–B23 and the new N-items in the catalog below; each
-      gets a regression test and removes an =xfail=.
+- [ ] Fix every non-obsolete bug in the catalog below; each gets a
+      regression test.  B1, B2, B13, B14, N7, N8, and S9 are obsolete
+      because the deploy workflow was removed (D11).
 - [ ] Annotate every module end to end; enable Ruff =ANN= fully and the
       =ty= strict rules.  Use only =# ty: ignore[rule]= with a reason;
       no blanket =# type: ignore=.
 - [ ] Replace remaining =os.path= and =os.chdir= with =pathlib.Path= and
       =cwd=; make all datetimes timezone-aware (DTZ).
 - [ ] Delete dead code: =syncpoint=, =error_code=, =test_project= stubs,
-      =DeployViaRename.change_current= (pass), =Command.runp=, and the
-      =Spinner=.  (The =vm= group and =Vagrant= are already gone from
+      =Command.runp=, and the =Spinner=.  (The =vm= group and =Vagrant= are already gone from
       Stage 1.)
 - [ ] Coverage ratchet (record each step in the stage log):
       Stage 3 baseline -> 40% after Stage 4 -> 60% after Stage 6 ->
@@ -1489,8 +1471,8 @@ Poetry/setup.py era.
       =.org= docs, obsolete =resources/=, =poetry.lock=, and =setup.py=.
 - [ ] Smoke every command against a temporary project: =-h=,
       =--version=, =--config=, =--completions=, =file=, =single=,
-      =diff=, =db=, =deploy= (dry-run), =check=, =misc=.  Confirm
-      =sink vm= and =vm build= no longer exist.
+      =diff=, =db=, =check=, and =misc=.  Confirm =sink vm=,
+      =sink vm build=, and =sink deploy= no longer exist.
 - [ ] Tag =v0.3.0=; publish only with explicit approval.
 
 ** Exit criteria
@@ -1506,8 +1488,8 @@ Poetry/setup.py era.
 
   | #   | Location                              | Problem                                                                                                                                                   | Fix                                                                    | Sev  | Status         |
   |-----+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------+------+----------------|
-  | B1  | deploy.py:34,107                      | =self.ssh= used in =__init__= before assignment -> =AttributeError=                                                                                             | assign =self.ssh= first; lazy stamp                                      | High | Confirmed      |
-  | B2  | deploy.py:83,161                      | =_rsync= gets a server name as =action=, =Action.PUT= as flags                                                                                                  | pass =Action.PUT= and =server==                                            | High | Code-confirmed |
+  | B1  | deploy.py:34,107                      | =self.ssh= used in =__init__= before assignment -> =AttributeError=                                                                                             | assign =self.ssh= first; lazy stamp                                      | High | Obsolete (deploy removed) |
+  | B2  | deploy.py:83,161                      | =_rsync= gets a server name as =action=, =Action.PUT= as flags                                                                                                  | pass =Action.PUT= and =server==                                            | High | Obsolete (deploy removed) |
   | B3  | rsync.py:220                          | passes a server object to =excluded(name)=                                                                                                                  | pass =server.name=                                                       | High | Code-confirmed |
   | B4  | vm.py:64-66,207                       | =Dict2obj= subscript -> =TypeError=                                                                                                                           | removed with the =vm= group (D7)                                         | High | Obsolete       |
   | B5  | config.py:267                         | =default_project= mutated on every call                                                                                                                     | frozen dataclasses                                                     | High | Code-confirmed |
@@ -1518,8 +1500,8 @@ Poetry/setup.py era.
   | B10 | ssh.py:96-112                         | =result= unbound if =check_output= raises                                                                                                                     | explicit error path                                                    | Med  | Code-confirmed |
   | B11 | actions.py:35                         | builtin =exit(1)= instead of an exception                                                                                                                   | raise =CommandError=                                                     | Low  | Code-confirmed |
   | B12 | command.py:42-48                      | =SSHCommand.execute= returns =None=                                                                                                                           | return the result                                                      | Low  | Code-confirmed |
-  | B13 | deploy.py:419                         | stale loop variable =d= in the warning                                                                                                                      | use the current item                                                   | Low  | Code-confirmed |
-  | B14 | deploy.py:439-449                     | unbounded recursive =choose_letter=                                                                                                                         | while loop                                                             | Low  | Code-confirmed |
+  | B13 | deploy.py:419                         | stale loop variable =d= in the warning                                                                                                                      | use the current item                                                   | Low  | Obsolete (deploy removed) |
+  | B14 | deploy.py:439-449                     | unbounded recursive =choose_letter=                                                                                                                         | while loop                                                             | Low  | Obsolete (deploy removed) |
   | B15 | check.py:53-144                       | leaked/stale variables, broad excepts                                                                                                                     | tidy scopes                                                            | Low  | Code-confirmed |
   | B16 | sink.py:132                           | =file= server required; help says optional (confirmed)                                                                                                      | resolve rest args; test both                                           | Med  | Confirmed      |
   | B17 | sink.py:168-183                       | =single= requires a default server; passes =remote.name=                                                                                                      | per-server transfer                                                    | High | Confirmed      |
@@ -1535,8 +1517,8 @@ Poetry/setup.py era.
   | N4  | sink.py:332-372                       | =vm= help says =SERVER IP HOSTNAME=, docs say =HOSTNAME IP=                                                                                                     | removed with the =vm= group (D7)                                         | Med  | Obsolete       |
   | N5  | vm.py:148-164                         | =check_hosts= grep pattern is reversed                                                                                                                      | removed with the =vm= group (D7)                                         | Low  | Obsolete       |
   | N6  | rsync.py:157-174                      | =--ignore-all-space= is always added; =--compare-dest= is wrong; =less= hides git's exit status                                                                 | build the argv, fix the compare target, no pager in a pipe             | High | Confirmed      |
-  | N7  | deploy.py:387                         | =display_choices= joins =dist= relative to CWD                                                                                                                | anchor at project root                                                 | Med  | Confirmed      |
-  | N8  | deploy.py:263-278; sink.py:407,410    | =deploy init= writes =dist/= and forces =real=True=                                                                                                             | honor =--real=                                                           | High | Confirmed      |
+  | N7  | deploy.py:387                         | =display_choices= joins =dist= relative to CWD                                                                                                                | anchor at project root                                                 | Med  | Obsolete (deploy removed) |
+  | N8  | deploy.py:263-278; sink.py:407,410    | =deploy init= writes =dist/= and forces =real=True=                                                                                                             | honor =--real=                                                           | High | Obsolete (deploy removed) |
   | N9  | actions.py:37-41                      | =action local= executes without =--real=                                                                                                                      | honor dry-run                                                          | High | Confirmed      |
   | N10 | config.py:94-97                       | =Dict2obj.__iter__= leaks a =raw= row into action listings                                                                                                    | typed models                                                           | Low  | Confirmed      |
   | N11 | sink.py:131,162-165                   | =file diff= is offered but has no branch                                                                                                                    | implement or remove                                                    | Low  | Confirmed      |
@@ -1565,7 +1547,7 @@ Poetry/setup.py era.
   | S6  | .secrets.org                             | local secret file; must never be packaged/committed                                            | keep ignored; gitleaks scan                      | Low      |
   | S7  | db.py:236                                | =--password= leaks into the process table                                                        | Stage 4 credentials helper                       | High     |
   | S8  | actions.py:37-41                         | =action local= runs without =--real=                                                               | honor dry-run                                    | High     |
-  | S9  | deploy.py:263-278; sink.py:407,410       | =deploy init= mutates without =--real=                                                             | honor =--real=                                     | High     |
+  | S9  | deploy.py:263-278; sink.py:407,410       | =deploy init= mutates without =--real=                                                             | honor =--real=                                     | Obsolete (deploy removed) |
   | S10 | rsync.py:285; db.py:135; check.py:164    | one global dry-run boolean: invalid =--dry-run= for mysqldump; ssh/check execute unconditionally | per-tool capability; only rsync executes dry-run | High     |
 
 * TODO.org mapping
@@ -1583,9 +1565,9 @@ Poetry/setup.py era.
   | Platform rsync binary                  | Keep; validate in Stage 9                                                         |
   | SSH cd to server root                  | Keep; test in Stage 7                                                             |
   | =sink info -e= crash                     | Stage 6 (N2)                                                                      |
-  | DEPLOY-INFO.yaml in site root          | Stage 9                                                                           |
-  | Exclude DEPLOY-INFO from transfers     | Stage 9                                                                           |
-  | Deploy warnings repeated               | Stage 9                                                                           |
+  | DEPLOY-INFO.yaml in site root          | Dropped with the deploy workflow (D11)                                           |
+  | Exclude DEPLOY-INFO from transfers     | Dropped with the deploy workflow (D11)                                           |
+  | Deploy warnings repeated               | Dropped with the deploy workflow (D11)                                           |
   | Check more values                      | Stage 9                                                                           |
   | =sink build-vm=                          | Dropped: the =vm= group is removed (D7)                                             |
   | Use plumbum                            | Superseded: stdlib wrapper; plumbum removed in Stage 4 (D4)                       |
@@ -1612,7 +1594,7 @@ Poetry/setup.py era.
   | DB put tab completion (DONT-DO)        | Static completions offer file paths in Stage 6                                    |
   | Pre-pull before put (MAYBE)            | Backlog                                                                           |
   | Actions in the project section (MAYBE) | Intended today; fixed in Stage 9 (N3)                                             |
-  | Local deploy (MAYBE)                   | Stage 9 (existing local deploy repaired)                                          |
+  | Local deploy (MAYBE)                   | Dropped with the deploy workflow (D11)                                           |
   | Multiple ssh accounts                  | Works; only the first is used by rsync/actions; document                          |
 
 * app-base.org conformance
@@ -1665,6 +1647,7 @@ Poetry/setup.py era.
   - No =shell=True=, no =Dict2obj=, no global config, no naive datetimes, no
     =os.chdir=.
   - No known High-severity bug or security finding remains.
+  - The deploy workflow and its command group are gone.
   - =-h=, =--help=, =--version=, =--config=, =--completions=, and =--color=
     behave as specified outside a project.
   - Every command builds one command object.  By default it uses the tool's
@@ -1709,7 +1692,8 @@ Poetry/setup.py era.
   Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
   Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
   Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
-  Stage 9  | TODO | deploy/check tests:      | TODO items closed:
+  Deploy   | DONE 2026-11-25 | commits 1617e59, f7ebbbe | removed command/modules/coolname/tests/fixtures; 195 pass, 0 xfail; coverage 77.14%; fail_under 75; 0 ty errors, 16 warnings
+  Stage 9  | TODO | check tests:             | TODO items closed:
   Stage 10 | TODO | ty/ruff clean:           | coverage:
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
   Stage 12 | TODO | release tag:             | wheel sha256:

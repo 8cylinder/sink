@@ -31,5 +31,5 @@
 - `src/sink/ui.py`, `completions.py`, `logging.py` — Rich output, static completions, and diagnostics.
 - Every Python file has a module docstring; classes/functions are documented and tricky control flow is commented. `tests/test_docstrings.py` enforces this.
 - `src/sink/__main__.py` — `python -m sink`.
-- `tests/` — pytest suite, baseline fixtures, and `xfail` reproductions.
+- `tests/` — pytest suite and fixtures.
 - `MODERNIZE.plan.org` — staged modernization plan; read it before making structural changes.
