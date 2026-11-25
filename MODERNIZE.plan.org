@@ -1934,7 +1934,8 @@ tests/integration/
   =ca-certificates=.
 - The distro's OpenSSH, rsync, and MySQL/MariaDB client versions are
   intentionally not pinned; the Ubuntu matrix exercises them.
-- Non-root =deploy= user.
+- Non-root =deploy= user with a disabled password hash so sshd does not
+  treat the account as locked; password authentication stays disabled.
 - =deploy ALL=(ALL) NOPASSWD:ALL= for =sudo tee= tests.
 - SSH key-only authentication; password authentication disabled.
 - Expose =127.0.0.1::22= so the host port is assigned dynamically.

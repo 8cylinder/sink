@@ -443,7 +443,7 @@ def sandbox(
                     "server",
                     "sh",
                     "-c",
-                    "id deploy 2>&1; "
+                    "id deploy 2>&1; passwd -S deploy 2>&1; "
                     "ls -ld /home/deploy /home/deploy/.ssh "
                     "/home/deploy/.ssh/authorized_keys 2>&1; "
                     "wc -c /home/deploy/.ssh/authorized_keys 2>&1; "

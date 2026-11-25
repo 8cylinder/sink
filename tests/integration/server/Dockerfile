@@ -12,7 +12,11 @@ RUN apt-get update \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# sshd rejects locked accounts even for key authentication.  Give the
+# account a password hash so it is not locked; sshd_config still disables
+# password authentication, so only the injected key can log in.
 RUN useradd --create-home --shell /bin/bash deploy \
+    && echo 'deploy:sink-test-disabled-password' | chpasswd \
     && mkdir -p /run/sshd /home/deploy/.ssh /var/www \
     && touch /home/deploy/.ssh/authorized_keys \
     && chown -R deploy:deploy /home/deploy/.ssh \
