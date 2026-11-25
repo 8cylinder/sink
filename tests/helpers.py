@@ -17,10 +17,13 @@ def strip_ansi(text: str) -> str:
 def combined(result) -> str:
     """Return stdout and stderr without ANSI escapes.
 
-    Click 8.5 keeps ``Result.output`` (stdout) and ``Result.stderr``
-    separate, so tests must join them when asserting on user-facing text.
+    Click 8.5's ``Result.output`` already interleaves stdout and stderr;
+    ``Result.stdout`` and ``Result.stderr`` stay separate.  Use the
+    separate streams so stderr is not counted twice.
     """
-    return strip_ansi(result.output + result.stderr)
+    stdout = getattr(result, "stdout", result.output)
+    stderr = getattr(result, "stderr", "")
+    return strip_ansi(stdout + stderr)
 
 
 def unwrap(text: str) -> str:

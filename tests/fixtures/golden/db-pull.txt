@@ -1,0 +1,2 @@
++ ssh -p 2222 -C -T -i "<CONFIG_DIR>/id_rsa" deploy@example.com 'export MYSQL_PWD="secret"; mysqldump --dry-run --host=localhost --user=dbuser --single-transaction --triggers --events --routines --no-tablespaces demo' | gzip -c > "pulls/demo-dev-<DB_STAMP>.sql.gz"
+Success (DRY RUN)

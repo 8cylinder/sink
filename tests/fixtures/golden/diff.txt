@@ -1,0 +1,4 @@
++ rsync -e "ssh -p 2222" --rsh="ssh -i <CONFIG_DIR>/id_rsa" --itemize-changes --links --compress --checksum --include=".env.dev" --include="robots.txt.dev" --include=".htaccess.dev" --compare-dest='<PROJECT_ROOT>/index.html' 'deploy@example.com:/var/www/demo/index.html' '<DIFFDIR> [dev]'
+Success
++ git --no-pager diff --color=always --diff-algorithm=minimal --ignore-all-space '<DIFFDIR> [dev]/index.html' '<PROJECT_ROOT>/index.html' | less
+Files are the same.
