@@ -131,14 +131,15 @@ class ui:
         secrets: Iterable[str] = (),
     ) -> None:
         """Print an error and optionally exit non-zero."""
-        msg = ui.redact(msg, secrets)
+        msg = ui.redact(str(msg), secrets).strip("\n")
         distance = ""
         if indent:
             distance = " " * indent
-            msg = "\n".join([f"{distance}{i}" for i in msg.split("\n")])
+            # Keep the indentation before the label, not after it.
+            msg = f"\n{distance}".join(msg.split("\n"))
         if ui.quiet < 2:
             ui.err_console.print(
-                Text(f"{distance}[Error:] {msg}", style="red"), soft_wrap=True
+                Text(f"{distance}[Error] {msg}", style="red"), soft_wrap=True
             )
         if exit:
             sys.exit(1)

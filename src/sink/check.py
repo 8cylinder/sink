@@ -205,7 +205,7 @@ class TestConfig:
         if result.returncode:
             self.line(False, f"{bad} (error: {result.returncode})", spaces=2)
             if result.stderr:
-                ui.error(result.stderr, exit=False, indent=8)
+                ui.error(result.stderr, exit=False, indent=6)
             return False
 
         self.line(True, good, spaces=2)

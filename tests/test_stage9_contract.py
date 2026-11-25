@@ -69,6 +69,28 @@ def test_check_uses_a_unicode_cross_for_failures(project_factory) -> None:
     assert "[X]" not in text
 
 
+def test_check_error_output_is_compact(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke(
+        "check",
+        "dev",
+        env={
+            "STUB_EXIT_SSH": "1",
+            "STUB_ERR_SSH": "ERROR 1045 (28000): Access denied\n",
+        },
+    )
+
+    assert result.exit_code == 0, combined(result)
+    assert (
+        '  [✗] ssh login failed for "deploy@example.com". (error: 1)'
+        in result.output
+    )
+    assert result.stderr.startswith("      [Error] ERROR 1045")
+    assert "[Error]:" not in result.stderr
+    assert "\n\n" not in result.stderr
+
+
 def test_db_pull_creates_the_latest_symlink(project_factory) -> None:
     project = project_factory()
 
