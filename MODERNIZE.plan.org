@@ -141,8 +141,8 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 253 passed, 0 strict =xfail=, 1 deselected
-  =integration= test, branch coverage 93.68%, =fail_under = 90=; =ty=
+- Current test baseline: 253 passed, 0 strict =xfail=, 15 deselected
+  =integration= tests, branch coverage 93.68%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
@@ -1786,7 +1786,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv run ty check
 uv run pytest
-uv run pytest -m integration      # needs real rsync/ssh/mysql
+uv run pytest -m integration --no-cov  # needs real rsync/ssh/mysql
 uv build
 uv tool install --editable --force .
 make check
@@ -1864,6 +1864,17 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - Baseline for this section: 253 tests, 93.68% branch coverage, =make check=
   green.
 
+** Implementation status
+- [X] Docker Compose harness with Ubuntu LTS server and MySQL 8.0
+  (commit 508269f).
+- [X] File put/pull, diff, database pull/push, check, and version-smoke tests.
+- [X] =make integration=, =integration-oldest=, and =integration-matrix=.
+- [X] Integration tests skip cleanly when Docker is unavailable and stay out
+  of the default =make check= run.
+- [ ] First real Docker run on Ubuntu 20.04 and 26.04.
+- [ ] CI matrix and the remaining adversarial, interruption, and release-gate
+  stages.
+
 ** Safety contract
 Every stage references these IDs.
 
@@ -1931,7 +1942,8 @@ tests/integration/
 
 =db=:
 
-- Pinned =mysql:8.4= (or a documented current version).
+- Pinned =mysql:8.0= for compatibility with the oldest Ubuntu client.
+  The server version is intentionally separate from the OS matrix.
 - Internal-only network; no host port.
 - Health check with =mysqladmin ping=.
 - Init SQL creates a test database and users:
@@ -1965,7 +1977,7 @@ Policy:
   the stage log.
 - Do not pin OpenSSH or rsync separately; the Ubuntu version is the variable
   under test.
-- Keep the MySQL server image fixed initially (=mysql:8.4=).  Add a separate
+- Keep the MySQL server image fixed initially (=mysql:8.0=).  Add a separate
   =MYSQL_VERSION= dimension later if server-version coverage is needed.
 - The smoke test records =lsb_release -ds=, =ssh -V=, =rsync --version=,
   and =mysqldump --version= so a failure identifies the exact tool versions.
@@ -2029,15 +2041,15 @@ UBUNTU_LATEST ?= 26.04
 UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
 
 integration:  ## Run integration tests on the latest LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration
+	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration --no-cov
 
 integration-oldest:  ## Run integration tests on the oldest supported LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration
+	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration --no-cov
 
 integration-matrix:  ## Run the oldest and latest LTS
 	@for version in $(UBUNTU_VERSIONS); do \
 		echo "==> Ubuntu $$version"; \
-		SINK_TEST_UBUNTU=$$version uv run pytest -m integration || exit $$?; \
+		SINK_TEST_UBUNTU=$$version uv run pytest -m integration --no-cov || exit $$?; \
 	done
 
 integration-down:  ## Remove leftover integration containers

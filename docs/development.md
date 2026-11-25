@@ -11,6 +11,28 @@ make test
 `make check` runs formatting, linting, type checking, import contracts, and
 the full branch-coverage suite. The coverage floor is 90%.
 
+Docker-backed integration tests exercise real SSH, rsync, and MySQL against
+Ubuntu LTS containers. They are excluded from `make check` and require Docker
+Compose, `ssh`, `ssh-keygen`, `ssh-keyscan`, `rsync`, `git`, and `gzip` on the
+host:
+
+```console
+make integration          # latest Ubuntu LTS
+make integration-oldest   # oldest supported Ubuntu LTS
+make integration-matrix   # oldest and latest
+```
+
+Run one version directly:
+
+```console
+SINK_TEST_UBUNTU=22.04 uv run pytest -m integration --no-cov
+UBUNTU_VERSIONS="20.04 22.04 24.04 26.04" make integration-matrix
+```
+
+The fixture creates an isolated Compose project, ephemeral SSH keys, a
+temporary `known_hosts`, and temporary projects, then removes the stack. Use
+`make integration-down` to clean up containers left by an interrupted run.
+
 Build documentation:
 
 ```console

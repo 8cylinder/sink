@@ -45,6 +45,10 @@
   preserving passwords containing `#` and other special characters. The
   remote dump/import command installs an `EXIT` trap so the temporary `0600`
   file is removed even when the command fails or the connection drops.
+- Added opt-in Docker-backed integration tests for real SSH, rsync, and MySQL
+  against Ubuntu LTS containers. `make integration`, `make integration-oldest`,
+  and `make integration-matrix` cover the oldest and latest supported LTS
+  releases; the default `make check` suite remains Docker-free.
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.

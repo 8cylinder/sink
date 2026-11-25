@@ -163,6 +163,18 @@ make test
 the full branch-coverage suite. The coverage floor is 90%. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Docker-backed tests exercise real SSH, rsync, and MySQL against Ubuntu LTS
+containers:
+
+```console
+make integration          # latest Ubuntu LTS
+make integration-oldest   # oldest supported Ubuntu LTS
+make integration-matrix   # oldest and latest
+```
+
+They are excluded from `make check` and require Docker Compose plus real
+`ssh`, `rsync`, `git`, and `gzip` on the host.
+
 ## License
 
 Sink is licensed under the GNU General Public License, version 2 only
