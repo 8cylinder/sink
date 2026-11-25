@@ -8,6 +8,8 @@ import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 
+from rich.text import Text
+
 from sink.config.models import Config, DatabaseConfig, SSHConfig
 from sink.credentials import remote_mysql_credentials
 from sink.shell import remote_command, run
@@ -18,7 +20,7 @@ class TestConfig:
     """Run the configured server and URL checks."""
 
     good = "[\u2713]"
-    bad = "[X]"
+    bad = "[✗]"
     timeout = 25
 
     def __init__(self, config: Config, insecure: bool = False) -> None:
@@ -134,6 +136,7 @@ class TestConfig:
             for u in s.urls:
                 if not u.url:
                     continue
+                ok = False
                 with ui.status(f"Checking {u.url}"):
                     try:
                         # Default verifies the certificate chain and hostname;
@@ -146,39 +149,52 @@ class TestConfig:
                             u.url, timeout=self.timeout, context=ctx
                         )
                     except urllib.error.HTTPError as e:
-                        msg = f"{self.bad} URL({u.url}): HTTPError: {e.code}."
+                        msg = f"URL({u.url}): HTTPError: {e.code}."
                     except urllib.error.URLError as e:
-                        msg = f"{self.bad} URL({u.url}): URLError: {e.reason}."
+                        msg = f"URL({u.url}): URLError: {e.reason}."
                     except ValueError:
-                        msg = f"{self.bad} URL({u.url}): Not a valid URL."
+                        msg = f"URL({u.url}): Not a valid URL."
                     except AttributeError as e:
                         msg = f"AttributeError? {u.url} {e}"
                     except TimeoutError:
-                        msg = f"{self.bad} URL({u.url}) Timeout."
+                        msg = f"URL({u.url}) Timeout."
                     else:
-                        msg = f"{self.good} URL({u.url})"
-                self.out(msg, 2)
+                        ok = True
+                        msg = f"URL({u.url})"
+                self.line(ok, msg, 2)
 
     def table(self, rows: Sequence[tuple[str, str, str]]) -> None:
-        """Print a stable Setting/Value/Status table."""
+        """Print a stable status table with markers in front."""
         name_width = max(
             (len(name) for name, _value, _status in rows), default=8
         )
         value_width = max(
             (len(value) for _name, value, _status in rows), default=5
         )
+        # Four spaces align the header with the marker column.
         self.out(
-            f"{'Setting'.ljust(name_width)}  "
-            f"{'Value'.ljust(value_width)}  Status",
+            f"    {'Setting'.ljust(name_width)}  {'Value'.ljust(value_width)}",
             2,
         )
         for name, value, status in rows:
-            mark = self.good if status == "ok" else self.bad
-            self.out(
-                f"{name.ljust(name_width)}  {value.ljust(value_width)}  "
-                f"{mark} {status}",
+            ok = status == "ok"
+            self.line(
+                ok,
+                f"{name.ljust(name_width)}  {value.ljust(value_width)}",
                 2,
             )
+
+    def line(self, ok: bool, msg: str, spaces: int = 0) -> None:
+        """Print one colored status line with the marker in front."""
+        if ui.quiet >= 2:
+            return
+        text = Text()
+        text.append(
+            f"{' ' * spaces}{self.good if ok else self.bad} ",
+            style="green" if ok else "red",
+        )
+        text.append(msg)
+        ui.console.print(text, soft_wrap=True)
 
     def out(self, msg: str, spaces: int) -> None:
         """Print an indented status line."""
@@ -197,12 +213,12 @@ class TestConfig:
         )
         result = run(command, real=True, capture=True)
         if result.returncode:
-            self.out(f"{self.bad} {bad} (error: {result.returncode})", 2)
+            self.line(False, f"{bad} (error: {result.returncode})", 2)
             if result.stderr:
                 ui.error(result.stderr, exit=False, indent=8)
             return False
 
-        self.out(f"{self.good} {good}", 2)
+        self.line(True, good, 2)
         return True
 
 

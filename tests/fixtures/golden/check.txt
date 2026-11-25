@@ -1,14 +1,14 @@
 Local dirs
-Setting Value Status
-pulls_dir <CONFIG_DIR>/pulls [✓] ok
-rsync_binary <CONFIG_DIR>/bin/rsync [✓] ok
+Setting Value
+[✓] pulls_dir <CONFIG_DIR>/pulls
+[✓] rsync_binary <CONFIG_DIR>/bin/rsync
 
 
 dev
-Setting Value Status
-root /var/www/demo [✓] ok
-warn False [✓] ok
-automatic True [✓] ok
+Setting Value
+[✓] root /var/www/demo
+[✓] warn False
+[✓] automatic True
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com exit
 [✓] ssh login good (deploy).
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'

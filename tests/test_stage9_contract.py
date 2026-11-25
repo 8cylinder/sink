@@ -50,6 +50,22 @@ def test_check_runs_url_probes(project_factory, monkeypatch) -> None:
     assert project.stub_log.read_text() != ""
 
 
+def test_check_uses_a_unicode_cross_for_failures(project_factory) -> None:
+    project = project_factory(
+        project_overrides={
+            "pulls_dir": None,
+            "rsync_binary": "missing-rsync-binary",
+        }
+    )
+
+    result = project.invoke("check", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    text = combined(result)
+    assert "[✗] pulls_dir" in text
+    assert "[X]" not in text
+
+
 def test_db_pull_creates_the_latest_symlink(project_factory) -> None:
     project = project_factory()
 
