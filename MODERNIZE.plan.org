@@ -1823,398 +1823,398 @@ The annotated release tag is `v0.3.0`.
   #+end_src
 
 * Real world testing
-  Status: proposed.  This section extends the completed modernization with
-  Docker-backed end-to-end tests, destructive-operation safety, and release
-  confidence.  It does not reopen any D1–D11 decision.
+Status: proposed.  This section extends the completed modernization with
+Docker-backed end-to-end tests, destructive-operation safety, and release
+confidence.  It does not reopen any D1–D11 decision.
 
 ** Objective
-   Build enough real-world coverage to trust Sink with production websites and
-   databases.
+Build enough real-world coverage to trust Sink with production websites and
+databases.
 
-   The stub suite is good at command construction, config parsing, and
-   reporting.  It cannot prove that real =ssh=, =rsync=, =mysqldump=, =mysql=,
-   shell, filesystem, and MySQL interactions behave safely.  The target state
-   is:
+The stub suite is good at command construction, config parsing, and
+reporting.  It cannot prove that real =ssh=, =rsync=, =mysqldump=, =mysql=,
+shell, filesystem, and MySQL interactions behave safely.  The target state
+is:
 
-   - every destructive operation has both a success test and a failure/abort
-     test against a real server;
-   - every command that handles credentials proves that secrets are not leaked
-     and temporary files are removed;
-   - every value that reaches a remote shell is tested with adversarial input;
-   - a release cannot be tagged unless the real-world suite and the manual
-     staging checklist pass.
+- every destructive operation has both a success test and a failure/abort
+  test against a real server;
+- every command that handles credentials proves that secrets are not leaked
+  and temporary files are removed;
+- every value that reaches a remote shell is tested with adversarial input;
+- a release cannot be tagged unless the real-world suite and the manual
+  staging checklist pass.
 
-   Docker cannot prove absolute safety.  It removes most of the uncertainty
-   around shell quoting, SSH behavior, rsync paths, MySQL authentication, and
-   cleanup.  The remaining risks are tracked in Stage R8.
+Docker cannot prove absolute safety.  It removes most of the uncertainty
+around shell quoting, SSH behavior, rsync paths, MySQL authentication, and
+cleanup.  The remaining risks are tracked in Stage R8.
 
 ** Current state
-   - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
-   - =tests/test_integration.py= is opt-in but only checks that real binaries
-     exist.
-   - There is no Docker harness, Compose file, or CI workflow.
-   - The default pytest run excludes the =integration= marker.
-   - Recent safety work already covers pipeline stderr from every stage,
-     quoted MySQL option-file values, remote =EXIT=-trap cleanup, and removal
-     of the obsolete =single= command.
-   - Baseline for this section: 253 tests, 93.68% branch coverage, =make check=
-     green.
+- =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
+- =tests/test_integration.py= is opt-in but only checks that real binaries
+  exist.
+- There is no Docker harness, Compose file, or CI workflow.
+- The default pytest run excludes the =integration= marker.
+- Recent safety work already covers pipeline stderr from every stage,
+  quoted MySQL option-file values, remote =EXIT=-trap cleanup, and removal
+  of the obsolete =single= command.
+- Baseline for this section: 253 tests, 93.68% branch coverage, =make check=
+  green.
 
 ** Safety contract
-   Every stage references these IDs.
+Every stage references these IDs.
 
-   | ID  | Invariant                                                                                       | Why it matters                                      |
-   |-----+-------------------------------------------------------------------------------------------------+-----------------------------------------------------|
-   | S1  | Nothing destructive runs without =--real=.                                                       | Prevents accidental writes and deletes.             |
-   | S2  | =check= probes are read-only and always run.                                                      | Avoids false safety and destructive surprises.      |
-   | S3  | Local and remote paths stay inside the project root.                                             | Prevents writing outside the intended tree.         |
-   | S4  | =warn: yes= requires confirmation before overwriting files or a database.                         | Prevents destructive mistakes.                      |
-   | S5  | Passwords never appear in argv, rendered commands, logs, or stdout/stderr.                       | Prevents credential leaks.                          |
-   | S6  | Temporary credential files are =0600= and removed on success, failure, and interruption.          | Prevents credential persistence.                    |
-   | S7  | A failing stage fails the whole pipeline; the real stderr is reported.                           | Prevents silent data corruption.                    |
-   | S8  | Host-key and non-interactive SSH policy is enforced.                                             | Prevents MITM and hanging scripts.                  |
-   | S9  | Config values cannot inject shell syntax or escape path boundaries.                              | Prevents command injection and path traversal.      |
-   | S10 | A failed pull never becomes the =LATEST-*= symlink or is reported as success.                      | Prevents restoring a corrupt or partial dump.       |
-   | S11 | File transfers preserve intended files and do not delete unrelated files.                        | Prevents the most damaging class of transfer bug.   |
-   | S12 | Errors leave a non-zero exit code and do not claim success.                                      | Makes automation safe.                              |
-   | S13 | Large payloads stream without excessive memory use.                                              | Prevents OOM failures on real dumps.                |
-   | S14 | Existing files are not overwritten by =db pull= naming collisions.                                | Prevents silent data loss.                          |
+| ID  | Invariant                                                                              | Why it matters                                    |
+|-----+----------------------------------------------------------------------------------------+---------------------------------------------------|
+| S1  | Nothing destructive runs without =--real=.                                               | Prevents accidental writes and deletes.           |
+| S2  | =check= probes are read-only and always run.                                             | Avoids false safety and destructive surprises.    |
+| S3  | Local and remote paths stay inside the project root.                                   | Prevents writing outside the intended tree.       |
+| S4  | =warn: yes= requires confirmation before overwriting files or a database.                | Prevents destructive mistakes.                    |
+| S5  | Passwords never appear in argv, rendered commands, logs, or stdout/stderr.             | Prevents credential leaks.                        |
+| S6  | Temporary credential files are =0600= and removed on success, failure, and interruption. | Prevents credential persistence.                  |
+| S7  | A failing stage fails the whole pipeline; the real stderr is reported.                 | Prevents silent data corruption.                  |
+| S8  | Host-key and non-interactive SSH policy is enforced.                                   | Prevents MITM and hanging scripts.                |
+| S9  | Config values cannot inject shell syntax or escape path boundaries.                    | Prevents command injection and path traversal.    |
+| S10 | A failed pull never becomes the =LATEST-*= symlink or is reported as success.            | Prevents restoring a corrupt or partial dump.     |
+| S11 | File transfers preserve intended files and do not delete unrelated files.              | Prevents the most damaging class of transfer bug. |
+| S12 | Errors leave a non-zero exit code and do not claim success.                            | Makes automation safe.                            |
+| S13 | Large payloads stream without excessive memory use.                                    | Prevents OOM failures on real dumps.              |
+| S14 | Existing files are not overwritten by =db pull= naming collisions.                       | Prevents silent data loss.                        |
 
 ** Three-tier test strategy
-   1. *Fast stub suite* — current =make check=; remains the default.
-   2. *Docker integration suite* — opt-in, real SSH/rsync/MySQL; run with
-      =make integration= and in CI.
-   3. *Manual staging certification* — a short checklist against a real
-      staging server before a release.
+1. *Fast stub suite* — current =make check=; remains the default.
+2. *Docker integration suite* — opt-in, real SSH/rsync/MySQL; run with
+  =make integration= and in CI.
+3. *Manual staging certification* — a short checklist against a real
+  staging server before a release.
 
-   Do not move every existing test into Docker.  Keep the fast loop for logic
-   and add integration tests only where behavior depends on real programs or
-   the OS.
+Do not move every existing test into Docker.  Keep the fast loop for logic
+and add integration tests only where behavior depends on real programs or
+the OS.
 
 ** Shared Docker harness
 *** Layout
-    #+begin_src text
-      tests/integration/
-        conftest.py
-        compose.yaml
-        server/
-          Dockerfile
-          sshd_config
-          entrypoint.sh
-        db/
-          init.sql
-        test_files.py
-        test_diff.py
-        test_db.py
-        test_check_action.py
-        test_adversarial.py
-        test_failures.py
-    #+end_src
+#+begin_src text
+tests/integration/
+  conftest.py
+  compose.yaml
+  server/
+    Dockerfile
+    sshd_config
+    entrypoint.sh
+  db/
+    init.sql
+  test_files.py
+  test_diff.py
+  test_db.py
+  test_check_action.py
+  test_adversarial.py
+  test_failures.py
+#+end_src
 
 *** Services
-    =server=:
+=server=:
 
-    - Debian stable slim image.
-    - =openssh-server=, =rsync=, =default-mysql-client=, =sudo=,
-      =ca-certificates=.
-    - Non-root =deploy= user.
-    - =deploy ALL=(ALL) NOPASSWD:ALL= for =sudo tee= tests.
-    - SSH key-only authentication; password authentication disabled.
-    - Expose =127.0.0.1::22= so the host port is assigned dynamically.
-    - Health check on TCP port 22.
+- Debian stable slim image.
+- =openssh-server=, =rsync=, =default-mysql-client=, =sudo=,
+  =ca-certificates=.
+- Non-root =deploy= user.
+- =deploy ALL=(ALL) NOPASSWD:ALL= for =sudo tee= tests.
+- SSH key-only authentication; password authentication disabled.
+- Expose =127.0.0.1::22= so the host port is assigned dynamically.
+- Health check on TCP port 22.
 
-    =db=:
+=db=:
 
-    - Pinned =mysql:8.4= (or a documented current version).
-    - Internal-only network; no host port.
-    - Health check with =mysqladmin ping=.
-    - Init SQL creates a test database and users:
-      - a normal user;
-      - a user whose password contains =#=, quotes, backslashes, =$=, and
-        spaces;
-      - a restricted user for failure tests.
+- Pinned =mysql:8.4= (or a documented current version).
+- Internal-only network; no host port.
+- Health check with =mysqladmin ping=.
+- Init SQL creates a test database and users:
+  - a normal user;
+  - a user whose password contains =#=, quotes, backslashes, =$=, and
+    spaces;
+  - a restricted user for failure tests.
 
 *** Harness behavior
-    - One Compose stack per test session.
-    - Unique Compose project name per run.
-    - Generate an ephemeral ed25519 key with =ssh-keygen=.
-    - Copy the public key into =deploy='s =authorized_keys= and set
-      mode/ownership.
-    - Seed a temporary =$HOME/.ssh/known_hosts= with the container's host key.
-    - Wait for SSH and MySQL with bounded retries, not =sleep=.
-    - Use a temporary =HOME= and temporary project directory.
-    - Do *not* use =project_factory=; it places stub binaries on =PATH=.
-    - Tear down with =docker compose down -v --remove-orphans= in a fixture
-      finalizer.
-    - Skip integration tests with a clear message when Docker is unavailable.
+- One Compose stack per test session.
+- Unique Compose project name per run.
+- Generate an ephemeral ed25519 key with =ssh-keygen=.
+- Copy the public key into =deploy='s =authorized_keys= and set
+  mode/ownership.
+- Seed a temporary =$HOME/.ssh/known_hosts= with the container's host key.
+- Wait for SSH and MySQL with bounded retries, not =sleep=.
+- Use a temporary =HOME= and temporary project directory.
+- Do *not* use =project_factory=; it places stub binaries on =PATH=.
+- Tear down with =docker compose down -v --remove-orphans= in a fixture
+  finalizer.
+- Skip integration tests with a clear message when Docker is unavailable.
 
 *** Project fixture
-    Each integration test gets:
+Each integration test gets:
 
-    - a temporary project directory;
-    - a generated =sink.yaml= pointing at =127.0.0.1:<mapped-port>= and the
-      =db= service;
-    - a unique remote root under =/var/www/<test-id>=;
-    - a unique database or table namespace;
-    - real SSH/rsync/mysql binaries on =PATH=;
-    - the temporary =HOME= containing =known_hosts=.
+- a temporary project directory;
+- a generated =sink.yaml= pointing at =127.0.0.1:<mapped-port>= and the
+  =db= service;
+- a unique remote root under =/var/www/<test-id>=;
+- a unique database or table namespace;
+- real SSH/rsync/mysql binaries on =PATH=;
+- the temporary =HOME= containing =known_hosts=.
 
-    Run commands through =click.testing.CliRunner= or a small helper that
-    invokes the installed =sink= with =--real= where required.
+Run commands through =click.testing.CliRunner= or a small helper that
+invokes the installed =sink= with =--real= where required.
 
 *** Make targets
-    #+begin_src make
-      integration:  ## Run Docker-backed integration tests
-      	uv run pytest -m integration
+#+begin_src make
+integration:  ## Run Docker-backed integration tests
+	uv run pytest -m integration
 
-      integration-down:  ## Force-remove leftover integration containers
-      	docker compose -f tests/integration/compose.yaml down -v --remove-orphans
-    #+end_src
+integration-down:  ## Force-remove leftover integration containers
+	docker compose -f tests/integration/compose.yaml down -v --remove-orphans
+#+end_src
 
-    Keep =make check= unchanged.  A later =make ci-full= can run both.
+Keep =make check= unchanged.  A later =make ci-full= can run both.
 
 ** Stages
-   Each stage is committed separately and stops until its exit criteria are
-   met.  Record completed R stages in Appendix B.
+Each stage is committed separately and stops until its exit criteria are
+met.  Record completed R stages in Appendix B.
 
 *** TODO Stage R0 - Safety matrix and risk register
-    *Goal:* Make the safety scope explicit before adding infrastructure.
+*Goal:* Make the safety scope explicit before adding infrastructure.
 
-    Tasks:
-    - [ ] Map every command and destructive path to S1–S14.
-    - [ ] Identify current test coverage and known gaps.
-    - [ ] Add a short =docs/safety.md= describing dry-run, =--real=,
-          warnings, credential handling, and cleanup.
-    - [ ] Record accepted residual risks and an owner.
+Tasks:
+- [ ] Map every command and destructive path to S1–S14.
+- [ ] Identify current test coverage and known gaps.
+- [ ] Add a short =docs/safety.md= describing dry-run, =--real=,
+  warnings, credential handling, and cleanup.
+- [ ] Record accepted residual risks and an owner.
 
-    Exit criteria:
-    - Every invariant has at least one planned positive test and one planned
-      failure test.
-    - No destructive command is unclassified.
+Exit criteria:
+- Every invariant has at least one planned positive test and one planned
+  failure test.
+- No destructive command is unclassified.
 
 *** TODO Stage R1 - Docker harness foundation
-    *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
-    test passes.
+*Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
+test passes.
 
-    Tasks:
-    - [ ] Add =tests/integration/compose.yaml=.
-    - [ ] Add the =server= image and =sshd_config=.
-    - [ ] Add the MySQL service and init SQL.
-    - [ ] Add the session fixture: build, start, health-wait, key generation,
-          =known_hosts=, teardown.
-    - [ ] Add the temporary-project fixture.
-    - [ ] Add =make integration= and document prerequisites.
-    - [ ] Verify tests skip cleanly when Docker is absent.
-    - [ ] Add one smoke test: SSH connection and =sink check= against the
-          sandbox.
+Tasks:
+- [ ] Add =tests/integration/compose.yaml=.
+- [ ] Add the =server= image and =sshd_config=.
+- [ ] Add the MySQL service and init SQL.
+- [ ] Add the session fixture: build, start, health-wait, key generation,
+  =known_hosts=, teardown.
+- [ ] Add the temporary-project fixture.
+- [ ] Add =make integration= and document prerequisites.
+- [ ] Verify tests skip cleanly when Docker is absent.
+- [ ] Add one smoke test: SSH connection and =sink check= against the
+  sandbox.
 
-    Exit criteria:
-    - =make integration= reliably starts and stops the stack.
-    - No leaked containers, keys, or temp files after success or failure.
-    - The smoke test fails if SSH or MySQL is unreachable.
+Exit criteria:
+- =make integration= reliably starts and stops the stack.
+- No leaked containers, keys, or temp files after success or failure.
+- The smoke test fails if SSH or MySQL is unreachable.
 
 *** TODO Stage R2 - Real file transfers
-    *Goal:* Prove file and directory transfers are correct and safe.
+*Goal:* Prove file and directory transfers are correct and safe.
 
-    Tests:
-    - [ ] =file put= a single file; verify remote content and mode.
-    - [ ] =file pull= a file modified on the server.
-    - [ ] =file put= / =file pull= a directory tree.
-    - [ ] Project and server exclusions are honored.
-    - [ ] Filenames containing spaces and Unicode work.
-    - [ ] Paths outside =project.root= are rejected.
-    - [ ] Dry-run performs no remote mutation.
-    - [ ] =warn: yes= asks before overwriting; "no" aborts without changing
-          the remote.
-    - [ ] Remote rsync failure reports stderr and exits non-zero.
-    - [ ] =--chown=/group/user behavior only runs when configured.
+Tests:
+- [ ] =file put= a single file; verify remote content and mode.
+- [ ] =file pull= a file modified on the server.
+- [ ] =file put= / =file pull= a directory tree.
+- [ ] Project and server exclusions are honored.
+- [ ] Filenames containing spaces and Unicode work.
+- [ ] Paths outside =project.root= are rejected.
+- [ ] Dry-run performs no remote mutation.
+- [ ] =warn: yes= asks before overwriting; "no" aborts without changing
+  the remote.
+- [ ] Remote rsync failure reports stderr and exits non-zero.
+- [ ] =--chown=/group/user behavior only runs when configured.
 
-    Exit criteria:
-    - S1, S3, S4, S11, S12 have real-server evidence.
-    - No test relies on stubbed =rsync= or =ssh=.
+Exit criteria:
+- S1, S3, S4, S11, S12 have real-server evidence.
+- No test relies on stubbed =rsync= or =ssh=.
 
 *** TODO Stage R3 - Real diffs and remote commands
-    *Goal:* Validate rsync-based diffing and remote execution.
+*Goal:* Validate rsync-based diffing and remote execution.
 
-    Tests:
-    - [ ] =diff= identical files.
-    - [ ] =diff= changed files, including whitespace/word/letter options.
-    - [ ] Missing remote file fails cleanly.
-    - [ ] Directory diff uses the correct =--compare-dest=.
-    - [ ] =--difftool= success and failure.
-    - [ ] =action= runs a real remote command and propagates its exit status.
-    - [ ] Interactive =ssh= is verified manually; lower-level SSH execution is
-          covered through =action=/=check=.
+Tests:
+- [ ] =diff= identical files.
+- [ ] =diff= changed files, including whitespace/word/letter options.
+- [ ] Missing remote file fails cleanly.
+- [ ] Directory diff uses the correct =--compare-dest=.
+- [ ] =--difftool= success and failure.
+- [ ] =action= runs a real remote command and propagates its exit status.
+- [ ] Interactive =ssh= is verified manually; lower-level SSH execution is
+  covered through =action=/=check=.
 
-    Exit criteria:
-    - Diff and remote-command failures are visible and non-zero.
-    - No pager hangs when stdout is not a terminal.
+Exit criteria:
+- Diff and remote-command failures are visible and non-zero.
+- No pager hangs when stdout is not a terminal.
 
 *** TODO Stage R4 - Real database pull and push
-    *Goal:* Prove the highest-risk data paths.
+*Goal:* Prove the highest-risk data paths.
 
-    Tests:
-    - [ ] =db pull= succeeds and writes a valid gzip dump.
-    - [ ] Pulled SQL contains expected schema/data.
-    - [ ] =LATEST-<server>.sql.gz= points at the successful dump.
-    - [ ] Failed =mysqldump= reports real stderr, exits non-zero, and does not
-          update =LATEST=.
-    - [ ] Partially written dumps are not reported as success.
-    - [ ] Password with =#=, quotes, backslashes, =$=, and spaces
-          authenticates correctly.
-    - [ ] Temporary credentials file is =0600= and absent after
-          success/failure.
-    - [ ] =db put= loads a gzipped dump; verify the row in MySQL.
-    - [ ] Non-gzip and missing local files are rejected before touching the
-          remote.
-    - [ ] Remote =zcat=/=mysql= failure reports stderr.
-    - [ ] =warn: yes= blocks =db put= without confirmation.
-    - [ ] Multiple database entries use the documented selection rule; the
-          chosen account is visible in output.
+Tests:
+- [ ] =db pull= succeeds and writes a valid gzip dump.
+- [ ] Pulled SQL contains expected schema/data.
+- [ ] =LATEST-<server>.sql.gz= points at the successful dump.
+- [ ] Failed =mysqldump= reports real stderr, exits non-zero, and does not
+  update =LATEST=.
+- [ ] Partially written dumps are not reported as success.
+- [ ] Password with =#=, quotes, backslashes, =$=, and spaces
+  authenticates correctly.
+- [ ] Temporary credentials file is =0600= and absent after
+  success/failure.
+- [ ] =db put= loads a gzipped dump; verify the row in MySQL.
+- [ ] Non-gzip and missing local files are rejected before touching the
+  remote.
+- [ ] Remote =zcat=/=mysql= failure reports stderr.
+- [ ] =warn: yes= blocks =db put= without confirmation.
+- [ ] Multiple database entries use the documented selection rule; the
+  chosen account is visible in output.
 
-    Exit criteria:
-    - S5, S6, S7, S10, S12, S14 have real-server evidence.
-    - A wrong-password test proves the quoting fix and error reporting.
+Exit criteria:
+- S5, S6, S7, S10, S12, S14 have real-server evidence.
+- A wrong-password test proves the quoting fix and error reporting.
 
 *** TODO Stage R5 - Real check, SSH policy, and failure paths
-    *Goal:* Verify diagnostics and authentication behavior against real
-    services.
+*Goal:* Verify diagnostics and authentication behavior against real
+services.
 
-    Tests:
-    - [ ] =check= reports SSH, root, MySQL, and URL success.
-    - [ ] Bad SSH key/user fails clearly.
-    - [ ] Unknown host key is refused.
-    - [ ] Wrong MySQL password fails with the real server message.
-    - [ ] Multiple MySQL entries are all probed.
-    - [ ] Server-name filtering works.
-    - [ ] Missing project/root/pulls directory is reported.
-    - [ ] URL success and failure use a local test HTTP server.
-    - [ ] Read-only =check= makes no writes.
+Tests:
+- [ ] =check= reports SSH, root, MySQL, and URL success.
+- [ ] Bad SSH key/user fails clearly.
+- [ ] Unknown host key is refused.
+- [ ] Wrong MySQL password fails with the real server message.
+- [ ] Multiple MySQL entries are all probed.
+- [ ] Server-name filtering works.
+- [ ] Missing project/root/pulls directory is reported.
+- [ ] URL success and failure use a local test HTTP server.
+- [ ] Read-only =check= makes no writes.
 
-    Exit criteria:
-    - S2, S5, S7, S8 are covered.
-    - No probe hangs on authentication or host-key prompts.
+Exit criteria:
+- S2, S5, S7, S8 are covered.
+- No probe hangs on authentication or host-key prompts.
 
 *** TODO Stage R6 - Adversarial inputs and path safety
-    *Goal:* Attack Sink with hostile but valid configuration and names.
+*Goal:* Attack Sink with hostile but valid configuration and names.
 
-    Tests:
-    - [ ] Server names, action names, filenames, and tags containing =;=,
-          =$(...)=, backticks, quotes, newlines, spaces, and Unicode.
-    - [ ] =db pull --tag= values such as =../../escape=, absolute paths, and
-          shell syntax stay inside =pulls_dir=.
-    - [ ] rsync paths with spaces and shell metacharacters survive render and
-          execute.
-    - [ ] Password values never appear in rendered commands or logs.
-    - [ ] Symlinked local paths outside the project root are rejected.
-    - [ ] Symlinked remote roots do not allow writes outside the intended
-          directory.
-    - [ ] Unknown config keys remain non-destructive.
-    - [ ] Environment-variable expansion is not re-evaluated as shell syntax.
+Tests:
+- [ ] Server names, action names, filenames, and tags containing =;=,
+  =$(...)=, backticks, quotes, newlines, spaces, and Unicode.
+- [ ] =db pull --tag= values such as =../../escape=, absolute paths, and
+  shell syntax stay inside =pulls_dir=.
+- [ ] rsync paths with spaces and shell metacharacters survive render and
+  execute.
+- [ ] Password values never appear in rendered commands or logs.
+- [ ] Symlinked local paths outside the project root are rejected.
+- [ ] Symlinked remote roots do not allow writes outside the intended
+  directory.
+- [ ] Unknown config keys remain non-destructive.
+- [ ] Environment-variable expansion is not re-evaluated as shell syntax.
 
-    Exit criteria:
-    - S3, S5, S9, S14 have adversarial evidence.
-    - Every discovered injection or traversal bug gets a permanent regression
-      test.
+Exit criteria:
+- S3, S5, S9, S14 have adversarial evidence.
+- Every discovered injection or traversal bug gets a permanent regression
+  test.
 
 *** TODO Stage R7 - Interruption, cleanup, and failure injection
-    *Goal:* Prove Sink fails safely when the world goes wrong.
+*Goal:* Prove Sink fails safely when the world goes wrong.
 
-    Tests:
-    - [ ] SIGINT/SIGTERM during a large file put/pull leaves no partial
-          success claim and cleans temp files.
-    - [ ] SIGINT during =db pull= does not create/update =LATEST=.
-    - [ ] SSH connection drop during =mysqldump= reports failure and cleans
-          credentials.
-    - [ ] MySQL stopped mid-operation fails with a clear error.
-    - [ ] Remote root unwritable fails without local corruption.
-    - [ ] Disk-pressure/partial-output test (small tmpfs or constrained
-          volume) does not report success.
-    - [ ] Concurrent pulls to different tags do not corrupt =LATEST=.
-    - [ ] Credential cleanup survives command failure paths.
+Tests:
+- [ ] SIGINT/SIGTERM during a large file put/pull leaves no partial
+  success claim and cleans temp files.
+- [ ] SIGINT during =db pull= does not create/update =LATEST=.
+- [ ] SSH connection drop during =mysqldump= reports failure and cleans
+  credentials.
+- [ ] MySQL stopped mid-operation fails with a clear error.
+- [ ] Remote root unwritable fails without local corruption.
+- [ ] Disk-pressure/partial-output test (small tmpfs or constrained
+  volume) does not report success.
+- [ ] Concurrent pulls to different tags do not corrupt =LATEST=.
+- [ ] Credential cleanup survives command failure paths.
 
-    Exit criteria:
-    - S6, S7, S10, S12 hold under interruption.
-    - Any test that cannot be made deterministic is documented as a manual
-      check rather than silently skipped.
+Exit criteria:
+- S6, S7, S10, S12 hold under interruption.
+- Any test that cannot be made deterministic is documented as a manual
+  check rather than silently skipped.
 
 *** TODO Stage R8 - CI, release gate, and residual risk
-    *Goal:* Make the integration suite part of the release process.
+*Goal:* Make the integration suite part of the release process.
 
-    Tasks:
-    - [ ] Add a Docker-capable CI job for =make integration=.
-    - [ ] Run on pull requests and/or nightly; document the policy.
-    - [ ] Require the suite before tagging a release.
-    - [ ] Cache Docker layers and pin image versions.
-    - [ ] Publish a short failure report with container logs on CI failure.
-    - [ ] Track flaky tests explicitly; do not hide them with automatic
-          reruns.
-    - [ ] Add dependency/security scanning if not already covered by CI.
+Tasks:
+- [ ] Add a Docker-capable CI job for =make integration=.
+- [ ] Run on pull requests and/or nightly; document the policy.
+- [ ] Require the suite before tagging a release.
+- [ ] Cache Docker layers and pin image versions.
+- [ ] Publish a short failure report with container logs on CI failure.
+- [ ] Track flaky tests explicitly; do not hide them with automatic
+  reruns.
+- [ ] Add dependency/security scanning if not already covered by CI.
 
-    Exit criteria:
-    - A release cannot be produced with a red integration suite.
-    - No unexplained flaky tests in the last N runs.
+Exit criteria:
+- A release cannot be produced with a red integration suite.
+- No unexplained flaky tests in the last N runs.
 
 *** TODO Stage R9 - Manual staging certification
-    *Goal:* Cover the things Docker cannot.
+*Goal:* Cover the things Docker cannot.
 
-    Checklist for a real staging server:
-    - [ ] SSH host key is pre-trusted and correct.
-    - [ ] Run every command first without =--real=.
-    - [ ] Back up the remote database and target directory.
-    - [ ] =file put= and =file pull= a small file and a directory.
-    - [ ] =diff= a changed file.
-    - [ ] =db pull=; inspect gzip and restore it to a scratch database.
-    - [ ] =db put= to a scratch database; verify row counts.
-    - [ ] =check= reports all green.
-    - [ ] Confirm no temporary credentials file remains.
-    - [ ] Confirm no unexpected deletions or ownership changes.
-    - [ ] Test with the production =sshd=/sudo/MySQL policy.
+Checklist for a real staging server:
+- [ ] SSH host key is pre-trusted and correct.
+- [ ] Run every command first without =--real=.
+- [ ] Back up the remote database and target directory.
+- [ ] =file put= and =file pull= a small file and a directory.
+- [ ] =diff= a changed file.
+- [ ] =db pull=; inspect gzip and restore it to a scratch database.
+- [ ] =db put= to a scratch database; verify row counts.
+- [ ] =check= reports all green.
+- [ ] Confirm no temporary credentials file remains.
+- [ ] Confirm no unexpected deletions or ownership changes.
+- [ ] Test with the production =sshd=/sudo/MySQL policy.
 
-    Exit criteria:
-    - Checklist completed and attached to the release notes.
-    - Any deviation becomes a new integration or regression test.
+Exit criteria:
+- Checklist completed and attached to the release notes.
+- Any deviation becomes a new integration or regression test.
 
 *** TODO Stage R10 - Ongoing safety
-    - [ ] Every production bug gets a failing Docker test before the fix.
-    - [ ] Revisit the safety matrix when a command or flag is added.
-    - [ ] Re-run the manual checklist after SSH/MySQL/rsync upgrades.
-    - [ ] Review residual risks at each release.
+- [ ] Every production bug gets a failing Docker test before the fix.
+- [ ] Revisit the safety matrix when a command or flag is added.
+- [ ] Re-run the manual checklist after SSH/MySQL/rsync upgrades.
+- [ ] Review residual risks at each release.
 
 ** Definition of full confidence
-   Absolute proof is not possible for a tool that writes to remote servers.
-   For this project, "full confidence" means:
+Absolute proof is not possible for a tool that writes to remote servers.
+For this project, "full confidence" means:
 
-   - 100% of destructive operations map to at least one positive and one
-     negative real-server test.
-   - S1–S14 are verified or explicitly accepted with a documented rationale.
-   - The Docker suite is green on the supported Linux matrix.
-   - The manual staging checklist has passed for the release.
-   - No known high-severity safety issue is open.
-   - No secrets are found in output, logs, or temporary files by the test
-     suite.
-   - All residual risks have an owner and a review date.
+- 100% of destructive operations map to at least one positive and one
+  negative real-server test.
+- S1–S14 are verified or explicitly accepted with a documented rationale.
+- The Docker suite is green on the supported Linux matrix.
+- The manual staging checklist has passed for the release.
+- No known high-severity safety issue is open.
+- No secrets are found in output, logs, or temporary files by the test
+  suite.
+- All residual risks have an owner and a review date.
 
 ** Residual risks Docker will not cover
-   - macOS/BSD =rsync= behavior.
-   - Production =sshd=, PAM, sudo, SELinux, AppArmor, and firewall policy.
-   - Exact MySQL versions, plugins, and cloud IAM authentication.
-   - Real network latency, packet loss, and connection resets.
-   - Filesystem full, quota, and inode exhaustion on the actual server.
-   - Lando/DDEV local workflows.
-   - User error outside Sink's control.
+- macOS/BSD =rsync= behavior.
+- Production =sshd=, PAM, sudo, SELinux, AppArmor, and firewall policy.
+- Exact MySQL versions, plugins, and cloud IAM authentication.
+- Real network latency, packet loss, and connection resets.
+- Filesystem full, quota, and inode exhaustion on the actual server.
+- Lando/DDEV local workflows.
+- User error outside Sink's control.
 
-   These remain manual checks or future environment-specific suites.
+These remain manual checks or future environment-specific suites.
 
 ** Recommended first slice
-   Implement Stages R0–R1, then the highest-risk half of Stage R4:
+Implement Stages R0–R1, then the highest-risk half of Stage R4:
 
-   1. Safety matrix.
-   2. Compose harness with SSH and MySQL.
-   3. Successful =db pull= with a =#= password.
-   4. Failed =db pull= with wrong credentials and credential cleanup.
-   5. Successful =db put= with row verification.
-   6. File put/pull smoke test.
+1. Safety matrix.
+2. Compose harness with SSH and MySQL.
+3. Successful =db pull= with a =#= password.
+4. Failed =db pull= with wrong credentials and credential cleanup.
+5. Successful =db put= with row verification.
+6. File put/pull smoke test.
 
-   That gives the most safety value quickly, before expanding into diffing,
-   adversarial inputs, and interruption tests.
+That gives the most safety value quickly, before expanding into diffing,
+adversarial inputs, and interruption tests.
