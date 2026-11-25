@@ -109,7 +109,9 @@ For sites that have =warn: true=
 - pulls_dir
 - show warn & automatic status for each server
 
-*** TODO New command: build-vm
+*** DONT-DO New command: build-vm
+CLOSED: [2026-11-25 Wed]
+The =vm= group was removed entirely; see MODERNIZE.plan.org D7.
 Build a vagrant vm to get a project running quickly.
 : sink build-vm
 - download boss

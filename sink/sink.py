@@ -26,7 +26,6 @@ from sink.deploy import DeployViaSymlink
 from sink.deploy import DeployViaRename
 from sink.deploy import DeployViaLocal
 from sink.actions import Actions
-from sink.vm import Vagrant
 
 
 ## RICH_CLICK
@@ -319,57 +318,6 @@ def action(server, action_name, real):
         actions.run(action_name)
     else:
         actions.list_actions()
-
-
-# --------------------------------- VM --------------------------------
-@sink.group(context_settings=CONTEXT_SETTINGS, cls=NaturalOrderGroup)
-def vm():
-    """[Group] Setup a vm.
-
-    Run "sink check" first to see what is needed."""
-
-
-@vm.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('ip')
-@click.argument('hostname')
-def build(server, hostname, ip):
-    """Initialize a vagrant vm.
-
-    The SERVER is the server defined in sink.yaml you want the vm for.
-
-    Add an IP and HOSTNAME in /etc/hosts and specify the same here.
-
-    \b
-    Checklist:
-      - Add ip & domain name to /etc/hosts
-      - Add boss to project root
-      - Create .env
-      - Create .htaccess
-      - Create sink.yaml
-      - Run `sink vm <server> <hostname> <ip>`
-      - Run `vagrant up`
-      - Run `sink db put <sqlfile.sql.gz>`
-      - In vagrant vm, remove 000-default.conf & delete /var/www/html
-    """
-    config.load_config()
-    vvm = Vagrant()
-    vvm.create(server, ip, hostname)
-
-
-@vm.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('server', shell_complete=get_servers)
-@click.argument('ip')
-@click.argument('hostname')
-def check(server, hostname, ip):
-    """Check for requirments to create a vm.
-
-    The SERVER is the server defined in sink.yaml you want the vm for.
-
-    Add an IP and HOSTNAME in /etc/hosts and specify the same here.
-    """
-    vvm = Vagrant()
-    vvm.check(server, ip, hostname)
 
 
 # ------------------------------- Deploy ------------------------------

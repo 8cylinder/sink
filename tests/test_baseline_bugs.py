@@ -29,13 +29,6 @@ def test_deploy_rename_init(project_factory):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(strict=True, reason="B4: vm check indexes Dict2obj with []")
-def test_vm_check_reports_without_crashing(project_factory):
-    project = project_factory()
-    result = project.invoke("vm", "check", "dev", "localhost", "1.2.3.4")
-    assert result.exit_code == 0, result.output
-
-
 @pytest.mark.xfail(strict=True, reason="B17/N1: single passes the filename as a server name")
 def test_single_uses_the_configured_servers(project_factory):
     project = project_factory()
