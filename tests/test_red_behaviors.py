@@ -11,10 +11,6 @@ import pytest
 from helpers import combined, unwrap
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N6: git's exit status is hidden by the pipeline to less",
-)
 def test_diff_propagates_a_git_failure(project_factory) -> None:
     project = project_factory()
 
@@ -22,6 +18,7 @@ def test_diff_propagates_a_git_failure(project_factory) -> None:
         "diff",
         "dev",
         "project/index.html",
+        "--real",
         env={"STUB_EXIT_GIT": "1"},
     )
 

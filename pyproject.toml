@@ -124,7 +124,7 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 65
+fail_under = 68
 show_missing = true
 
 [tool.importlinter]

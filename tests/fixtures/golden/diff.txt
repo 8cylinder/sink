@@ -1,3 +1,3 @@
-+ rsync --rsh 'ssh -p 2222 -i <CONFIG_DIR>/id_rsa' --itemize-changes --links --compress --checksum --include .env.dev --include robots.txt.dev --include .htaccess.dev --compare-dest=<PROJECT_ROOT>/index.html deploy@example.com:/var/www/demo/index.html '<DIFFDIR> [dev]'
++ rsync --rsh 'ssh -p 2222 -i <CONFIG_DIR>/id_rsa' --itemize-changes --links --compress --checksum --include .env.dev --include robots.txt.dev --include .htaccess.dev --compare-dest=<PROJECT_ROOT> deploy@example.com:/var/www/demo/index.html '<DIFFDIR> [dev]'
 [Success (DRY RUN)] dev: download complete
-+ git --no-pager diff --color=always --ignore-all-space --diff-algorithm=minimal '<DIFFDIR> [dev]/index.html' <PROJECT_ROOT>/index.html | less
++ git --no-pager diff --color=always --diff-algorithm=minimal '<DIFFDIR> [dev]/index.html' <PROJECT_ROOT>/index.html

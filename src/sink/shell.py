@@ -320,8 +320,15 @@ def _execute_pipeline(
     if error_text is None:
         error_text = ""
 
+    # A pipeline's shell exit status is the last stage, but that would hide
+    # a failing producer such as ``git diff | less``.  Sink reports the first
+    # non-zero stage when one exists so callers can propagate real failures.
+    returncode = next(
+        (process.returncode for process in processes if process.returncode),
+        previous.returncode,
+    )
     return Result(
-        returncode=previous.returncode,
+        returncode=returncode,
         stdout=output_text,
         stderr=error_text,
     )

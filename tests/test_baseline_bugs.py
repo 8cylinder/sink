@@ -42,10 +42,6 @@ def test_single_does_not_require_a_default_server(project_factory):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B16: file requires SERVER even though help says it is optional",
-)
 def test_file_put_uses_the_default_server(project_factory):
     project = project_factory()
     result = project.invoke("file", "put")
@@ -87,11 +83,8 @@ def test_ssh_defaults_to_dry_run(project_factory):
     assert project.stub_log.read_text() == ""
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N12: file pull outside the project root builds an absolute remote path",
-)
 def test_file_pull_outside_the_project_root(project_factory):
     project = project_factory()
     result = project.invoke("file", "pull", "dev", "outside.txt")
-    assert "deploy@example.com:/var/www/demo" in rendered(result)
+    assert result.exit_code != 0
+    assert str(project.path / "project") in rendered(result)

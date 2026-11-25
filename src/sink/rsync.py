@@ -4,12 +4,14 @@ import glob
 import os
 import re
 import shlex
+import sys
 import tempfile
 from pathlib import Path
 
 import click
 
 from sink.config.models import Action, Project, Server
+from sink.errors import TransferError
 from sink.shell import Argv, Pipeline, run
 from sink.ui import ui
 
@@ -185,11 +187,17 @@ class Transfer:
 
             # The downloaded file is required for the diff, so the default
             # mode prints the real transfer instead of rsync's dry run.
+            # compare-dest must be a directory containing the local copy at
+            # the same relative path; passing the file itself makes rsync
+            # compare against a non-directory.
+            compare_to = (
+                local_file if local_file.is_dir() else local_file.parent
+            )
             self._rsync(
                 diffdir,
                 remotef,
                 Action.DIFF,
-                compare_to=local_file,
+                compare_to=compare_to,
                 native_dry_run=False,
             )
 
@@ -201,10 +209,16 @@ class Transfer:
                 command = self._difftool_command(
                     tmp_file_fixed, local_file, diffdir
                 )
-                run(command, real=self.real, capture=False)
+                result = run(command, real=self.real, capture=False)
+                if self.real and result.returncode:
+                    raise TransferError(
+                        f"difftool failed with exit code {result.returncode}"
+                    )
                 return
 
-            flags = ["--ignore-all-space"]
+            flags = []
+            if ignore:
+                flags.append("--ignore-all-space")
             if word_diff == "word":
                 flags.append("--word-diff=color")
             elif word_diff == "letter":
@@ -220,9 +234,18 @@ class Transfer:
                 tmp_file_fixed,
                 str(local_file),
             ]
-            pipeline = Pipeline((Argv(tuple(argv)), Argv(("less",))))
+            stages = [Argv(tuple(argv))]
+            # A pager is useful interactively but would hide git's status and
+            # block a pipe, so only add it when stdout is a terminal.
+            if sys.stdout.isatty():
+                stages.append(Argv(("less",)))
+            pipeline = Pipeline(tuple(stages))
             result = run(pipeline, real=self.real, capture=False)
-            if self.real and result.returncode == 0:
+            if self.real and result.returncode:
+                raise TransferError(
+                    f"git diff failed with exit code {result.returncode}"
+                )
+            if self.real:
                 ui.echo("Files are the same.")
 
     def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
@@ -237,20 +260,21 @@ class Transfer:
 
     def _locations(self, filename):
         """Map a local path to its remote path."""
-        p = self.project
-        s = self.server
-        local = filename
-        remote = str(local)
-        # remove the local project root from the file
-        remote = remote.replace(str(p.root.absolute()), ".")
-        # add the server root
-        if s.root is None:
-            ui.error(f"Server has no root ({s.name}).")
-        remote = Path(s.root, remote)
-        return {
-            "local": local,
-            "remote": remote,
-        }
+        local = Path(filename)
+        # A relative remote path is derived from the local path.  Reject a
+        # path outside project.root rather than silently turning an absolute
+        # local path into a remote one.
+        try:
+            relative = local.resolve().relative_to(self.project.root.resolve())
+        except ValueError:
+            raise TransferError(
+                f"Path is outside the project root "
+                f"({self.project.root}): {local}"
+            ) from None
+        if self.server.root is None:
+            ui.error(f"Server has no root ({self.server.name}).")
+        remote = Path(self.server.root, relative)
+        return {"local": local, "remote": remote}
 
     def _rsync(
         self,

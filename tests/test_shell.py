@@ -120,6 +120,31 @@ def test_pipeline_writes_the_redirection(tmp_path: Path) -> None:
     assert str(destination) in pipeline.render(True)
 
 
+def test_pipeline_reports_a_failing_producer() -> None:
+    pipeline = Pipeline(
+        (
+            Argv(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.exit(3)",
+                )
+            ),
+            Argv(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); sys.exit(0)",
+                )
+            ),
+        )
+    )
+
+    result = pipeline.execute(real=True, capture=True)
+
+    assert result.returncode == 3
+
+
 def test_remote_command_quotes_the_fragment() -> None:
     ssh = SimpleNamespace(username="deploy", server="example.com", port=2222)
     command = remote_command(ssh, "echo hi", batch=True)

@@ -10,10 +10,29 @@ from sink.config.models import Action
 from sink.rsync import Transfer
 from sink.ui import ui
 
+FILE_ACTIONS = (Action.PUT.value, Action.PULL.value)
+
+
+def _resolve_target(rt, action, server, filename):
+    """Resolve the optional SERVER/FILENAME tokens.
+
+    ``sink file put dev`` means the whole project.  A single token that is
+    not a configured server is a filename on the default server, so
+    ``sink file put index.html`` keeps working.
+    """
+    cfg = rt.config
+    if server is None:
+        return cfg.server(None), filename
+    if filename is not None:
+        return cfg.server(server), filename
+    if server in cfg.servers:
+        return cfg.servers[server], None
+    return cfg.server(None), server
+
 
 @cli.command("file", context_settings=CONTEXT_SETTINGS, cls=AppCommand)
-@click.argument("action", type=click.Choice([str(i.value) for i in Action]))
-@click.argument("server")
+@click.argument("action", type=click.Choice(FILE_ACTIONS))
+@click.argument("server", required=False)
 @click.argument("filename", type=click.Path(), required=False)
 @click.option("--real", "-r", is_flag=True)
 @click.option("--silent", is_flag=True, help="Deprecated alias for -qq.")
@@ -26,21 +45,24 @@ def files(rt, action, filename, server, real, silent, extra_flags):
 
     \b
     ACTION: pull or put
-    SERVER: server name, if not specified sink will use the default server.
-    FILENAME: file/dir to be transfered."""
+    SERVER: server name; if omitted the default server is used.
+    FILENAME: file/dir to transfer; if omitted the whole project is used.
+    With one token, a configured server name selects that server,
+    otherwise the token is treated as a filename."""
     if silent:
         rt.quiet = max(rt.quiet, 2)
         ui.quiet = max(ui.quiet, 2)
 
+    cfg = rt.config
+    target, filename = _resolve_target(rt, action, server, filename)
     if filename and action == Action.PUT.value and not os.path.exists(filename):
         ui.error(f"Path does not exist: {filename}")
 
-    cfg = rt.config
     f = Path(os.path.abspath(filename)) if filename else Path(cfg.project.root)
 
     xfer = Transfer(
         cfg.project,
-        cfg.server(server),
+        target,
         real=real,
         silent=silent,
     )

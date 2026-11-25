@@ -128,7 +128,7 @@ def test_missing_environment_variable_is_a_config_error(
 
 def test_unknown_server_lists_known_servers(project_factory) -> None:
     project = project_factory()
-    result = project.invoke("file", "put", "nope")
+    result = project.invoke("file", "put", "nope", "project/index.html")
 
     assert result.exit_code != 0
     text = combined(result)
