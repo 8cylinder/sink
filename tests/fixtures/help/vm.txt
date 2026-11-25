@@ -1,0 +1,12 @@
+Usage: sink vm [OPTIONS] COMMAND [ARGS]...
+
+  [Group] Setup a vm.
+
+  Run "sink check" first to see what is needed.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  build  Initialize a vagrant vm.
+  check  Check for requirments to create a vm.

@@ -1,0 +1,6 @@
+$ sink db put dev project/index.html
+[exit 0]
++ pv --numeric project/index.html | ssh -p 2222 -i \
+  "/tmp/sink-stage0/project/id_rsa" deploy@example.com 'export \
+  MYSQL_PWD="secret"; gunzip -c | mysql  --user=dbuser demo'
+Success (DRY RUN)

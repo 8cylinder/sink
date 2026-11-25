@@ -1,0 +1,12 @@
+Usage: sink misc init [OPTIONS] [SERVERS]...
+
+  Create a blank config.
+
+  The servers arg will create an entry for each server name given.
+
+  To write the config to a file use:
+  `sink misc init > sink.yaml`
+  `sink misc init dev stag prod > sink.yaml`
+
+Options:
+  -h, --help  Show this message and exit.

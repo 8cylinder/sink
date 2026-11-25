@@ -1,0 +1,21 @@
+Usage: sink misc api [OPTIONS] KEYS...
+
+  Retrieve information from the config file.
+
+  The data will be output as json.
+
+  Some examples:
+
+  To get the project name:
+    sink misc api project name
+
+  To get the 2nd excluded filename:
+    sink misc api project exclude 1
+
+  To get the dev servers user name:
+    sink misc api servers dev user
+
+Options:
+  -j, --json / -n, --no-json  Return the data as JSON instead of the default
+                              python output.
+  -h, --help                  Show this message and exit.

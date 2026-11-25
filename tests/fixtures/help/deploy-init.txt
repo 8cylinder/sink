@@ -1,0 +1,9 @@
+Usage: sink deploy init [OPTIONS] SERVER [DIRS]...
+
+  Initialize and setup a deploy.
+
+  Create a dir localy or on the remote server to hold the versions. The exact
+  method depends of the deploy method used.
+
+Options:
+  -h, --help  Show this message and exit.

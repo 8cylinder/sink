@@ -1,0 +1,12 @@
+Usage: sink diff [OPTIONS] SERVER [FILENAME]
+
+  Diff a local and remote file.
+
+  FILENAME: file to be transferred
+  SERVER: server name (defined in sink.yaml).
+
+Options:
+  -i, --ignore-whitespace        Ignore whitespace in diff.
+  -d, --difftool                 Use meld instead of "git diff".
+  -w, --word-diff [word|letter]  Refine diffs to word or letter differences.
+  -h, --help                     Show this message and exit.

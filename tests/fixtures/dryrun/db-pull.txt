@@ -1,0 +1,7 @@
+$ sink db pull dev
+[exit 0]
++ ssh -p 2222 -C -T -i "/tmp/sink-stage0/project/id_rsa" deploy@example.com \
+  'export MYSQL_PWD="secret"; mysqldump --dry-run --host=localhost \
+  --user=dbuser --single-transaction --triggers --events --routines \
+  --no-tablespaces demo' | gzip -c > "pulls/demo-dev-26-11-25_08-14-49.sql.gz"
+Success (DRY RUN)

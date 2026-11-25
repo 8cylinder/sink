@@ -1,0 +1,11 @@
+Usage: sink single [OPTIONS] FILENAME
+
+  Send a single file to any server marked as automatic.
+
+  Send a single file to any server that has been designated as automatic.
+  This is primarily designed for scripting from a text editor.
+
+Options:
+  -r, --real
+  -s, --silent  Reduced output, for use in Emacs.
+  -h, --help    Show this message and exit.

@@ -1,0 +1,18 @@
+Usage: sink db [OPTIONS] {put|pull|diff} SERVER [SQL_GZ]
+
+  Overwrite a db with a gzipped sql file.
+
+  ACTION: pull or put.
+  SERVER: server name (defined in util.yaml).
+  SQL-GZ: gzipped sql file to upload.  Required if action is "put".
+
+  When pulling, a gzipped file name is created using the project name, the
+  server name, the date and time.  It is created in the pulls_dir.  eg:
+
+  pulls_dir/projectname-servername-20-01-01_01-01-01.sql.gz
+
+Options:
+  -t, --tag TEXT  Add a tag to the generated filename when pulling.
+  -r, --real
+  -q, --quiet     Return only the filename
+  -h, --help      Show this message and exit.

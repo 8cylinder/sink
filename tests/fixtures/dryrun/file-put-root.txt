@@ -1,0 +1,8 @@
+$ sink file put dev
+[exit 0]
++ rsync --dry-run -e "ssh -p 2222" --rsh="ssh -i \
+  /tmp/sink-stage0/project/id_rsa" --itemize-changes --links --compress \
+  --checksum --recursive --include=".env.dev" --include="robots.txt.dev" \
+  --include=".htaccess.dev" --exclude=".env" --exclude=".git" \
+  '/tmp/sink-stage0/project/project/' deploy@example.com:/var/www/demo
+Success (DRY RUN)

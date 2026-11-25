@@ -1,0 +1,6 @@
+Usage: sink misc pack [OPTIONS]
+
+  Display a command to gzip uncommitted files.
+
+Options:
+  -h, --help  Show this message and exit.

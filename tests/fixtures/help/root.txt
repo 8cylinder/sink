@@ -1,0 +1,23 @@
+Usage: sink [OPTIONS] COMMAND [ARGS]...
+
+  🐙 Tools to manage projects.
+
+  [red]Use[/] `sink COMMAND -h` for help on specific commands.
+
+Options:
+  -s, --suppress-commands  Don't display the bash commands used.
+  --version                Show the version and exit.
+  -h, --help               Show this message and exit.
+
+Commands:
+  db      Overwrite a db with a gzipped sql file.
+  file    Send files to and fro.
+  single  Send a single file to any server marked as automatic.
+  ssh     SSH into a server.
+  diff    Diff a local and remote file.
+  info    View or edit the config file.
+  check   Test server settings in config.
+  action  Run a pre defined command on the server.
+  vm      [Group] Setup a vm.
+  deploy  [Group] Deploy site to server with rollback.
+  misc    [Group] Misc stuff.

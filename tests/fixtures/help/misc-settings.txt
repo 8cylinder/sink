@@ -1,0 +1,9 @@
+Usage: sink misc settings [OPTIONS] [APPLICATION]
+
+  Output settings values for the requested application.
+
+  For the requested application, output settings in a format thats easy to
+  copy & paste.
+
+Options:
+  -h, --help  Show this message and exit.

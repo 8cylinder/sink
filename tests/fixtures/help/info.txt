@@ -1,0 +1,15 @@
+Usage: sink info [OPTIONS]
+
+  View or edit the config file.
+
+  If edit, it will be opened in the default editor.
+
+  To config the default editor, add the following lines to ~/.bashrc.  Change
+  the 'program' to editor name.
+
+  export EDITOR='program'
+  export VISUAL='program'
+
+Options:
+  -v, --view / -e, --edit  View or edit config file.
+  -h, --help               Show this message and exit.

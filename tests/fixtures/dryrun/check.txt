@@ -1,0 +1,18 @@
+$ sink check dev
+[exit 0]
+
+
+dev
+  [_]  [✓] ssh login good (deploy).
+      + ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o \
+        'ConnectTimeout 25' -i "/tmp/sink-stage0/project/id_rsa" \
+        deploy@example.com 'exit'
+  [█]  [✓] root dir exists.
+      + ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o \
+        'ConnectTimeout 25' -i "/tmp/sink-stage0/project/id_rsa" \
+        deploy@example.com 'cd "/var/www/demo"'
+  [ ]  [✓] DB(demo): mysql username, password and db are good.
+      + ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o \
+        'ConnectTimeout 25' -i "/tmp/sink-stage0/project/id_rsa" \
+        deploy@example.com 'mysql --user=dbuser --password="secret" \
+        --host=localhost demo --execute="exit";'

@@ -1,0 +1,7 @@
+$ sink deploy -m local new dev
+[exit 0]
++ rsync --archive --verbose  --dry-run --include=".env.dev" \
+  --include="robots.txt.dev" --include=".htaccess.dev" --exclude=".env" \
+  --exclude=".git" --exclude="storage/logs" /tmp/sink-stage0/project/project/ \
+  dist/dev--2026-11-25T08:14:50--silent-avocet
+Success (DRY RUN)

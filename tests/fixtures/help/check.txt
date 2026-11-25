@@ -1,0 +1,7 @@
+Usage: sink check [OPTIONS] [SERVER_NAMES]...
+
+  Test server settings in config.
+
+Options:
+  -r, --required
+  -h, --help      Show this message and exit.

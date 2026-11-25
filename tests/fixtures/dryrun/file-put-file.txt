@@ -1,0 +1,8 @@
+$ sink file put dev project/index.html
+[exit 0]
++ rsync --dry-run -e "ssh -p 2222" --rsh="ssh -i \
+  /tmp/sink-stage0/project/id_rsa" --itemize-changes --links --compress \
+  --checksum --include=".env.dev" --include="robots.txt.dev" \
+  --include=".htaccess.dev" '/tmp/sink-stage0/project/project/index.html' \
+  deploy@example.com:/var/www/demo/index.html
+Success (DRY RUN)

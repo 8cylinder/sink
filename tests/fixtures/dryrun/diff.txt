@@ -1,0 +1,12 @@
+$ sink diff dev project/index.html
+[exit 0]
++ rsync -e "ssh -p 2222" --rsh="ssh -i /tmp/sink-stage0/project/id_rsa" \
+  --itemize-changes --links --compress --checksum --include=".env.dev" \
+  --include="robots.txt.dev" --include=".htaccess.dev" \
+  --compare-dest='/tmp/sink-stage0/project/project/index.html' \
+  'deploy@example.com:/var/www/demo/index.html' '/tmp/tmpq365eq_z [dev]'
+Success
++ git --no-pager diff --color=always  --diff-algorithm=minimal \
+  --ignore-all-space                          '/tmp/tmpq365eq_z \
+  [dev]/index.html' '/tmp/sink-stage0/project/project/index.html' | less
+Files are the same.

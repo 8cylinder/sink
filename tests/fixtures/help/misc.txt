@@ -1,0 +1,12 @@
+Usage: sink misc [OPTIONS] COMMAND [ARGS]...
+
+  [Group] Misc stuff.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  api       Retrieve information from the config file.
+  pack      Display a command to gzip uncommitted files.
+  init      Create a blank config.
+  settings  Output settings values for the requested application.

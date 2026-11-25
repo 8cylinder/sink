@@ -1,0 +1,12 @@
+Usage: sink deploy new [OPTIONS] SERVER
+
+  Upload a new version of the site.
+
+  Upload a new version to the deploy root.
+
+Options:
+  -r, --real
+  -q, --quiet      No itemized output from rsync.
+  -d, --dump-db    Take a snapshot of the db.
+  -n, --note TEXT  Add a note to DEPLOY_INFO.yaml.
+  -h, --help       Show this message and exit.

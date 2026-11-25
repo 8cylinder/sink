@@ -1,0 +1,10 @@
+Usage: sink vm check [OPTIONS] SERVER IP HOSTNAME
+
+  Check for requirments to create a vm.
+
+  The SERVER is the server defined in sink.yaml you want the vm for.
+
+  Add an IP and HOSTNAME in /etc/hosts and specify the same here.
+
+Options:
+  -h, --help  Show this message and exit.

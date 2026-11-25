@@ -1,0 +1,7 @@
+Usage: sink ssh [OPTIONS] SERVER [USER]
+
+  SSH into a server.
+
+Options:
+  -d, --dry-run  Do nothing, show the command only.
+  -h, --help     Show this message and exit.

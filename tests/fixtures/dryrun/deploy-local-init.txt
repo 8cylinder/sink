@@ -1,0 +1,3 @@
+$ sink deploy -m local init dev
+[exit 0]
+Warning: DIST (dist) dir does not exist, creating it.
