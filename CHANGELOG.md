@@ -13,8 +13,9 @@
 
 - `sink check` always runs its read-only probes and no longer has a
   `--real` flag. `--insecure` remains the TLS opt-out. It no longer lists
-  the unused `log_dir` and `cache_dir` settings. Status markers now lead
-  each line, use `✓`/`✗`, and are colored green/red.
+  the unused `log_dir` and `cache_dir` settings. Status lines now lead with
+  colored `✓`/`✗` markers, omit the table header, and render `key: value`
+  with the key and value in different colors.
 - The source tree is fully annotated and type-checked with `ty` without
   warning downgrades. Ruff now enforces `ANN`, `PTH`, `DTZ`, `RET`, and
   `ARG`, and branch coverage is gated at 90%.

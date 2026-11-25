@@ -1401,7 +1401,9 @@ warnings; import-linter keeps all three contracts.
 project's =pulls_dir=, =log_dir=, =cache_dir=, and =rsync_binary=,
 reports unknown config keys as warnings, then a table for each server's
 root, =warn=, and =automatic= fields before the ssh/mysql/url probes.
-Each status line starts with a green =[✓]= or red =[✗]= marker.  Missing values are reported without
+Each status line starts with a green =[✓]= or red =[✗]= marker and
+renders as =key: value= without a header row; keys and values use
+different colors.  Missing values are reported without
 aborting the remaining checks.
 
 The URL probe executes directly and uses a Rich status context; check has

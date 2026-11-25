@@ -161,30 +161,20 @@ class TestConfig:
                     else:
                         ok = True
                         msg = f"URL({u.url})"
-                self.line(ok, msg, 2)
+                self.line(ok, msg, spaces=2)
 
     def table(self, rows: Sequence[tuple[str, str, str]]) -> None:
-        """Print a stable status table with markers in front."""
-        name_width = max(
-            (len(name) for name, _value, _status in rows), default=8
-        )
-        value_width = max(
-            (len(value) for _name, value, _status in rows), default=5
-        )
-        # Four spaces align the header with the marker column.
-        self.out(
-            f"    {'Setting'.ljust(name_width)}  {'Value'.ljust(value_width)}",
-            2,
-        )
+        """Print status rows as ``[mark] key: value``."""
         for name, value, status in rows:
-            ok = status == "ok"
-            self.line(
-                ok,
-                f"{name.ljust(name_width)}  {value.ljust(value_width)}",
-                2,
-            )
+            self.line(status == "ok", name, value, spaces=2)
 
-    def line(self, ok: bool, msg: str, spaces: int = 0) -> None:
+    def line(
+        self,
+        ok: bool,
+        msg: str,
+        value: str | None = None,
+        spaces: int = 0,
+    ) -> None:
         """Print one colored status line with the marker in front."""
         if ui.quiet >= 2:
             return
@@ -193,13 +183,13 @@ class TestConfig:
             f"{' ' * spaces}{self.good if ok else self.bad} ",
             style="green" if ok else "red",
         )
-        text.append(msg)
+        if value is None:
+            text.append(msg)
+        else:
+            text.append(msg, style="cyan")
+            text.append(": ")
+            text.append(value, style="white")
         ui.console.print(text, soft_wrap=True)
-
-    def out(self, msg: str, spaces: int) -> None:
-        """Print an indented status line."""
-        indent = " " * spaces
-        ui.output(f"{indent}{msg}\n")
 
     def run_cmd_on_server(
         self, ssh: SSHConfig, cmd: str, good: str, bad: str
@@ -213,12 +203,12 @@ class TestConfig:
         )
         result = run(command, real=True, capture=True)
         if result.returncode:
-            self.line(False, f"{bad} (error: {result.returncode})", 2)
+            self.line(False, f"{bad} (error: {result.returncode})", spaces=2)
             if result.stderr:
                 ui.error(result.stderr, exit=False, indent=8)
             return False
 
-        self.line(True, good, 2)
+        self.line(True, good, spaces=2)
         return True
 
 

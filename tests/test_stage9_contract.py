@@ -14,6 +14,9 @@ def test_check_reports_project_and_server_fields(project_factory) -> None:
 
     assert result.exit_code == 0, combined(result)
     text = combined(result)
+    assert "Setting" not in text
+    assert "[✓] pulls_dir:" in text
+    assert "[✓] rsync_binary:" in text
     assert "rsync_binary" in text
     assert "pulls_dir" in text
     assert "log_dir" not in text
