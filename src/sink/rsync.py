@@ -1,3 +1,5 @@
+"""Build and run rsync transfers."""
+
 import glob
 import os
 import re
@@ -15,6 +17,8 @@ from sink.ui import ui
 # Rsync ignore owner, group, time, and perms:
 # https://unix.stackexchange.com/q/102211
 class Transfer:
+    """Build and run rsync transfers for one project and server."""
+
     def __init__(
         self,
         project: Project,
@@ -39,10 +43,12 @@ class Transfer:
         self.multiple = False
 
     def _excluded(self) -> tuple[str, ...]:
+        """Combine project and server exclusions."""
         values = {*self.project.exclude, *self.server.exclude}
         return tuple(sorted(value for value in values if value))
 
     def single(self, filename):
+        """Send a file to this transfer's server."""
         xfer = Transfer(
             self.project,
             self.server,
@@ -60,6 +66,7 @@ class Transfer:
         )
 
     def put(self, filename, extra_flags, dest_override=None):
+        """Upload a file or directory."""
         locations = self._locations(filename)
         local = locations["local"]
         # append a / to the remote path if its a dir so rsync will
@@ -73,6 +80,7 @@ class Transfer:
         self._rsync(local, remote, Action.PUT, self._flags(extra_flags))
 
     def pull(self, filename, extra_flags):
+        """Download a file or directory."""
         locations = self._locations(filename)
         local = locations["local"]
         remote = locations["remote"]
@@ -85,6 +93,7 @@ class Transfer:
 
     @staticmethod
     def _flags(extra_flags):
+        """Normalize extra rsync flags."""
         if not extra_flags:
             return ()
         if isinstance(extra_flags, str):
@@ -92,6 +101,7 @@ class Transfer:
         return tuple(extra_flags)
 
     def _hard_link_flag(self, dest, server_name):
+        """Find the newest deploy for ``--link-dest``."""
         parent = dest.parent
         dirs = glob.glob(f"{parent.absolute()}/{server_name}*")
         if not dirs:
@@ -100,12 +110,14 @@ class Transfer:
         return last.absolute()
 
     def _find(self, name, path):
+        """Find a file by name under a directory."""
         for root, _dirs, files in os.walk(path):
             if name in files:
                 return Path(root, name)
         return None
 
     def local(self, source, dest):
+        """Copy into a local deploy directory."""
         p = self.project
         server = self.server
         rsyncb = p.rsync_binary
@@ -157,9 +169,11 @@ class Transfer:
         #   download file
         # vimdiff all
         # remove temp dirs
+        """Placeholder for comparing several servers."""
         ...
 
     def diff(self, local_file, ignore=False, word_diff=None, difftool=False):
+        """Download a file and show or print the diff."""
         server_name = self.server.name
         local_file = Path(local_file)
         if local_file.is_dir():
@@ -212,6 +226,7 @@ class Transfer:
                 ui.echo("Files are the same.")
 
     def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
+        """Build the configured GUI difftool command."""
         gui = self.project.difftool
         if not gui:
             ui.error("No difftool program defined in sink.yaml")
@@ -221,6 +236,7 @@ class Transfer:
         return Argv(tuple(shlex.split(command)))
 
     def _locations(self, filename):
+        """Map a local path to its remote path."""
         p = self.project
         s = self.server
         local = filename
@@ -246,6 +262,7 @@ class Transfer:
         compare_to=None,
         native_dry_run=True,
     ):
+        """Build and run one rsync action."""
         command = self._rsync_command(
             localf,
             remotef,
@@ -268,6 +285,7 @@ class Transfer:
         compare_to=None,
         native_dry_run=True,
     ):
+        """Build the rsync argv for one action."""
         if not server.ssh:
             ui.error(f"Server has no ssh settings ({server.name}).")
         ssh = server.ssh[0]
@@ -275,6 +293,8 @@ class Transfer:
 
         argv = [rsyncb]
 
+        # rsync accepts one remote-shell command.  Keep port and identity in
+        # the same --rsh value; passing a separate -e would silently win.
         rsh = ["ssh"]
         if ssh.port:
             rsh.extend(["-p", str(ssh.port)])
@@ -337,6 +357,7 @@ class Transfer:
         )
 
     def run(self, command, single, action, server, remotef, localf):
+        """Confirm, execute, and report an rsync command."""
         doit = True
         if not single and action == Action.PUT and server.warn and self.real:
             doit = False
@@ -368,6 +389,7 @@ class Transfer:
             ui.display_success(self.real, server=server.name, message=message)
 
     def error_code(self, code):
+        """Return the rsync error description for a code."""
         code = str(code)
         codes = {
             "1": "Syntax or usage error",

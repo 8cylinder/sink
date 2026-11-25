@@ -1,3 +1,5 @@
+"""The ``sink info`` command and config editor."""
+
 from pathlib import Path
 
 import click
@@ -8,6 +10,7 @@ from sink.ui import ui
 
 
 def edit_config(path: Path):
+    """Edit and validate the config, offering a retry on YAML errors."""
     click.edit(filename=str(path))
     try:
         with open(path) as stream:

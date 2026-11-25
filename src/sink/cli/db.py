@@ -1,3 +1,5 @@
+"""The ``sink db`` command."""
+
 import click
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli

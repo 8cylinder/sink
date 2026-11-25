@@ -17,6 +17,7 @@ import click
 def _commands(
     group: click.Group, prefix: tuple[str, ...] = ()
 ) -> list[tuple[tuple[str, ...], click.Command]]:
+    """Yield every non-hidden command path and command."""
     commands = []
     for name, command in group.commands.items():
         if command.hidden:
@@ -29,10 +30,15 @@ def _commands(
 
 
 def _shell_words(values) -> str:
+    """Quote completion words for a bash ``compgen`` list."""
     return " ".join(shlex.quote(str(value)) for value in values)
 
 
 def _context(command: click.Command, path: tuple[str, ...]) -> click.Context:
+    """Build a Click context without disturbing the help-option cache."""
+    # Click 8.5 caches the first help option it builds on the command.  A
+    # bare Context defaults to ["--help"]; pass the command's configured
+    # names so generating completions never strips "-h" from later parsing.
     names = command.context_settings.get("help_option_names", ["--help"])
     return click.Context(
         command,
@@ -44,6 +50,7 @@ def _context(command: click.Command, path: tuple[str, ...]) -> click.Context:
 def _option_data(
     command: click.Command, path: tuple[str, ...]
 ) -> tuple[list[str], dict[str, list[str]], bool]:
+    """Collect option names and choice values for one command."""
     ctx = _context(command, path)
     options: list[str] = []
     choices: dict[str, list[str]] = {}
@@ -62,6 +69,7 @@ def _option_data(
 def _argument_data(
     command: click.Command, path: tuple[str, ...]
 ) -> tuple[dict[int, list[str]], set[int]]:
+    """Collect positional choices and path positions."""
     ctx = _context(command, path)
     choices: dict[int, list[str]] = {}
     paths: set[int] = set()
@@ -79,6 +87,7 @@ def _argument_data(
 
 
 def generate_bash(group: click.Group, prog_name: str, version: str) -> str:
+    """Return the complete static bash completion script."""
     commands = _commands(group)
     groups = {
         " ".join(path): command
@@ -183,6 +192,9 @@ def generate_bash(group: click.Group, prog_name: str, version: str) -> str:
         branch.append("      ;;")
         branches.append("\n".join(branch))
 
+    # The scanner compares "$cmd $word".  The first command has an empty
+    # prefix (so its pattern starts with a space); nested commands compare
+    # against the already-populated "parent child" path.
     command_cases = "\n".join(
         (
             f'        " {name}") cmd={shlex.quote(name)} ;;'
@@ -248,6 +260,7 @@ complete -o nosort -o bashdefault -o default -F _{prog_name}_complete {prog_name
 
 
 def completion_path(prog_name: str) -> Path:
+    """Return the per-user completion destination."""
     bash_dir = os.environ.get("BASH_COMPLETION_USER_DIR", "")
     first = next((part for part in bash_dir.split(":") if part), "")
     if first:
@@ -265,6 +278,7 @@ def completion_path(prog_name: str) -> Path:
 def install_bash_completion(
     group: click.Group, prog_name: str, version: str
 ) -> Path:
+    """Write the completion script atomically and return its path."""
     path = completion_path(prog_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     script = generate_bash(group, prog_name, version)

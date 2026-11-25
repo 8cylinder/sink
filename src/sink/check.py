@@ -1,3 +1,5 @@
+"""Check server, database, and URL configuration."""
+
 import shlex
 import ssl
 import urllib.error
@@ -10,6 +12,8 @@ from sink.ui import Spinner, ui
 
 
 class TestConfig:
+    """Run the configured server and URL checks."""
+
     good = "[\u2713]"
     bad = "[X]"
     timeout = 25
@@ -20,6 +24,7 @@ class TestConfig:
         self.insecure = insecure
 
     def test_project(self):
+        """Check that project-local directories exist."""
         ui.echo()
         ui.heading("Local dirs")
 
@@ -39,6 +44,7 @@ class TestConfig:
                 self.out(f"{self.bad} {directory}", indent)
 
     def test_requirements(self):
+        """Print the local tool-version command."""
         required = ["ssh -V", "git --version", "rsync --version"]
         required = [f"'{i}'" for i in required]
         req = " ".join(required)
@@ -49,6 +55,7 @@ class TestConfig:
         ui.echo(cmd)
 
     def test_servers(self, server_names=None):
+        """Check ssh, root, database, and URL access."""
         ui.echo()
         for s in self.config.servers.values():
             if server_names and s.name not in server_names:
@@ -108,6 +115,8 @@ class TestConfig:
                 spinner = Spinner(indent=2, delay=0.1)
                 spinner.start()
                 try:
+                    # Default verifies the certificate chain and hostname;
+                    # --insecure is the explicit opt-out for self-signed sites.
                     ctx = ssl.create_default_context()
                     if self.insecure:
                         ctx.check_hostname = False
@@ -131,10 +140,12 @@ class TestConfig:
                 self.out(msg, 2)
 
     def out(self, msg, spaces):
+        """Print an indented status line."""
         indent = " " * spaces
         ui.output(f"{indent}{msg}\n")
 
     def run_cmd_on_server(self, ssh, cmd, good, bad):
+        """Run one probe, printing the command and result."""
         command = remote_command(
             ssh,
             cmd,
@@ -155,6 +166,7 @@ class TestConfig:
 
 
 def _port(db):
+    """Return a database port as an integer, or ``None``."""
     try:
         return int(db.port)
     except AttributeError, TypeError, ValueError:

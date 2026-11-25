@@ -1,3 +1,5 @@
+"""The ``sink file`` and ``sink single`` commands."""
+
 import os
 from pathlib import Path
 

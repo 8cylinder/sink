@@ -1,3 +1,5 @@
+"""Rich console output, status labels, and redaction."""
+
 import os
 import random
 import sys
@@ -10,11 +12,14 @@ from rich.text import Text
 
 
 class Spinner:
+    """Small threaded terminal spinner."""
+
     busy = False
     delay = 0.1
 
     @staticmethod
     def spinning_cursor(indent):
+        """Yield spinner frames at the requested indent."""
         cursors = [
             "|/-\\",
             "_.oO||Oo._",
@@ -35,6 +40,7 @@ class Spinner:
             self.delay = delay
 
     def spinner_task(self):
+        """Write spinner frames until stopped."""
         while self.busy:
             sys.stdout.write(next(self.spinner_generator))
             sys.stdout.flush()
@@ -43,15 +49,19 @@ class Spinner:
             sys.stdout.flush()
 
     def start(self):
+        """Start the spinner thread."""
         self.busy = True
         threading.Thread(target=self.spinner_task).start()
 
     def stop(self):
+        """Stop the spinner thread."""
         self.busy = False
         time.sleep(self.delay)
 
 
 class ui:
+    """Console output, labels, redaction, and output levels."""
+
     quiet = 0
     verbose = 0
     suppress = False
@@ -67,6 +77,9 @@ class ui:
         verbose=0,
         suppress=False,
     ):
+        """Configure colors and output levels for this invocation."""
+        # quiet=1 hides rendered commands; quiet=2 hides every status/output
+        # line.  ``suppress`` mirrors the legacy -s flag.
         cls.quiet = quiet
         cls.verbose = verbose
         cls.suppress = suppress
@@ -94,6 +107,7 @@ class ui:
 
     @staticmethod
     def heading(msg, *, underline=False):
+        """Print a section heading."""
         if ui.quiet >= 2:
             return
         text = Text(msg, style="bold green")
@@ -102,6 +116,7 @@ class ui:
 
     @staticmethod
     def redact(text, secrets=()):
+        """Mask known secret values in text."""
         for secret in secrets:
             if secret:
                 text = text.replace(str(secret), "********")
@@ -109,6 +124,7 @@ class ui:
 
     @staticmethod
     def echo(msg="", nl=True):
+        """Print plain text unless ``-qq`` is active."""
         if ui.quiet >= 2:
             return
         click.echo(msg, nl=nl)
@@ -122,6 +138,7 @@ class ui:
 
     @staticmethod
     def msg(msg):
+        """Print a multi-line message."""
         msg = [i.strip() for i in msg.split("\n")]
         if ui.quiet >= 2:
             return
@@ -129,6 +146,7 @@ class ui:
 
     @staticmethod
     def notice(msg):
+        """Print a notice to stderr."""
         if ui.quiet >= 2:
             return
         ui.err_console.print(
@@ -137,6 +155,7 @@ class ui:
 
     @staticmethod
     def warn(msg, indent=""):
+        """Print a warning to stderr."""
         if ui.quiet >= 2:
             return
         ui.err_console.print(
@@ -145,6 +164,7 @@ class ui:
 
     @staticmethod
     def error(msg, exit=True, indent=0, secrets=()):
+        """Print an error and optionally exit non-zero."""
         msg = ui.redact(msg, secrets)
         distance = ""
         if indent:
@@ -159,10 +179,13 @@ class ui:
 
     @staticmethod
     def display_cmd(cmd, indent=0, suppress_commands=False, secrets=()):
+        """Print a rendered command unless quiet or suppressed."""
         if ui.quiet >= 1 or ui.suppress or suppress_commands:
             return
         cmd = ui.redact(cmd, secrets)
         distance = " " * indent
+        # soft_wrap keeps one copy-pasteable line; wrapping inside a quoted
+        # argument would change the shell command when pasted.
         ui.console.print(
             Text(f"{distance}+ {cmd}", style="yellow dim"),
             soft_wrap=True,
@@ -170,6 +193,7 @@ class ui:
 
     @staticmethod
     def display_success(real, extra=None, *, server=None, message=None):
+        """Print a success label with optional server/details."""
         if ui.quiet >= 2:
             return
         label = "[Success]" if real else "[Success (DRY RUN)]"
@@ -188,6 +212,7 @@ class ui:
 
     @staticmethod
     def display_options(data):
+        """Print aligned key/value options."""
         if ui.quiet >= 2:
             return
         width = max((len(key) for key in data), default=0)
@@ -199,6 +224,7 @@ class ui:
 
     @staticmethod
     def print_stack():
+        """Print a compact stack trace."""
         import traceback
 
         if ui.quiet >= 2:

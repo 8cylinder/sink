@@ -199,6 +199,15 @@
      =Protocol=, =@dataclass(frozen=True, slots=True)=.
    - Timezone-aware datetimes; =pathlib.Path= end to end; no =os.chdir=.
    - Public functions fully annotated; =ty= rules from =app-base.org=.
+** Code documentation
+   - Every Python file begins with a module docstring.
+   - Every public class, function, and method has a docstring; internal
+     helpers also get one when their purpose is not obvious from the name.
+   - Add comments for non-obvious control flow: shell quoting and argv
+     construction, pipeline/redirection handling, secret staging and
+     redaction, config path resolution, and completion metadata.
+   - =tests/test_docstrings.py= enforces module docstrings and docstrings
+     on every non-dunder class/function/method in =src/sink=.
 ** Tooling
    #+begin_src toml
      [project]
@@ -1566,6 +1575,8 @@ Poetry/setup.py era.
     =--real= prints and executes the real variant.  Copy-pasting either
     printed command reproduces that mode's action.
   - README, docs, man page, AGENTS.md, and TODO.org match the shipped behavior.
+  - Every Python source file has a module docstring; classes and functions
+    have docstrings, and non-obvious control flow is commented.
   - The repository history is clean of secrets and CI enforces it.
 
 * Appendix A - Commands

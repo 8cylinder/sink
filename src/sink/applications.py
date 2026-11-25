@@ -1,7 +1,11 @@
+"""Render copy-paste connection settings for common clients."""
+
 from sink.config.models import Config, Server, SSHConfig
 
 
 class Applications:
+    """Generate connection settings for known applications."""
+
     def __init__(self, config: Config):
         self.config = config
         self.apps = {
@@ -13,18 +17,22 @@ class Applications:
         self.app = None
 
     def name(self, app_name):
+        """Select an application by name."""
         if app_name in self.apps:
             self.app = self.apps[app_name]
             return True
         return False
 
     def app_settings(self):
+        """Render the selected application's settings."""
         return self.app()
 
     def known(self):
+        """Return the comma-separated application names."""
         return ", ".join(list(self.apps))
 
     def pretify(self, data):
+        """Format labelled connection fields for display."""
         pretty = ""
         for section in data:
             pretty += "\n"
@@ -38,9 +46,11 @@ class Applications:
 
     @staticmethod
     def _ssh(server: Server) -> SSHConfig:
+        """Return the first ssh config or an empty one."""
         return server.ssh[0] if server.ssh else SSHConfig()
 
     def _mysql(self):
+        """Render MySQL client connection settings."""
         out = []
         p = self.config.project
         for s in self.config.servers.values():
@@ -62,6 +72,7 @@ class Applications:
         return self.pretify(out)
 
     def _filezilla(self):
+        """Render FileZilla site settings."""
         out = []
         p = self.config.project
         for s in self.config.servers.values():
@@ -82,6 +93,7 @@ class Applications:
         return self.pretify(out)
 
     def _nautilus(self):
+        """Render Nautilus sftp URIs."""
         out = []
         for s in self.config.servers.values():
             ssh = self._ssh(s)
@@ -90,6 +102,7 @@ class Applications:
         return "\n".join(out)
 
     def _dbeaver(self):
+        """Render DBeaver connection settings."""
         out = []
         p = self.config.project
         for s in self.config.servers.values():

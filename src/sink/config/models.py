@@ -15,6 +15,8 @@ from sink.errors import NoDefaultServer, UnknownServer
 
 
 class Action(Enum):
+    """File and database transfer directions."""
+
     PUT = "put"
     PULL = "pull"
     DIFF = "diff"
@@ -22,6 +24,8 @@ class Action(Enum):
 
 @dataclass(frozen=True, slots=True)
 class SSHConfig:
+    """One ssh account for a server."""
+
     name: str | None = None
     username: str | None = None
     password: str | None = None
@@ -33,6 +37,8 @@ class SSHConfig:
 
 @dataclass(frozen=True, slots=True)
 class DatabaseConfig:
+    """One MySQL database connection."""
+
     db: str | None = None
     username: str | None = None
     password: str | None = None
@@ -44,6 +50,8 @@ class DatabaseConfig:
 
 @dataclass(frozen=True, slots=True)
 class URLConfig:
+    """One site URL and its optional credentials."""
+
     url: str | None = None
     admin_url: str | None = None
     username: str | None = None
@@ -55,12 +63,16 @@ class URLConfig:
 
 @dataclass(frozen=True, slots=True)
 class ActionConfig:
+    """A named action command."""
+
     name: str
     command: str
 
 
 @dataclass(frozen=True, slots=True)
 class Project:
+    """Project-level configuration values."""
+
     name: str
     root: Path
     pulls_dir: Path | None = None
@@ -75,6 +87,8 @@ class Project:
 
 @dataclass(frozen=True, slots=True)
 class Server:
+    """One remote server configuration."""
+
     name: str
     root: Path | None = None
     deploy_root: Path | None = None
@@ -102,6 +116,8 @@ class Server:
 
 @dataclass(frozen=True, slots=True)
 class Config:
+    """A fully loaded configuration snapshot."""
+
     path: Path
     project: Project
     servers: Mapping[str, Server]
@@ -110,6 +126,7 @@ class Config:
     warnings: tuple[str, ...] = ()
 
     def server(self, name: str | None = None) -> Server:
+        """Return a named or default server."""
         key = name or self.default_server
         if key is None:
             raise NoDefaultServer(
@@ -124,6 +141,7 @@ class Config:
             ) from None
 
     def excluded(self, name: str | None = None) -> tuple[str, ...]:
+        """Combine project and server exclusions."""
         server = self.server(name) if name is not None else None
         values = list(self.project.exclude)
         if server is not None:

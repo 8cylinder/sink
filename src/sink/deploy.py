@@ -1,3 +1,5 @@
+"""Local and remote deploy strategies."""
+
 import datetime
 import os
 import string
@@ -17,6 +19,8 @@ from sink.ui import ui
 
 
 class DeployViaRename:
+    """Deploy by copying and renaming the site directory."""
+
     def __init__(
         self, project: Project, server: Server, real=False, quiet=False
     ):
@@ -32,6 +36,7 @@ class DeployViaRename:
         self.date_file = f"SINK-DATE:{self.stamp}"
 
     def init_deploy(self, *dirs):
+        """Print the remote commands needed to initialize."""
         ui.heading(f"\nOn remote server ({self.s.name}) run:")
         deploy_dir = Path(self.s.deploy_root, self.stamp)
         date_file = deploy_dir / self.date_file
@@ -76,6 +81,7 @@ class DeployViaRename:
         xfer._rsync(local_root, deploy_dest, Action.PUT)
 
     def change_current(self, load_db=False):
+        """Rename deploys are selected by directory name."""
         pass
 
     def _server_time(self):
@@ -87,6 +93,8 @@ class DeployViaRename:
 
 
 class DeployViaSymlink:
+    """Deploy by creating timestamped directories and a symlink."""
+
     def __init__(
         self, project: Project, server: Server, real=False, quiet=False
     ):
@@ -122,6 +130,7 @@ class DeployViaSymlink:
         )
 
     def _get_active(self):
+        """Return the symlink's current target."""
         active_cmd = f"readlink --verbose {self.s.root}"
         active = self.ssh.run(active_cmd).strip()
         active = Path(active)
@@ -262,6 +271,7 @@ class DeployViaLocal:
         self.config_dir = config_dir
 
     def get_dist(self) -> Path:
+        """Return the local deploy root."""
         return Path(self.config_dir, self.DIST_HOME)
 
     def init_deploy(self):
@@ -321,6 +331,7 @@ class DeployViaLocal:
                 ui.notice(f"{info_file} created")
 
     def update_deploy_date(self, yaml_file):
+        """Record the upload date in a deploy's metadata."""
         with yaml_file.open() as f:
             data = yaml.load(f.read(), Loader=yaml.SafeLoader)
         now = datetime.datetime.now().isoformat(timespec="seconds")
@@ -361,6 +372,7 @@ class DeployViaLocal:
         xfer.put(source, extra_flags, dest_override=s.root)
 
     def get_current_deploy(self, server: Server, real):
+        """Read the active deploy metadata from the server."""
         s = server
         ssh = SSH(server, dry_run=False)
         remote_path = Path(s.root, self.INFO_FILE)
@@ -377,6 +389,7 @@ class DeployViaLocal:
         return data
 
     def display_choices(self, dirs, current, server_name):
+        """Show deploys and return the selected one."""
         pointer = "->"
         # pointer = '▶ '
         pointer_pretty = pointer
@@ -449,6 +462,7 @@ class DeployViaLocal:
         return self.choose_letter(choices)
 
     def choose_letter(self, choices):
+        """Prompt until the user selects a valid deploy."""
         msg = "Select a deploy to upload (ctrl-c to abort)"
         choice = click.prompt(msg)
         try:

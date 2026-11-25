@@ -24,6 +24,8 @@ DEFAULT_TIMEOUT = 25
 
 @dataclass(frozen=True, slots=True)
 class RemoteCredentials:
+    """Out-of-band remote MySQL credentials."""
+
     ssh: object
     password: str
     user: str | None = None
@@ -37,6 +39,7 @@ class RemoteCredentials:
 
     @property
     def content(self) -> str:
+        """Return the credentials file body."""
         lines = ["[client]"]
         if self.user:
             lines.append(f"user={self.user}")
@@ -50,9 +53,11 @@ class RemoteCredentials:
 
     @property
     def option(self) -> str:
+        """Return the mysql defaults-file option."""
         return f"--defaults-extra-file={self.path}"
 
     def stage_command(self) -> RemoteCommand:
+        """Return the command that writes the file over ssh."""
         return remote_command(
             self.ssh,
             f"umask 077; cat > {shlex.quote(self.path)}",
@@ -61,6 +66,7 @@ class RemoteCredentials:
         )
 
     def cleanup_command(self) -> RemoteCommand:
+        """Return the command that removes the remote file."""
         return remote_command(
             self.ssh,
             f"rm -f {shlex.quote(self.path)}",
@@ -87,6 +93,8 @@ def remote_mysql_credentials(
         host=host,
         port=port,
     )
+    # The secrets travel on stdin, never in argv.  In dry-run mode this only
+    # prints the staging command; real mode writes the 0600 file remotely.
     staged = run(
         credentials.stage_command(),
         real=real,

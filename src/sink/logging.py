@@ -8,6 +8,7 @@ from rich.logging import RichHandler
 
 
 def configure(verbose: int) -> None:
+    """Configure Rich logging for ``-v``."""
     level = logging.DEBUG if verbose > 1 else logging.INFO
     logging.basicConfig(
         level=level,

@@ -1,3 +1,5 @@
+"""The ``sink action`` command."""
+
 import click
 
 from sink.actions import Actions

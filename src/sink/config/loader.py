@@ -94,6 +94,7 @@ ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
 def find_config(start: Path) -> Path | None:
+    """Walk up from ``start`` to find ``sink.yaml``."""
     start = start.resolve()
     for directory in (start, *start.parents):
         candidate = directory / "sink.yaml"
@@ -103,6 +104,7 @@ def find_config(start: Path) -> Path | None:
 
 
 def load(path: Path) -> Config:
+    """Parse, validate, and resolve a config file into models."""
     path = path.resolve()
     try:
         document = yaml.safe_load(path.read_text())
@@ -142,6 +144,7 @@ def load(path: Path) -> Config:
 
 
 def _expand_env(value: Any, path: Path) -> Any:
+    """Recursively expand ``${NAME}`` references in YAML values."""
     if isinstance(value, Mapping):
         return {key: _expand_env(item, path) for key, item in value.items()}
     if isinstance(value, list):
@@ -150,6 +153,7 @@ def _expand_env(value: Any, path: Path) -> Any:
         return value
 
     def replace(match: re.Match[str]) -> str:
+        """Return one environment value or raise a config error."""
         name = match.group(1)
         try:
             return os.environ[name]
@@ -162,6 +166,7 @@ def _expand_env(value: Any, path: Path) -> Any:
 
 
 def _project(data: Any, path: Path, warnings: list[str]) -> Project:
+    """Build and validate the project section."""
     if not isinstance(data, Mapping):
         raise ConfigError(f"{path}: project section must be a mapping")
     _check_unknown(data, PROJECT_KEYS, f"{path}: project", warnings)
@@ -198,6 +203,7 @@ def _servers(
     project: Project,
     warnings: list[str],
 ) -> dict[str, Server]:
+    """Build every server in the servers section."""
     if data is None:
         return {}
     if not isinstance(data, Mapping):
@@ -220,6 +226,7 @@ def _server(
     project: Project,
     warnings: list[str],
 ) -> Server:
+    """Build and validate one server entry."""
     where = f"{path}: servers.{name}"
     _check_unknown(data, SERVER_KEYS, where, warnings)
 
@@ -262,6 +269,7 @@ def _ssh_configs(
     where: str,
     warnings: list[str],
 ) -> tuple[SSHConfig, ...]:
+    """Build ssh configs and resolve key paths."""
     if data is None:
         return ()
     if not isinstance(data, list):
@@ -295,6 +303,7 @@ def _ssh_configs(
 
 
 def _databases(data: Any, path: Path, where: str) -> tuple[DatabaseConfig, ...]:
+    """Build the database list for one server."""
     if data is None:
         return ()
     if not isinstance(data, list):
@@ -329,6 +338,7 @@ def _databases(data: Any, path: Path, where: str) -> tuple[DatabaseConfig, ...]:
 
 
 def _urls(data: Any, path: Path, where: str) -> tuple[URLConfig, ...]:
+    """Build the URL list for one server."""
     if data is None:
         return ()
     if not isinstance(data, list):
@@ -365,6 +375,7 @@ def _urls(data: Any, path: Path, where: str) -> tuple[URLConfig, ...]:
 
 
 def _actions(data: Any, path: Path, where: str) -> Mapping[str, str]:
+    """Build an immutable action mapping."""
     if data is None:
         return MappingProxyType({})
     if not isinstance(data, Mapping):
@@ -383,12 +394,14 @@ def _check_unknown(
     where: str,
     warnings: list[str],
 ) -> None:
+    """Collect a warning for each unknown key."""
     for key in data:
         if key not in allowed:
             warnings.append(f'{where}: unknown key "{key}" was ignored')
 
 
 def _string(value: Any, path: Path, where: str) -> str | None:
+    """Validate an optional string value."""
     if value is None:
         return None
     if not isinstance(value, str):
@@ -397,6 +410,7 @@ def _string(value: Any, path: Path, where: str) -> str | None:
 
 
 def _boolean(value: Any, path: Path, where: str) -> bool:
+    """Validate YAML-style boolean values."""
     if value is None:
         return False
     if isinstance(value, bool):
@@ -413,6 +427,7 @@ def _boolean(value: Any, path: Path, where: str) -> bool:
 def _optional_int(
     value: Any, path: Path, where: str, default: int | None = None
 ) -> int | None:
+    """Validate an optional integer value."""
     if value is None or value == "":
         return default
     try:
@@ -422,6 +437,7 @@ def _optional_int(
 
 
 def _string_tuple(value: Any, path: Path, where: str) -> tuple[str, ...]:
+    """Validate a list of non-empty strings."""
     if value is None:
         return ()
     if isinstance(value, str):
@@ -438,6 +454,7 @@ def _string_tuple(value: Any, path: Path, where: str) -> tuple[str, ...]:
 
 
 def _mapping(value: Any, path: Path, where: str) -> Mapping[str, object]:
+    """Validate and freeze a mapping value."""
     if value is None:
         return MappingProxyType({})
     if not isinstance(value, Mapping):
@@ -446,6 +463,7 @@ def _mapping(value: Any, path: Path, where: str) -> Mapping[str, object]:
 
 
 def _resolve_path(value: Any, path: Path, where: str) -> Path:
+    """Resolve a path relative to the config file."""
     if not isinstance(value, (str, os.PathLike)):
         raise ConfigError(f"{path}: {where} must be a path")
     candidate = Path(os.path.expanduser(str(value)))
@@ -455,12 +473,14 @@ def _resolve_path(value: Any, path: Path, where: str) -> Path:
 
 
 def _optional_path(value: Any, path: Path, where: str) -> Path | None:
+    """Resolve an optional local path."""
     if value is None or value == "":
         return None
     return _resolve_path(value, path, where)
 
 
 def _optional_remote_path(value: Any, path: Path, where: str) -> Path | None:
+    """Expand an optional remote path."""
     if value is None or value == "":
         return None
     if not isinstance(value, (str, os.PathLike)):
@@ -475,7 +495,11 @@ def _resolve_key(
     warnings: list[str],
     where: str,
 ) -> str | None:
+    """Resolve an ssh key against the config and project roots."""
     candidate = Path(os.path.expanduser(key))
+    # Try the path as written first, then relative to the config file, then
+    # relative to the project root.  A missing key is a warning, not a fatal
+    # error, so commands still render for inspection.
     candidates = (
         [candidate]
         if candidate.is_absolute()
@@ -489,6 +513,7 @@ def _resolve_key(
 
 
 def _rsync_binary(value: Any, path: Path) -> str:
+    """Select a platform-specific rsync binary name."""
     if isinstance(value, Mapping):
         if sys.platform.startswith("linux"):
             key = "linux"

@@ -1,11 +1,18 @@
+"""Generate a starter ``sink.yaml`` document."""
+
+
 class Init:
+    """Build the starter YAML template."""
+
     def __init__(self):
         self.server_names = None
 
     def servers(self, names: tuple[str, ...]):
+        """Set the server names to include."""
         self.server_names = names
 
     def create(self):
+        """Return the rendered template."""
         blank_config = """
           # -*- make-backup-files: nil; -*-
 

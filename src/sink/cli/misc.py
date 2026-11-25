@@ -1,3 +1,5 @@
+"""The ``sink misc`` command group."""
+
 import datetime
 import json
 import shlex
@@ -15,6 +17,7 @@ SENSITIVE = ("password", "passwd", "secret", "token")
 
 
 def _config_secrets(config: Config) -> tuple[str, ...]:
+    """Collect configured passwords for output redaction."""
     secrets: set[str] = set()
     for server in config.servers.values():
         for ssh in server.ssh:
@@ -32,6 +35,7 @@ def _config_secrets(config: Config) -> tuple[str, ...]:
 
 
 def _redact_value(value, show_secrets: bool):
+    """Recursively mask secret-looking values."""
     if show_secrets:
         return value
     if isinstance(value, Mapping):

@@ -1,3 +1,5 @@
+"""The ``sink deploy`` command group."""
+
 from enum import Enum
 
 import click
@@ -12,6 +14,8 @@ from sink.ui import ui
 
 
 class DeployType(Enum):
+    """Supported deploy strategies."""
+
     RENAME = "rename"
     SYMLINK = "symlink"
     LOCAL = "local"

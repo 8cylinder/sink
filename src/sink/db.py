@@ -1,3 +1,5 @@
+"""Pull and push MySQL databases safely."""
+
 import datetime
 import os
 import shlex
@@ -16,6 +18,7 @@ from sink.ui import ui
 
 @contextmanager
 def cd(newdir):
+    """Temporarily change directory and always restore it."""
     prevdir = os.getcwd()
     os.chdir(os.path.expanduser(newdir))
     try:
@@ -25,6 +28,7 @@ def cd(newdir):
 
 
 def _port(db):
+    """Return a database port as an integer, or ``None``."""
     try:
         return int(db.port)
     except AttributeError, TypeError, ValueError:
@@ -32,6 +36,7 @@ def _port(db):
 
 
 def _client_options(db, credentials=None):
+    """Build mysql client arguments without a password flag."""
     if credentials is not None:
         return [credentials.option]
     options = []
@@ -48,6 +53,7 @@ def _client_options(db, credentials=None):
 
 
 def _mysqldump_argv(db, credentials=None):
+    """Build the mysqldump argv."""
     return [
         "mysqldump",
         *_client_options(db, credentials),
@@ -61,10 +67,12 @@ def _mysqldump_argv(db, credentials=None):
 
 
 def _mysql_argv(db, credentials=None):
+    """Build the mysql import argv."""
     return ["mysql", *_client_options(db, credentials), db.db]
 
 
 def _env_with_password(db):
+    """Return an environment carrying ``MYSQL_PWD``."""
     env = os.environ.copy()
     if db.password:
         env["MYSQL_PWD"] = db.password
@@ -72,6 +80,8 @@ def _env_with_password(db):
 
 
 class DB:
+    """Pull and push databases for one project and server."""
+
     def __init__(
         self,
         project: Project,
@@ -88,6 +98,7 @@ class DB:
         self.secrets: tuple[str, ...] = ()
 
     def _database(self) -> DatabaseConfig:
+        """Return the first configured database or raise."""
         if not self.server.databases:
             raise CommandError(
                 f"Server {self.server.name} has no database configured"
@@ -97,10 +108,12 @@ class DB:
         return database
 
     def dump_remote(self, dest):
+        """Write a dump on the remote server."""
         dest = Path(dest)
         self._pull(dest, local=False)
 
     def pull(self, tag=None):
+        """Pull a dump into the pulls directory."""
         p = self.project
         s = self.server
         db = self._database()
@@ -120,6 +133,7 @@ class DB:
 
     def _pull_lando(self, sqlfile):
         # suppress stderr since lando outputs update messages there
+        """Pull through Lando."""
         command = Pipeline(
             (Argv(("lando", "db-export", str(sqlfile))),),
             stderr_devnull=True,
@@ -128,6 +142,7 @@ class DB:
 
     def _pull_ddev(self, sqlfile):
         # ddev outputs informational output on stderr.
+        """Pull through DDEV."""
         command = Pipeline(
             (
                 Argv(
@@ -144,6 +159,7 @@ class DB:
         self.run_pull_cmd(command, sqlfile, True)
 
     def _pull(self, sqlfile, local=True):
+        """Build and run a local or remote dump pipeline."""
         p = self.project
         s = self.server
         db = self._database()
@@ -201,6 +217,7 @@ class DB:
             self._report_pull(result, Path(sqlfile), local)
 
     def _report_pull(self, result, sqlfile, local):
+        """Report the result of a pull."""
         if not self.real:
             ui.display_success(
                 self.real,
@@ -233,10 +250,12 @@ class DB:
             ui.error("Command failed", exit=False)
 
     def run_pull_cmd(self, cmd, sqlfile, local):
+        """Run a pull command and report its result."""
         result = run(cmd, real=self.real, capture=True)
         self._report_pull(result, Path(sqlfile), local)
 
     def make_symlink(self, sqlfile):
+        """Point ``LATEST-<server>.sql.gz`` at the newest dump."""
         link_name = Path(f"LATEST-{self.server.name}.sql.gz")
         with cd(sqlfile.parent):
             with suppress(FileNotFoundError):
@@ -245,10 +264,12 @@ class DB:
             link_name.symlink_to(f"./{sqlfile.name}")
 
     def load_remote(self, source):
+        """Load a dump that already exists on the server."""
         source = Path(source)
         self._put(source, local=False)
 
     def put(self, sqlfile):
+        """Push a local dump to the server."""
         s = self.server
         self._database()
         sql = Path(sqlfile)
@@ -260,6 +281,7 @@ class DB:
             self._put(sql)
 
     def _put_lando(self, sql):
+        """Import through Lando."""
         command = Pipeline(
             (Argv(("lando", "db-import", str(sql))),),
             stderr_devnull=True,
@@ -267,10 +289,12 @@ class DB:
         self.run_put_cmd(command)
 
     def _put_ddev(self, sql):
+        """Import through DDEV."""
         command = Argv(("ddev", "import-db", "--progress", f"--src={sql}"))
         self.run_put_cmd(command)
 
     def _put(self, sqlfile, local=True):
+        """Build and run a local or remote import pipeline."""
         s = self.server
         db = self._database()
         if not s.ssh:
@@ -329,6 +353,7 @@ class DB:
             self._report_put(result)
 
     def _report_put(self, result):
+        """Report the result of an import."""
         if not self.real:
             ui.display_success(
                 self.real,
@@ -336,6 +361,8 @@ class DB:
                 message="sql upload complete",
             )
             return
+        # ``pv --numeric`` writes progress percentages to stderr.  They are
+        # not errors, so keep only non-numeric lines for the failure report.
         errors = [
             line
             for line in result.stderr.splitlines()
@@ -352,6 +379,7 @@ class DB:
         )
 
     def run_put_cmd(self, cmd):
+        """Confirm, run, and report an import command."""
         s = self.server
         if self.real and s.warn:
             msg = (
@@ -364,6 +392,7 @@ class DB:
         self._report_put(result)
 
     def _dest(self, project_name, dbname, dirname, id, tag):
+        """Build the timestamped dump filename."""
         now = datetime.datetime.now()
         now = now.strftime("%y-%m-%d_%H-%M-%S")
         tag = f"-{tag}" if tag else ""

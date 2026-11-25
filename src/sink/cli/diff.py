@@ -1,3 +1,5 @@
+"""The ``sink diff`` command."""
+
 import os
 from pathlib import Path
 

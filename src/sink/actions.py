@@ -1,3 +1,5 @@
+"""Run configured project and server actions."""
+
 import shlex
 
 from sink.config.models import Project, Server
@@ -8,6 +10,8 @@ from sink.ui import ui
 
 
 class Actions:
+    """Project- or server-scoped configured actions."""
+
     def __init__(self, project: Project, server: Server | None, real: bool):
         self.project = project
         self.server = server
@@ -15,17 +19,21 @@ class Actions:
 
     @property
     def servername(self) -> str:
+        """Return ``local`` or the target server name."""
         return self.server.name if self.server is not None else "local"
 
     def actions(self):
+        """Return the action mapping for this scope."""
         source = self.project if self.server is None else self.server
         return source.actions
 
     def list_actions(self):
+        """Print the available actions."""
         for name, cmd in self.actions().items():
             ui.output(f'{name} - "{cmd}"\n')
 
     def run(self, command_name):
+        """Run one configured action or report it missing."""
         commands = self.actions()
         try:
             cmd = commands[command_name]

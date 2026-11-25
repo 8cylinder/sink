@@ -24,9 +24,11 @@ class AppGroup(click.Group):
     """Display commands in file order and render expected errors."""
 
     def list_commands(self, ctx):
+        """Keep commands in their registration order."""
         return self.commands.keys()
 
     def invoke(self, ctx):
+        """Render expected application errors without a traceback."""
         try:
             return super().invoke(ctx)
         except SinkError as error:
@@ -34,6 +36,7 @@ class AppGroup(click.Group):
 
 
 def _version() -> str:
+    """Return the installed Sink version."""
     try:
         return importlib.metadata.version("sink")
     except importlib.metadata.PackageNotFoundError:
@@ -41,6 +44,7 @@ def _version() -> str:
 
 
 def _config_callback(ctx, param, value):
+    """Print the discovered config path and exit."""
     if not value or ctx.resilient_parsing:
         return None
     path = Runtime.discover_config(Path.cwd())
@@ -54,6 +58,7 @@ def _config_callback(ctx, param, value):
 
 
 def _completions_callback(ctx, param, value):
+    """Install static bash completions and exit."""
     if not value or ctx.resilient_parsing:
         return None
     path = install_bash_completion(cli, "sink", _version())
@@ -144,6 +149,7 @@ def cli(
 
 
 def main() -> int:
+    """Console-script entry point."""
     cli.main(prog_name="sink")
     return 0
 

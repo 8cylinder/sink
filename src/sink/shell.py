@@ -21,21 +21,32 @@ from sink.ui import ui
 
 @dataclass(frozen=True, slots=True)
 class Result:
+    """Captured command result."""
+
     returncode: int
     stdout: str = ""
     stderr: str = ""
 
     @property
     def ok(self) -> bool:
+        """Whether the command exited successfully."""
         return self.returncode == 0
 
 
 class Command(Protocol):
-    def argv_for(self, real: bool) -> tuple[str, ...]: ...
+    """Protocol shared by argv, remote, and pipeline commands."""
 
-    def render(self, real: bool) -> str: ...
+    def argv_for(self, real: bool) -> tuple[str, ...]:
+        """Return the local argv for the selected mode."""
+        ...
 
-    def can_execute(self, real: bool) -> bool: ...
+    def render(self, real: bool) -> str:
+        """Render the command as valid shell text."""
+        ...
+
+    def can_execute(self, real: bool) -> bool:
+        """Whether this mode may spawn a process."""
+        ...
 
     def execute(
         self,
@@ -47,7 +58,9 @@ class Command(Protocol):
         input: str | None = None,
         stdout: IO[str] | None = None,
         stderr: IO[str] | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        """Execute the selected variant."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,14 +76,19 @@ class Argv:
             raise ValueError("argv must contain at least the program")
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
+        """Return the argv, adding a native dry-run flag when asked."""
+        # The flag belongs to the tool, not the shell, so it sits directly
+        # after the program name and is part of the same argv that executes.
         if not real and self.dry_run_flag:
             return (self.argv[0], self.dry_run_flag, *self.argv[1:])
         return self.argv
 
     def can_execute(self, real: bool) -> bool:
+        """Whether this mode may spawn a process."""
         return real or self.dry_run_flag is not None
 
     def render(self, real: bool) -> str:
+        """Render the argv as a safe shell command."""
         command = shlex.join(self.argv_for(real))
         if self.env_refs:
             prefix = " ".join(f'{name}="${{{name}}}"' for name in self.env_refs)
@@ -88,6 +106,7 @@ class Argv:
         stdout: IO[str] | None = None,
         stderr: IO[str] | None = None,
     ) -> Result:
+        """Run the selected argv."""
         argv = self.argv_for(real)
         return _execute_argv(
             argv,
@@ -108,12 +127,15 @@ class RemoteCommand:
     fragment: str
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
+        """Append the remote fragment as one ssh argument."""
         return (*self.ssh_argv, self.fragment)
 
     def render(self, real: bool) -> str:
+        """Render the ssh argv with a quoted fragment."""
         return shlex.join(self.argv_for(real))
 
     def can_execute(self, real: bool) -> bool:
+        """Remote commands never have a native dry-run."""
         return real
 
     def execute(
@@ -127,6 +149,7 @@ class RemoteCommand:
         stdout: IO[str] | None = None,
         stderr: IO[str] | None = None,
     ) -> Result:
+        """Run the ssh argv."""
         return _execute_argv(
             self.argv_for(real),
             env=env,
@@ -152,9 +175,11 @@ class Pipeline:
             raise ValueError("pipeline must contain at least one stage")
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
+        """Pipelines have no single argv."""
         raise TypeError("a pipeline has no single argv")
 
     def render(self, real: bool) -> str:
+        """Render stages and redirections as shell text."""
         text = " | ".join(stage.render(real) for stage in self.stages)
         if self.stdout_path is not None:
             text += f" > {shlex.quote(str(self.stdout_path))}"
@@ -165,6 +190,7 @@ class Pipeline:
         return text
 
     def can_execute(self, real: bool) -> bool:
+        """Pipelines only execute in real mode."""
         return real
 
     def execute(
@@ -178,6 +204,7 @@ class Pipeline:
         stdout: IO[str] | None = None,
         stderr: IO[str] | None = None,
     ) -> Result:
+        """Connect stages with pipes and apply redirections."""
         return _execute_pipeline(
             self,
             env=env,
@@ -199,6 +226,7 @@ def _execute_argv(
     stdout: IO[str] | None,
     stderr: IO[str] | None,
 ) -> Result:
+    """Execute one argv with optional capture and stdin."""
     run_kwargs: dict[str, object] = {
         "args": list(argv),
         "env": dict(env) if env is not None else None,
@@ -235,6 +263,7 @@ def _execute_pipeline(
     stdout: IO[str] | None,
     stderr: IO[str] | None,
 ) -> Result:
+    """Execute a Popen chain and return its result."""
     processes: list[subprocess.Popen[str]] = []
     previous: subprocess.Popen[str] | None = None
     output_file: IO[str] | None = None
@@ -257,6 +286,9 @@ def _execute_pipeline(
 
         for index, stage in enumerate(pipeline.stages):
             last = index == len(pipeline.stages) - 1
+            # Each stage receives the previous stage's stdout.  The writer
+            # side is closed in the parent after connecting the next stage;
+            # otherwise the reader would never see EOF.
             process = subprocess.Popen(
                 list(stage.argv_for(True)),
                 stdin=previous.stdout if previous is not None else None,
@@ -273,6 +305,8 @@ def _execute_pipeline(
 
         if previous is None:
             raise RuntimeError("pipeline did not start")
+        # Only the final process writes to the caller's output; earlier
+        # processes are drained/wait'ed below so their stderr is not lost.
         output_text, error_text = previous.communicate(input=input)
     finally:
         if output_file is not None:
@@ -331,6 +365,7 @@ def _ssh_base(
     key: str | None = None,
     compress: bool = False,
 ) -> tuple[str, ...]:
+    """Build the local ssh argv before the remote fragment."""
     argv: list[str] = ["ssh"]
     if compress:
         argv.append("-C")
@@ -365,6 +400,7 @@ def ssh_argv(
     key: str | None = None,
     compress: bool = False,
 ) -> tuple[str, ...]:
+    """Build a full ssh argv including the remote fragment."""
     return (
         *_ssh_base(
             ssh,
@@ -390,6 +426,7 @@ def remote_command(
     key: str | None = None,
     compress: bool = False,
 ) -> RemoteCommand:
+    """Build a reusable remote command object."""
     return RemoteCommand(
         ssh_argv=_ssh_base(
             ssh,
@@ -411,6 +448,7 @@ def scp_argv(
     *,
     timeout: int = 10,
 ) -> tuple[str, ...]:
+    """Build an scp argv for a source and destination."""
     argv: list[str] = [
         "scp",
         "-o",
@@ -427,4 +465,5 @@ def scp_argv(
 
 
 def devnull() -> str:
+    """Return the platform null device path."""
     return os.devnull

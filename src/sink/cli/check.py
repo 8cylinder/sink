@@ -1,3 +1,5 @@
+"""The ``sink check`` command."""
+
 import click
 
 from sink.check import TestConfig
