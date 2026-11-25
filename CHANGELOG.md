@@ -36,6 +36,8 @@
 - Database pull timestamps are timezone-aware while keeping the existing
   local-time filename format. Lando/DDEV failures now preserve stderr and
   exit non-zero.
+- Pipelines capture stderr from every stage, so a failing producer such as
+  `mysqldump | gzip` reports its real error instead of `Command failed`.
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.
