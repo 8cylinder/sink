@@ -331,7 +331,7 @@ Branch =modernize=, annotated tag =baseline-2026-11-25= (commit
   test marked =xfail=.
 - =git status= is clean; no source behavior has changed.
 
-* Stage 1 - uv, hatchling, src layout, and single-source version                :stage_1:
+* DONE Stage 1 - uv, hatchling, src layout, and single-source version           :stage_1:
 ** Goal
 Replace Poetry and the legacy =setup.py= with =uv= + =hatchling=, move
 the package under =src/=, and make =pyproject.toml= the only manifest.
@@ -339,49 +339,59 @@ This is the one stage that touches every path; keep it mechanical and
 commit it in small steps.
 
 ** Tasks
-- [ ] Delete =poetry.lock= and =setup.py=.
-- [ ] Rewrite =pyproject.toml= as PEP 621 =[project]= with the metadata,
+- [X] Delete =poetry.lock= and =setup.py=.
+- [X] Rewrite =pyproject.toml= as PEP 621 =[project]= with the metadata,
       dependencies, =[project.scripts]=, =[project.urls]=, and
       =license = "GPL-2.0-only"= +
       =license-files = ["LICENSE", "NOTICE"]=.
       Remove every =[tool.poetry.*]= section.
-- [ ] Add =[build-system]= with =hatchling= and an explicit =packages=
+- [X] Add =[build-system]= with =hatchling= and an explicit =packages=
       entry for =src/sink=.
-- [ ] Move =sink/= to =src/sink/=; keep the package name and all
+- [X] Move =sink/= to =src/sink/=; keep the package name and all
       =sink.*= imports unchanged.
-- [ ] Add =src/sink/__main__.py= with
-      =from sink.cli import main; raise SystemExit(main())=.
-- [ ] Delete =__version__= from =sink/sink.py=; delete the duplicate
+- [X] Add =src/sink/__main__.py= (Stage 1 uses =sink(prog_name="sink")=;
+      Stage 6 changes it to =sink.cli:main=).
+- [X] Delete =__version__= from =sink/sink.py=; delete the duplicate
       version logic from =setup.py= (deleted).  Add
       =@click.version_option(package_name="sink", prog_name="sink")=.
-- [ ] Set =requires-python = ">=3.15"= (D1) and add =.python-version=.
+- [X] Set =requires-python = ">=3.15"= (D1) and add =.python-version=.
       Run =uv python install 3.15=, delete the broken =.venv=, and
       =uv sync --all-groups=.
-- [ ] Regenerate =uv.lock= and commit it; verify =uv lock --check=.
-- [ ] Update =.gitignore= for =src/= build artifacts, =.venv/=,
+- [X] Regenerate =uv.lock= and commit it; verify =uv lock --check=.
+- [X] Update =.gitignore= for =src/= build artifacts, =.venv/=,
       =__pycache__/=, caches, coverage, =docs/_build/=, =dist/=,
       =build/=, =*.egg-info/=, while keeping =uv.lock= and
       =.python-version= tracked.
-- [ ] Rename =README.org= to =README.md= and set =readme = "README.md"= in
+- [X] Rename =README.org= to =README.md= and set =readme = "README.md"= in
       =pyproject.toml= (D5).  Convert the install section to =uv= now;
       the full rewrite is Stage 12, but the commands must not be broken
       in the meantime.
-- [ ] Keep =plumbum= for now so =command.py= still imports; it is removed
+- [X] Keep =plumbum= for now so =command.py= still imports; it is removed
       in Stage 4 together with =command.py= (D4).  Do not leave a
       half-migrated dependency.
-- [ ] Delete the obsolete =vm= group (D7): =sink vm build=, =sink vm
+- [X] Delete the obsolete =vm= group (D7): =sink vm build=, =sink vm
       check=, =vm.py=, the =Vagrant= class, and
       =sink/resources/Vagrantfile=.  Update the CLI registration and
       TODO.org.  This removes B4/N4/N5 and the Vagrant packaging concern
       before the shell refactor.
-- [ ] License (D10): =LICENSE= is GPLv2, =pyproject.toml= says
+- [X] License (D10): =LICENSE= is GPLv2, =pyproject.toml= says
       =GPL-2.0-only=, and the copyright line is in README/NOTICE.
       The =jb <fuckyou@fuckoff.com>= identity was confirmed as Sheldon
       on 2026-11-25; commit =.mailmap= and =CONTRIBUTORS.md= so the
       history is normalized and the attestation is recorded.  Existing
       releases remain GPLv3; note the relicensing in =CHANGELOG.md=.
-- [ ] Add a minimal =Makefile= with =help=, =sync=, =build=, =clean=,
+- [X] Add a minimal =Makefile= with =help=, =sync=, =build=, =clean=,
       and placeholders for the Stage 2 targets.
+
+** Result
+Python 3.15.2 via =uv= (the sandbox required
+=UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default cache was
+read-only).  Package lives at =src/sink=; =hatchling= + PEP 621;
+=uv.lock= regenerated and =uv lock --check= passes.  =sink vm= and the
+Vagrantfile resource are gone.  =uv build= produces
+=sink-0.3.0-py3-none-any.whl= with =License-Expression: GPL-2.0-only=,
+=LICENSE=, =NOTICE=, and a lean sdist.  Baseline suite: =11 xfailed=.
+Commits =f508a50= (build) and =15644b1= (help fixture).
 
 ** Exit criteria
 - =uv sync= creates a working =./.venv=; =uv run sink -h= works.
@@ -1321,7 +1331,7 @@ Poetry/setup.py era.
 
   #+begin_src text
   Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
-  Stage 1  | TODO | uv/hatchling commit:     | wheel:
+  Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
   Stage 2  | TODO | CI run:                  | gitleaks:
   Stage 3  | TODO | test count:              | coverage:
   Stage 4  | TODO | shell=True sites: 0      | secrets test:
