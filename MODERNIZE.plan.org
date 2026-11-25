@@ -96,8 +96,8 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =d84bb7b= (Stage 7
-    transfer/diff/ssh fixes).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =ed4cbde= (Stage 7
+    diff status refinement).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
@@ -115,8 +115,9 @@
     (typed models, pure loader, Runtime migration).
   - Stage 6 commits: =9047477= (CLI/output contract tests), =88d7baf=
     (cli package, Rich output, completions, redaction).
-  - Stage 7 commit: =d84bb7b= (file ambiguity, root rejection, diff,
-    ssh, and transfer contract tests).
+  - Stage 7 commits: =d84bb7b= (file ambiguity, root rejection, diff,
+    ssh, and transfer contract tests), =ed4cbde= (git-difference versus
+    git-failure status).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -129,8 +130,8 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 183 passed, 4 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 69.87%, =fail_under = 68=; =ty=
+  - Current test baseline: 184 passed, 4 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 69.91%, =fail_under = 68=; =ty=
     has 0 errors and 24 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
@@ -1217,8 +1218,8 @@ Dry-run output remains the contract.
 
 
 ** Result
-183 tests pass, 4 are strict =xfail=, and the integration test is
-deselected; branch coverage is 69.87% with =fail_under = 68=.  =make
+184 tests pass, 4 are strict =xfail=, and the integration test is
+deselected; branch coverage is 69.91% with =fail_under = 68=.  =make
 check= is green with 0 =ty= errors and 24 warnings; import-linter keeps
 all three contracts.
 
@@ -1242,7 +1243,9 @@ absolute path.
 =diff= now uses the local file's parent directory for =--compare-dest=
 (a directory, not the file itself), only adds =--ignore-all-space= when
 =--ignore-whitespace= is passed, omits the =less= pager when stdout is
-not a TTY, and propagates difftool/git failures.  =Pipeline= reports
+not a TTY, and propagates the git status: 0 is "same", 1 is
+"different", and values above 1 are reported as failures.  Difftool
+failures are also reported.  =Pipeline= reports
 the first non-zero stage, so a failing producer is no longer hidden by
 a successful =less=.  The default remains print-only; =--real= performs
 the transfer and diff.
@@ -1662,7 +1665,7 @@ Poetry/setup.py era.
   Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
   Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
   Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
-  Stage 7  | DONE 2026-11-25 | commit d84bb7b | 183 pass, 4 xfail, 1 deselected; coverage 69.87%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
+  Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
   Stage 8  | TODO | db tests:                | pv:
   Stage 9  | TODO | deploy/check tests:      | TODO items closed:
   Stage 10 | TODO | ty/ruff clean:           | coverage:
