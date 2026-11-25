@@ -123,10 +123,13 @@ def load(path: Path) -> Config:
 
     expanded = cast(Mapping[str, object], _expand_env(document, path))
     warnings: list[str] = []
-    _check_unknown(expanded, TOP_LEVEL_KEYS, str(path), warnings)
+    unknown_keys: list[str] = []
+    _check_unknown(expanded, TOP_LEVEL_KEYS, str(path), unknown_keys)
 
-    project = _project(expanded.get("project"), path, warnings)
-    servers = _servers(expanded.get("servers"), path, project, warnings)
+    project = _project(expanded.get("project"), path, unknown_keys)
+    servers = _servers(
+        expanded.get("servers"), path, project, warnings, unknown_keys
+    )
 
     defaults = [server.name for server in servers.values() if server.default]
     if len(defaults) > 1:
@@ -143,6 +146,7 @@ def load(path: Path) -> Config:
         default_server=default_server,
         raw=MappingProxyType(expanded),
         warnings=tuple(warnings),
+        unknown_keys=tuple(unknown_keys),
     )
 
 
@@ -168,11 +172,15 @@ def _expand_env(value: object, path: Path) -> object:
     return ENV_PATTERN.sub(replace, value)
 
 
-def _project(data: object, path: Path, warnings: list[str]) -> Project:
+def _project(
+    data: object,
+    path: Path,
+    unknown_keys: list[str],
+) -> Project:
     """Build and validate the project section."""
     if not isinstance(data, Mapping):
         raise ConfigError(f"{path}: project section must be a mapping")
-    _check_unknown(data, PROJECT_KEYS, f"{path}: project", warnings)
+    _check_unknown(data, PROJECT_KEYS, f"{path}: project", unknown_keys)
 
     root_value = data.get("root")
     if root_value is None:
@@ -207,6 +215,7 @@ def _servers(
     path: Path,
     project: Project,
     warnings: list[str],
+    unknown_keys: list[str],
 ) -> dict[str, Server]:
     """Build every server in the servers section."""
     if data is None:
@@ -220,7 +229,9 @@ def _servers(
             raise ConfigError(f"{path}: server names must be strings")
         if not isinstance(raw, Mapping):
             raise ConfigError(f'{path}: server "{name}" must be a mapping')
-        servers[name] = _server(name, raw, path, project, warnings)
+        servers[name] = _server(
+            name, raw, path, project, warnings, unknown_keys
+        )
     return servers
 
 
@@ -230,16 +241,22 @@ def _server(
     path: Path,
     project: Project,
     warnings: list[str],
+    unknown_keys: list[str],
 ) -> Server:
     """Build and validate one server entry."""
     where = f"{path}: servers.{name}"
-    _check_unknown(data, SERVER_KEYS, where, warnings)
+    _check_unknown(data, SERVER_KEYS, where, unknown_keys)
 
-    ssh_configs = _ssh_configs(data.get("ssh"), path, project, where, warnings)
-    databases = _databases(
-        data.get("mysql", data.get("databases")), path, where
+    ssh_configs = _ssh_configs(
+        data.get("ssh"), path, project, where, warnings, unknown_keys
     )
-    urls = _urls(data.get("urls"), path, where)
+    databases = _databases(
+        data.get("mysql", data.get("databases")),
+        path,
+        where,
+        unknown_keys,
+    )
+    urls = _urls(data.get("urls"), path, where, unknown_keys)
 
     return Server(
         name=name,
@@ -270,6 +287,7 @@ def _ssh_configs(
     project: Project,
     where: str,
     warnings: list[str],
+    unknown_keys: list[str],
 ) -> tuple[SSHConfig, ...]:
     """Build ssh configs and resolve key paths."""
     if data is None:
@@ -282,7 +300,7 @@ def _ssh_configs(
         item_where = f"{where}.ssh[{index}]"
         if not isinstance(raw, Mapping):
             raise ConfigError(f"{path}: {item_where} must be a mapping")
-        _check_unknown(raw, SSH_KEYS, f"{path}: {item_where}", warnings)
+        _check_unknown(raw, SSH_KEYS, f"{path}: {item_where}", unknown_keys)
         key = _string(raw.get("key"), path, f"{item_where}.key")
         if key:
             key = _resolve_key(key, path, project, warnings, item_where)
@@ -305,7 +323,10 @@ def _ssh_configs(
 
 
 def _databases(
-    data: object, path: Path, where: str
+    data: object,
+    path: Path,
+    where: str,
+    unknown_keys: list[str],
 ) -> tuple[DatabaseConfig, ...]:
     """Build the database list for one server."""
     if data is None:
@@ -318,7 +339,9 @@ def _databases(
         item_where = f"{where}.mysql[{index}]"
         if not isinstance(raw, Mapping):
             raise ConfigError(f"{path}: {item_where} must be a mapping")
-        _check_unknown(raw, DATABASE_KEYS, f"{path}: {item_where}", [])
+        _check_unknown(
+            raw, DATABASE_KEYS, f"{path}: {item_where}", unknown_keys
+        )
         databases.append(
             DatabaseConfig(
                 db=_string(raw.get("db"), path, f"{item_where}.db"),
@@ -341,7 +364,12 @@ def _databases(
     return tuple(databases)
 
 
-def _urls(data: object, path: Path, where: str) -> tuple[URLConfig, ...]:
+def _urls(
+    data: object,
+    path: Path,
+    where: str,
+    unknown_keys: list[str],
+) -> tuple[URLConfig, ...]:
     """Build the URL list for one server."""
     if data is None:
         return ()
@@ -353,7 +381,7 @@ def _urls(data: object, path: Path, where: str) -> tuple[URLConfig, ...]:
         item_where = f"{where}.urls[{index}]"
         if not isinstance(raw, Mapping):
             raise ConfigError(f"{path}: {item_where} must be a mapping")
-        _check_unknown(raw, URL_KEYS, f"{path}: {item_where}", [])
+        _check_unknown(raw, URL_KEYS, f"{path}: {item_where}", unknown_keys)
         urls.append(
             URLConfig(
                 url=_string(raw.get("url"), path, f"{item_where}.url"),
@@ -396,12 +424,12 @@ def _check_unknown(
     data: Mapping[str, object],
     allowed: set[str],
     where: str,
-    warnings: list[str],
+    unknown_keys: list[str],
 ) -> None:
-    """Collect a warning for each unknown key."""
+    """Collect each unknown key for ``sink check``."""
     for key in data:
         if key not in allowed:
-            warnings.append(f'{where}: unknown key "{key}" was ignored')
+            unknown_keys.append(f'{where}: unknown key "{key}"')
 
 
 def _string(value: object, path: Path, where: str) -> str | None:

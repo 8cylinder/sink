@@ -167,15 +167,16 @@ def test_bad_yaml_is_a_config_error(tmp_path: Path) -> None:
     assert "sink.yaml" in str(error.value)
 
 
-def test_unknown_keys_are_collected_as_warnings(tmp_path: Path) -> None:
+def test_unknown_keys_are_collected_for_check(tmp_path: Path) -> None:
     data = document()
     data["bogus"] = True
     data["project"]["other"] = "ignored"
 
     config = load(write_config(tmp_path, data))
 
-    assert any('"bogus"' in warning for warning in config.warnings)
-    assert any('"other"' in warning for warning in config.warnings)
+    assert config.warnings == ()
+    assert any('"bogus"' in key for key in config.unknown_keys)
+    assert any('"other"' in key for key in config.unknown_keys)
 
 
 def test_environment_variables_expand(

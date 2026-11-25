@@ -125,6 +125,7 @@ class Config:
     default_server: str | None = None
     raw: Mapping[str, object] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    unknown_keys: tuple[str, ...] = ()
 
     def server(self, name: str | None = None) -> Server:
         """Return a named or default server."""

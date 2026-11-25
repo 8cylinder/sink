@@ -85,7 +85,7 @@ def test_bad_yaml_is_reported_as_a_config_error(
     assert "sink.yaml" in text
 
 
-def test_unknown_keys_warn_and_are_ignored(project_factory) -> None:
+def test_unknown_keys_are_silent_until_check(project_factory) -> None:
     project = project_factory()
     with (project.path / "sink.yaml").open("a") as file:
         file.write("bogus: true\n")
@@ -93,9 +93,13 @@ def test_unknown_keys_warn_and_are_ignored(project_factory) -> None:
     result = project.invoke("misc", "api", "project", "name")
 
     assert result.exit_code == 0, combined(result)
-    text = combined(result)
-    assert "Warning" in text
-    assert "bogus" in text
+    assert "Warning" not in combined(result)
+    assert "bogus" not in combined(result)
+
+    checked = project.invoke("check", "dev")
+    assert checked.exit_code == 0, combined(checked)
+    assert "unknown config key" in combined(checked)
+    assert "bogus" in combined(checked)
 
 
 def test_environment_variables_are_expanded(

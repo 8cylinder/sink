@@ -29,5 +29,6 @@ def check(
     if required:
         tc.test_requirements()
     else:
+        tc.test_unknown_keys()
         tc.test_project()
         tc.test_servers(server_names)

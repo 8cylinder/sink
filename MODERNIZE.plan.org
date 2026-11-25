@@ -854,7 +854,10 @@ deliberately documented two-pass read.  Do not make two-pass the default.
 - Merge defaults into fresh objects; never mutate class-level dicts or
   the parsed mapping.
 - Choose the default server exactly once; more than one is an error.
-- Unknown keys warn and are ignored (existing-config rule).
+- Unknown keys are silently ignored during normal commands.  The loader
+  collects them in =Config.unknown_keys=, and =sink check= reports them as
+  warnings so shared =sink.yaml= files can hold unrelated data while still
+  catching misspelled Sink keys.
 - =${ENV_VAR}= substitution; a missing variable is a =ConfigError=.
 - No =sys.exit=, no printing, no caching, no =Configuration= instance.
 
@@ -1375,6 +1378,8 @@ The deploy workflow was dropped (D11); there is no deploy command to repair.
 - [X] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
       =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
       a stable table.
+- [X] Check: report unknown config keys as warnings without failing normal
+      commands.
 - [X] Check: verify TLS by default and add a timeout.
 - [X] Check: add =--real/-r= and default to dry-run, printing every
       ssh/mysql/url probe it would run.  =--real= prints the same probes
@@ -1393,8 +1398,8 @@ warnings; import-linter keeps all three contracts.
 
 =sink check= now prints a stable Setting/Value/Status table for the
 project's =pulls_dir=, =log_dir=, =cache_dir=, and =rsync_binary=,
-then a table for each server's root, =warn=, and =automatic= fields
-before the ssh/mysql/url probes.  Missing values are reported without
+reports unknown config keys as warnings, then a table for each server's
+root, =warn=, and =automatic= fields before the ssh/mysql/url probes.  Missing values are reported without
 aborting the remaining checks.
 
 The URL probe uses a Rich status context instead of the old threaded

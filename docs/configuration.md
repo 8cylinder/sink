@@ -44,6 +44,10 @@ servers:
         hostname: localhost
 ```
 
+Extra keys are allowed. Sink ignores them during normal commands so a
+`sink.yaml` can hold unrelated project data; `sink check` lists them as
+unknown-key warnings to catch misspellings.
+
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Secrets are redacted from rendered commands and from `misc api` /
 `misc settings` unless `--show-secrets` is passed.

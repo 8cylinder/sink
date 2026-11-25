@@ -28,6 +28,11 @@ class TestConfig:
         self.real = real
         self.insecure = insecure
 
+    def test_unknown_keys(self) -> None:
+        """Report unknown config keys as warnings without failing the run."""
+        for key in self.config.unknown_keys:
+            ui.warn(f"unknown config key: {key}")
+
     def test_project(self) -> None:
         """Check project dirs and the configured rsync binary."""
         ui.echo()

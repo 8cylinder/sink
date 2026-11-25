@@ -85,7 +85,8 @@ servers:
 ```
 
 Environment references use `${NAME}`. A missing variable is a configuration
-error. Secrets are redacted from `misc api` and `misc settings` unless
+error. Extra keys are allowed and ignored by normal commands; `sink check`
+reports them as warnings so misspelled Sink keys are still visible. Secrets are redacted from `misc api` and `misc settings` unless
 `--show-secrets` is passed.
 
 ## Command overview
