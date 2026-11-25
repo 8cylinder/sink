@@ -96,13 +96,13 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =ec79862= (Stage 5
-    typed config and Runtime).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =88d7baf= (Stage 6
+    CLI/output contract).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
-    secrets), Stage 5 (typed config and composition root).  Next:
-    Stage 6 (CLI structure and output contract).
+    secrets), Stage 5 (typed config and composition root), Stage 6
+    (CLI structure and output contract).  Next: Stage 7 (transfers).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -112,6 +112,8 @@
     (local MYSQL_PWD display), =78b5dd6= (sdist changelog).
   - Stage 5 commits: =87e0626= (structural contract tests), =ec79862=
     (typed models, pure loader, Runtime migration).
+  - Stage 6 commits: =9047477= (CLI/output contract tests), =88d7baf=
+    (cli package, Rich output, completions, redaction).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -124,9 +126,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 132 passed, 15 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 66.42%, =fail_under = 60=; =ty=
-    has 0 errors and 22 warnings (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 163 passed, 7 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 69.23%, =fail_under = 65=; =ty=
+    has 0 errors and 24 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -752,50 +754,50 @@ deliberately documented two-pass read.  Do not make two-pass the default.
 
 ** Models - =src/sink/config/models.py= (pure, no I/O)
 #+begin_src python
-@dataclass(frozen=True, slots=True)
-class Project:
-    name: str
-    root: Path
-    pulls_dir: Path | None
-    cache_dir: Path | None
-    log_dir: Path | None
-    rsync_binary: str
-    difftool: str | None
-    exclude: tuple[str, ...]
-    actions: Mapping[str, str]
+  @dataclass(frozen=True, slots=True)
+  class Project:
+      name: str
+      root: Path
+      pulls_dir: Path | None
+      cache_dir: Path | None
+      log_dir: Path | None
+      rsync_binary: str
+      difftool: str | None
+      exclude: tuple[str, ...]
+      actions: Mapping[str, str]
 
-@dataclass(frozen=True, slots=True)
-class Server:
-    name: str
-    root: Path
-    deploy_root: Path | None
-    warn: bool
-    default: bool
-    automatic: bool
-    group: str | None
-    user: str | None
-    ssh: tuple[SSHConfig, ...]
-    databases: tuple[Database, ...]
-    urls: tuple[URL, ...]
-    actions: Mapping[str, str]
-    exclude: tuple[str, ...]
+  @dataclass(frozen=True, slots=True)
+  class Server:
+      name: str
+      root: Path
+      deploy_root: Path | None
+      warn: bool
+      default: bool
+      automatic: bool
+      group: str | None
+      user: str | None
+      ssh: tuple[SSHConfig, ...]
+      databases: tuple[Database, ...]
+      urls: tuple[URL, ...]
+      actions: Mapping[str, str]
+      exclude: tuple[str, ...]
 
-@dataclass(frozen=True, slots=True)
-class Config:
-    path: Path
-    project: Project
-    servers: Mapping[str, Server]
-    default_server: str | None
-    raw: Mapping[str, object]      # for `misc api` only
+  @dataclass(frozen=True, slots=True)
+  class Config:
+      path: Path
+      project: Project
+      servers: Mapping[str, Server]
+      default_server: str | None
+      raw: Mapping[str, object]      # for `misc api` only
 
-    def server(self, name: str | None = None) -> Server:
-        key = name or self.default_server
-        if key is None:
-            raise NoDefaultServer()
-        try:
-            return self.servers[key]
-        except KeyError:
-            raise UnknownServer(key, sorted(self.servers)) from None
+      def server(self, name: str | None = None) -> Server:
+          key = name or self.default_server
+          if key is None:
+              raise NoDefaultServer()
+          try:
+              return self.servers[key]
+          except KeyError:
+              raise UnknownServer(key, sorted(self.servers)) from None
 #+end_src
 
 - Frozen + slots + tuples/immutable mappings.  A =Server= is a stable
@@ -809,15 +811,15 @@ class Config:
 
 ** Loader - =src/sink/config/loader.py= (the only module that reads YAML)
 #+begin_src python
-def find_config(start: Path) -> Path | None:
-    for directory in (start, *start.parents):
-        candidate = directory / "sink.yaml"
-        if candidate.is_file():
-            return candidate
-    return None
+  def find_config(start: Path) -> Path | None:
+      for directory in (start, *start.parents):
+          candidate = directory / "sink.yaml"
+          if candidate.is_file():
+              return candidate
+      return None
 
-def load(path: Path) -> Config:
-    """Parse, validate, resolve paths.  Raise ConfigError.  No cache."""
+  def load(path: Path) -> Config:
+      """Parse, validate, resolve paths.  Raise ConfigError.  No cache."""
 #+end_src
 
 - Validate types explicitly; raise =ConfigError= with the file and key
@@ -953,7 +955,6 @@ this only for a genuine selector-inside-the-config case.
 - [X] Add a test that builds a =Config= literal and injects it through
       =CliRunner(obj=...)=; no global reset or monkeypatching.
 
-
 ** Result
 132 tests pass, 15 are strict =xfail=, and the integration test is
 deselected; branch coverage is 66.42% with =fail_under = 60= (the Stage 6
@@ -1004,27 +1005,27 @@ secret redaction in =misc api=/=misc settings= remains Stage 6.
 - Loader and Runtime tests pass; =import-linter= passes; =make check= is
   green.
 
-* Stage 6 - CLI structure and output contract                                   :stage_6:
+* DONE Stage 6 - CLI structure and output contract                              :stage_6:
 ** Goal
 Split the 571-line =sink/sink.py= into thin command modules, adopt the app-base
 help/color/completion contract, and settle the quiet/silent behavior from
 TODO.org.
 
 ** Tasks
-- [ ] Create =src/sink/cli/=; one module per command group; register
+- [X] Create =src/sink/cli/=; one module per command group; register
       them in =cli/__init__.py=.  Keep command and option names stable
       except where a fix is explicitly listed.
-- [ ] Add =AppGroup=/=AppCommand= base classes so =-h= works on the
+- [X] Add =AppGroup=/=AppCommand= base classes so =-h= works on the
       root and every subcommand; root uses =no_args_is_help=True=.
-- [ ] Add root options: =--color [auto|always|never]=, =--config=,
+- [X] Add root options: =--color [auto|always|never]=, =--config=,
       =--completions=, =--suppress-commands=, =--version=, and the
       output flags.  All machine options are eager and work outside a
       project.
-- [ ] =--config= prints only the absolute path of the discovered
+- [X] =--config= prints only the absolute path of the discovered
       =sink.yaml=; it does not create or modify anything and emits no
       ANSI.  Do not add =--config-file= or an environment override
       unless the user asks.
-- [ ] Rewrite =src/sink/ui.py= on =rich=: a stdout console and a stderr
+- [X] Rewrite =src/sink/ui.py= on =rich=: a stdout console and a stderr
       console, =rich.markup.escape()= on every dynamic value, status
       labels that include words (not color alone), plain output for
       =--version=/=--config=/=--completions=/=--json=, and no
@@ -1034,11 +1035,11 @@ TODO.org.
       warning, red error, blue/cyan notice.  A blank line separates the
       command block from the output.  Remove every =click.style= and
       =click.secho= call.
-- [ ] Render long commands as shell-valid text.  Do not wrap in a way
+- [X] Render long commands as shell-valid text.  Do not wrap in a way
       that changes an argument: a test asserts
       =shlex.split(display) == argv= for every golden command, including
       quoting, spaces, and backslashes.
-- [ ] Output modes (D8 confirmed):
+- [X] Output modes (D8 confirmed):
       - default: rendered command + command output + success line;
       - =-q/--quiet=: hide the rendered command only; keep the command's
         output and the success line;
@@ -1056,38 +1057,96 @@ TODO.org.
       =--no-itemize=.  Define the success formats from TODO.org:
       =[Success] SERVER: upload complete=, =...: sql upload complete=,
       =...: <path>=.
-- [ ] Command display is on by default for both dry-run and =--real=.
+- [X] Command display is on by default for both dry-run and =--real=.
       In either mode the command is printed before execution (native
       dry-run or real), and the output/success/error follows it.
       =--suppress-commands= or =-q= is the only way to hide the command;
       neither mode hides it implicitly.
-- [ ] Normalize the execution flag across the CLI: every command that
+- [X] Normalize the execution flag across the CLI: every command that
       runs a shell command defaults to dry-run and accepts =--real/-r=.
       Remove the inverse =sink ssh --dry-run/-d=, and add =--real= to
       =diff= and =check=, which currently execute unconditionally.
       Read-only commands that run no shell command (=info=, =misc api=,
       =misc init=, =misc settings=) are unaffected.
-- [ ] Add =-v/--verbose= (count) and =logging= with
+- [X] Add =-v/--verbose= (count) and =logging= with
       =rich.logging.RichHandler=; diagnostics go to stderr, data to
       stdout.
-- [ ] Implement =--completions= per =app-base.org=: destination
+- [X] Implement =--completions= per =app-base.org=: destination
       precedence (BASH_COMPLETION_USER_DIR, XDG_DATA_HOME,
       ~/.local/share), =APP.bash=, atomic write, bash >= 4.4 check,
       static script, tests with real bash.
-- [ ] Follow D3 literally: remove =shell_complete=get_servers= and the
+- [X] Follow D3 literally: remove =shell_complete=get_servers= and the
       =get_servers= callback entirely.  The static script completes
       commands, options, choices, and file paths but *not* server names.
       Document the limitation in =--completions= output, README, and the
       man page.
-- [ ] Fix =sink info -e= by passing a string path to =click.edit= (the
+- [X] Fix =sink info -e= by passing a string path to =click.edit= (the
       bug is version-dependent: confirmed on Click 8.2–8.4, absent on
       8.1 and 8.5).
-- [ ] Make =misc api= JSON-only and ANSI-free; make =misc pack= print a
+- [X] Make =misc api= JSON-only and ANSI-free; make =misc pack= print a
       plain, =shlex.quote()=d command.  Redact passwords, keys, and
       tokens by default in =misc api= and =misc settings=; add an
       explicit =--show-secrets= flag to print the values (D9).  =info=
       still shows the raw =sink.yaml=, because viewing your own config is
       the point of that command.
+
+
+** Result
+163 tests pass, 7 are strict =xfail=, and the integration test is
+deselected; branch coverage is 69.23% with =fail_under = 65= (above the
+Stage 6 target).  =make check= is green with 0 =ty= errors and 24
+warnings; =import-linter= keeps all three contracts.
+
+The 571-line =sink.py= is gone.  =src/sink/cli/= now holds
+=__init__.py= (group, root options, =main()=), plus =db.py=, =file.py=,
+=ssh.py=, =diff.py=, =info.py=, =check.py=, =action.py=, =deploy.py=,
+and =misc.py=.  The console entry point is =sink.cli:main=, and
+=python -m sink= dispatches through it.  =AppGroup= keeps file ordering
+and renders typed errors; =AppCommand= carries the common help options.
+
+Root options are =--color auto|always|never=, =--config=,
+=--completions=, =-q/--quiet=, =-qq=, =-s/--suppress-commands=,
+=--silent=, =-v/--verbose=, and =--version=.  =--config= prints only
+the discovered absolute path; =-completions= writes
+=APP.bash= atomically using the bash-completion destination precedence
+and prints only the path on stdout.  The generated script accepts
+commands, options, choices, and paths, does not execute Python or sink,
+and does not offer server names.  A note on stderr documents that
+limitation.
+
+=src/sink/ui.py= now uses Rich consoles with the requested palette and
+no =click.style=/=click.secho= calls remain.  =-q= hides the rendered
+command; =-qq= hides rendered commands, command output, warnings,
+errors, and success lines while preserving the exit code.
+=--suppress-commands= and =--silent= are aliases.  Success output is
+=[Success] SERVER: upload complete=, =...: download complete=,
+=...: sql upload/upload complete=, or =...: <path>= with the dry-run
+variant labelled =[Success (DRY RUN)]=.  Commands are rendered on one
+shell-valid line; the argv round-trip test passes.
+
+=db --quiet= became =--filename-only=, =deploy new --quiet= became
+=--no-itemize=, =ssh --dry-run= was removed in favour of =--real=, and
+=check --required= moved to =-R= so =--real/-r= is consistent.  =-v=
+configures a Rich stderr log handler through =src/sink/logging.py=.
+
+=misc api= is JSON-only and ANSI-free; both =misc api= and
+=misc settings= redact passwords/tokens by default and accept
+=--show-secrets=.  =misc pack= prints a plain =shlex.quote()=d command.
+=info --edit= passes a string path to =click.edit=.
+
+=src/sink/completions.py= adds the static generator and installer.
+=tests/test_completions.py= covers destination precedence, atomic
+installation, =bash -n=, suggestion behavior, the absence of server
+names, and the no-parent-options-after-subcommand rule.
+=tests/test_output_modes.py= covers color, quiet exit codes, JSON-only
+API output, redaction/show-secrets, pack quoting, and the editor path.
+
+Deviation: the generated completion script uses one dispatcher function
+with per-command case branches rather than one bash function per
+command.  Behavior, static generation, and the no-Python constraint are
+covered; per-command function naming can be revisited without changing
+the public option.  README/man-page notes for the server-name
+limitation remain Stage 12.
 
 ** Exit criteria
 - Every command importable from its own module; =sink.py= is gone.
@@ -1539,7 +1598,7 @@ Poetry/setup.py era.
   Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
   Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
   Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
-  Stage 6  | TODO | commands split:          | help tests:
+  Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
   Stage 7  | TODO | transfer tests:          | single repro:
   Stage 8  | TODO | db tests:                | pv:
   Stage 9  | TODO | deploy/check tests:      | TODO items closed:
