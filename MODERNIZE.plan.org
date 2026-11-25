@@ -98,14 +98,15 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =f7ebbbe= (deploy
-    workflow removal).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =d77f73e= (Stage 9
+    check reporting and cleanup).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
     (CLI structure and output contract), Stage 7 (transfers), Stage 8
-    (database), and the deploy removal.  Next: Stage 9 (check only).
+    (database), the deploy removal, and Stage 9 (check and cleanup).
+    Next: Stage 10 (bug sweep, strict typing, and coverage).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -124,6 +125,7 @@
     keys), =a15676b= (gzip validation, pv/mysqlpump, lando/ddev errors).
   - Deploy removal commits: =1617e59= (removal contract tests),
     =f7ebbbe= (command/modules/dependency/tests removed).
+  - Stage 9 commit: =d77f73e= (check field table, Rich status, no chdir).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -136,8 +138,8 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 195 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 77.14%, =fail_under = 75=; =ty=
+  - Current test baseline: 200 passed, 0 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 78.51%, =fail_under = 78=; =ty=
     has 0 errors and 16 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
@@ -1359,24 +1361,50 @@ are not part of this stage.
       without =pv=.
 - =db put= rejects a non-gzip file before touching the server.
 
-* Stage 9 - Check and cleanup                                                   :stage_9:
+* DONE Stage 9 - Check and cleanup                                              :stage_9:
 ** Goal
 Make =sink check= usable and remove the remaining directory-changing code.
 The deploy workflow was dropped (D11); there is no deploy command to repair.
 
 ** Tasks
-- [ ] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
+- [X] Check: validate =rsync_binary=, =pulls_dir=, =log_dir=,
       =cache_dir=, =warn=, and =automatic= per TODO.org; report each in
       a stable table.
 - [X] Check: verify TLS by default and add a timeout.
 - [X] Check: add =--real/-r= and default to dry-run, printing every
       ssh/mysql/url probe it would run.  =--real= prints the same probes
       and executes them.
-- [ ] Check: replace the =Spinner= thread with =rich= status.
-- [ ] Remove =os.chdir= from =db.cd= and pass =cwd= to command objects;
+- [X] Check: replace the =Spinner= thread with =rich= status.
+- [X] Remove =os.chdir= from =db.cd= and pass =cwd= to command objects;
       no deploy helper remains.
-- [ ] Add regression tests for the new check fields, dry-run no-spawn,
+- [X] Add regression tests for the new check fields, dry-run no-spawn,
       URL/TLS behavior, and password redaction.
+
+
+** Result
+200 tests pass with no xfails; branch coverage is 78.51% with
+=fail_under = 78=.  =make check= is green with 0 =ty= errors and 16
+warnings; import-linter keeps all three contracts.
+
+=sink check= now prints a stable Setting/Value/Status table for the
+project's =pulls_dir=, =log_dir=, =cache_dir=, and =rsync_binary=,
+then a table for each server's root, =warn=, and =automatic= fields
+before the ssh/mysql/url probes.  Missing values are reported without
+aborting the remaining checks.
+
+The URL probe uses a Rich status context instead of the old threaded
+=Spinner=, so =ui.py= no longer contains the spinner implementation.
+=db.make_symlink= builds an absolute link path and no longer calls
+=os.chdir=; the =db.cd= helper was removed.  Check and database paths
+have no directory-changing calls.
+
+=tests/test_stage9_contract.py= covers field reporting, missing rsync
+binary, dry-run URL probes, the latest-dump symlink, and the no-chdir
+rule.  The already-present tests cover TLS verification, quiet modes,
+dry-run no-spawn, and password redaction.
+
+Deploy remains absent: there is no deploy command, module, dependency,
+fixture, or active TODO item (D11).
 
 ** Exit criteria
 - =check= reports all TODO.org fields and never leaks a password.
@@ -1405,7 +1433,8 @@ raise the coverage gate to the app-base floor.
       Stage 1.)
 - [ ] Coverage ratchet (record each step in the stage log):
       Stage 3 baseline -> 40% after Stage 4 -> 60% after Stage 6 ->
-      75% after Stage 9 -> 85% after the bug sweep -> 90% final gate.
+      75% after Stage 9 (measured 78.51%) -> 85% after the bug sweep ->
+      90% final gate.
       Do not lower the final 90% branch target.
 - [ ] Run a full =ruff check=, =ty check=, and =pytest= with no
       suppressions that are not individually justified.
@@ -1693,7 +1722,7 @@ Poetry/setup.py era.
   Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
   Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
   Deploy   | DONE 2026-11-25 | commits 1617e59, f7ebbbe | removed command/modules/coolname/tests/fixtures; 195 pass, 0 xfail; coverage 77.14%; fail_under 75; 0 ty errors, 16 warnings
-  Stage 9  | TODO | check tests:             | TODO items closed:
+  Stage 9  | DONE 2026-11-25 | commit d77f73e | 200 pass, 0 xfail; coverage 78.51%; fail_under 78; check field table, Rich status, no chdir; 0 ty errors, 16 warnings
   Stage 10 | TODO | ty/ruff clean:           | coverage:
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
   Stage 12 | TODO | release tag:             | wheel sha256:
