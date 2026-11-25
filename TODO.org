@@ -3,7 +3,6 @@
 Completed items and decisions live in MODERNIZE.plan.org and git history.
 
 * Current
-
 ** TODO Harden database credential handling
    Current method: a random =0600= MySQL option file is staged over SSH
    stdin, referenced with =--defaults-extra-file=, quoted/escaped, and
@@ -21,68 +20,55 @@ Completed items and decisions live in MODERNIZE.plan.org and git history.
          deferred schema v2 work (D6).
    - [ ] =db pull= / =db push= use =databases[0]=.  Add a way to select an
          entry by username or index when several are configured.
-
 ** TODO Restore server-name tab completion
    Static completion intentionally omits project server names (D3).
    Restoring it requires a =shell_complete= callback plus either a fully
    dynamic Click script or a hybrid static script that queries =sink= for
    server-name positions.
-
 ** TODO Enable tab completion on macOS/zsh
    =--completions= currently installs a bash-only script.  Bash 4.4 or
    newer is required.
 
 * Future
-
 ** MAYBE Allow use of external exclusion files
    - Use rsync's =--exclude-from=FILE=.
    - Consider =.gitignore= or generated per-server exclusion files such as
      =sink-prod.exclude= and =sink-stag.exclude=.
-
 ** MAYBE DB download details
    Save extended information beside a dump:
    : sink db pull --extended-info="Long descriptive text"
    : sink db info [GZ-FILE]
-
 ** MAYBE Custom db pull filename
    Allow a token-based name:
 
    | token | field       |
    |-------+-------------|
-   | =%u=  | user        |
-   | =%n=  | db name     |
-   | =%s=  | server name |
-   | =%d=  | short date  |
-   | =%D=  | long date   |
-   | =%t=  | tag         |
+   | =%u=    | user        |
+   | =%n=    | db name     |
+   | =%s=    | server name |
+   | =%d=    | short date  |
+   | =%D=    | long date   |
+   | =%t=    | tag         |
 
    Examples:
    - =%n-%s-%d= -> =dbname-servername-20-01-30.sql.gz=
    - =%n--%s:u--%D= -> =dbname--SERVERNAME--20-01-30-10:30:15.sql.gz=
-
 ** MAYBE Pre-pull before put
    List files to pull before putting files.  Useful for project config
    files, such as a Craft =project.yaml=, that should not be overwritten
    by the local copy.
-
 ** MAYBE Option to upload a bashrc file and execute it when sshing
    For locked-down servers that do not allow editing =.bashrc=.
 
-** MAYBE click contrib helpers
-   - =help-colors=
-   - =click-option-group=
-   - Laravel Forge plugin integration
-
 * Backlog
-
   Intentionally out of scope for the 0.3.0 modernization.
 
-  | Item | Notes |
-  |------+-------|
-  | External exclusion files | MAYBE; see detailed notes above. |
-  | DB download details | MAYBE; save metadata beside the dump. |
-  | Upload a bashrc for ssh sessions | MAYBE; for restricted servers. |
-  | Custom db pull filename | MAYBE; token-based names. |
-  | Pre-pull before put | MAYBE; protect project config files. |
-  | click-option-group | Not needed for the current command tree. |
-  | Laravel Forge plugin | Out of scope. |
+  | Item                             | Notes                                    |
+  |----------------------------------+------------------------------------------|
+  | External exclusion files         | MAYBE; see detailed notes above.         |
+  | DB download details              | MAYBE; save metadata beside the dump.    |
+  | Upload a bashrc for ssh sessions | MAYBE; for restricted servers.           |
+  | Custom db pull filename          | MAYBE; token-based names.                |
+  | Pre-pull before put              | MAYBE; protect project config files.     |
+  | click-option-group               | Not needed for the current command tree. |
+  | Laravel Forge plugin             | Out of scope.                            |

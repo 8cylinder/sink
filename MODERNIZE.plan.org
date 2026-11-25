@@ -140,7 +140,7 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 238 passed, 0 strict =xfail=, 1 deselected
+  - Current test baseline: 240 passed, 0 strict =xfail=, 1 deselected
     =integration= test, branch coverage 91.88%, =fail_under = 90=; =ty=
     is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
     changes: unknown-key policy =422c7a3=, check execution =d339d65=,
@@ -1817,5 +1817,5 @@ The annotated release tag is `v0.3.0`.
   Check UI | DONE 2026-11-25 | commits 16bb825, 59fc02f, 9668d75, 3007243 | omit unused dirs; colored markers; key: value rows; compact errors; multi-entry DB labels; colon-free labels; 242 pass; coverage 91.90%
   Pipeline | DONE 2026-11-25 | commit e546db9 | capture stderr from every pipeline stage; 243 pass; coverage 91.95%
   Creds    | DONE 2026-11-25 | commit 734ec23 | quote option-file values; EXIT-trap cleanup; 245 pass; coverage 91.97%
-  Single   | DONE 2026-11-25 | commit d145f56 | removed =single= and its transfer path; legacy =automatic= accepted but unused; 238 pass; coverage 91.88%
+  Single   | DONE 2026-11-25 | commit d145f56 | removed =single= and its transfer path; legacy =automatic= accepted but unused; 240 pass; coverage 91.88%
   #+end_src
