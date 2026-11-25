@@ -98,15 +98,16 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =d77f73e= (Stage 9
-    check reporting and cleanup).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =a4316ef= (Stage 10
+    strict typing and coverage).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
     (CLI structure and output contract), Stage 7 (transfers), Stage 8
-    (database), the deploy removal, and Stage 9 (check and cleanup).
-    Next: Stage 10 (bug sweep, strict typing, and coverage).
+    (database), the deploy removal, Stage 9 (check and cleanup), and
+    Stage 10 (bug sweep, strict typing, and coverage).  Stage 11 is
+    deferred.  Next: Stage 12 (documentation and release).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -126,6 +127,7 @@
   - Deploy removal commits: =1617e59= (removal contract tests),
     =f7ebbbe= (command/modules/dependency/tests removed).
   - Stage 9 commit: =d77f73e= (check field table, Rich status, no chdir).
+  - Stage 10 commit: =a4316ef= (strict annotations, Ruff/ty gates, coverage).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -138,9 +140,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 200 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 78.51%, =fail_under = 78=; =ty=
-    has 0 errors and 16 warnings (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 237 passed, 0 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 91.77%, =fail_under = 90=; =ty=
+    is clean with no warning downgrades.
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -1414,30 +1416,61 @@ fixture, or active TODO item (D11).
   dry-run.
 - The removed deploy command and modules remain absent.
 
-* Stage 10 - Bug sweep, strict typing, and the coverage ratchet                 :stage_10:
+* DONE Stage 10 - Bug sweep, strict typing, and the coverage ratchet            :stage_10:
 ** Goal
 Close every remaining known defect, annotate the whole codebase, and
 raise the coverage gate to the app-base floor.
 
 ** Tasks
-- [ ] Fix every non-obsolete bug in the catalog below; each gets a
+- [X] Fix every non-obsolete bug in the catalog below; each gets a
       regression test.  B1, B2, B13, B14, N7, N8, and S9 are obsolete
       because the deploy workflow was removed (D11).
-- [ ] Annotate every module end to end; enable Ruff =ANN= fully and the
+- [X] Annotate every module end to end; enable Ruff =ANN= fully and the
       =ty= strict rules.  Use only =# ty: ignore[rule]= with a reason;
       no blanket =# type: ignore=.
-- [ ] Replace remaining =os.path= and =os.chdir= with =pathlib.Path= and
+- [X] Replace remaining =os.path= and =os.chdir= with =pathlib.Path= and
       =cwd=; make all datetimes timezone-aware (DTZ).
-- [ ] Delete dead code: =syncpoint=, =error_code=, =test_project= stubs,
+- [X] Delete dead code: =syncpoint=, =error_code=, =test_project= stubs,
       =Command.runp=, and the =Spinner=.  (The =vm= group and =Vagrant= are already gone from
       Stage 1.)
-- [ ] Coverage ratchet (record each step in the stage log):
+- [X] Coverage ratchet (record each step in the stage log):
       Stage 3 baseline -> 40% after Stage 4 -> 60% after Stage 6 ->
       75% after Stage 9 (measured 78.51%) -> 85% after the bug sweep ->
       90% final gate.
       Do not lower the final 90% branch target.
-- [ ] Run a full =ruff check=, =ty check=, and =pytest= with no
+- [X] Run a full =ruff check=, =ty check=, and =pytest= with no
       suppressions that are not individually justified.
+
+
+** Result
+237 tests pass with no xfails; branch coverage is 91.77% with
+=fail_under = 90=.  =make check= is green, =ty check= is clean, and
+=ruff check= passes with =ANN=, =PTH=, =DTZ=, =RET=, and =ARG= enabled.
+=import-linter= keeps all three contracts.
+
+Ruff auto-fixes supplied straightforward return annotations; the
+remaining public and private arguments were annotated with the actual
+models, paths, sequences, and Click types.  Test modules are exempt from
+=ANN= because pytest fixture parameters are dynamic.  The loader no
+longer uses =Any= for YAML values: it starts from =object=, narrows with
+=isinstance=, and casts the expanded document once.
+
+=ty= now runs without =--exit-zero-on-warning=; the legacy rule
+downgrades are removed.  =shell.py= uses a targeted
+=# ty: ignore[no-matching-overload]= for the intentionally dynamic
+subprocess kwargs, and the YAML error formatting uses =getattr= for
+optional =problem=/=context= attributes.
+
+The remaining dead helper =error_code()= was deleted.  No =Dict2obj=,
+global config, =shell=True=, =os.chdir=, or naive database timestamp
+remains.  The bug catalog's non-obsolete entries are marked Fixed; the
+deploy entries remain Obsolete.
+
+Coverage was raised with focused applications/init/SSH/UI tests, loader
+validation matrices, CLI error paths, and direct shell/database/rsync/
+credential branch tests.  =tests/test_cli_edges.py=,
+=tests/test_edges_core.py=, and =tests/test_edges_internals.py= supplement
+the contract and golden suites.
 
 ** Exit criteria
 - All catalogued bugs are fixed or explicitly deferred with a reason.
@@ -1519,51 +1552,51 @@ Poetry/setup.py era.
   |-----+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------+------+----------------|
   | B1  | deploy.py:34,107                      | =self.ssh= used in =__init__= before assignment -> =AttributeError=                                                                                             | assign =self.ssh= first; lazy stamp                                      | High | Obsolete (deploy removed) |
   | B2  | deploy.py:83,161                      | =_rsync= gets a server name as =action=, =Action.PUT= as flags                                                                                                  | pass =Action.PUT= and =server==                                            | High | Obsolete (deploy removed) |
-  | B3  | rsync.py:220                          | passes a server object to =excluded(name)=                                                                                                                  | pass =server.name=                                                       | High | Code-confirmed |
+  | B3  | rsync.py:220                          | passes a server object to =excluded(name)=                                                                                                                  | pass =server.name=                                                       | High | Fixed |
   | B4  | vm.py:64-66,207                       | =Dict2obj= subscript -> =TypeError=                                                                                                                           | removed with the =vm= group (D7)                                         | High | Obsolete       |
-  | B5  | config.py:267                         | =default_project= mutated on every call                                                                                                                     | frozen dataclasses                                                     | High | Code-confirmed |
-  | B6  | config.py:232                         | unbound =servername= in the missing-servers warning                                                                                                         | guard the message                                                      | Med  | Code-confirmed |
-  | B7  | config.py:243-253                     | =find_config= mutates a class attr and recurses                                                                                                             | loop + local path + cache                                              | Med  | Code-confirmed |
-  | B8  | db.py:249                             | nested quotes in the remote password command                                                                                                              | argv + credentials helper                                              | High | Confirmed      |
-  | B9  | db.py:176                             | unused =Dict2obj= wrapper                                                                                                                                   | delete                                                                 | Low  | Confirmed      |
-  | B10 | ssh.py:96-112                         | =result= unbound if =check_output= raises                                                                                                                     | explicit error path                                                    | Med  | Code-confirmed |
-  | B11 | actions.py:35                         | builtin =exit(1)= instead of an exception                                                                                                                   | raise =CommandError=                                                     | Low  | Code-confirmed |
-  | B12 | command.py:42-48                      | =SSHCommand.execute= returns =None=                                                                                                                           | return the result                                                      | Low  | Code-confirmed |
+  | B5  | config.py:267                         | =default_project= mutated on every call                                                                                                                     | frozen dataclasses                                                     | High | Fixed |
+  | B6  | config.py:232                         | unbound =servername= in the missing-servers warning                                                                                                         | guard the message                                                      | Med  | Fixed |
+  | B7  | config.py:243-253                     | =find_config= mutates a class attr and recurses                                                                                                             | loop + local path + cache                                              | Med  | Fixed |
+  | B8  | db.py:249                             | nested quotes in the remote password command                                                                                                              | argv + credentials helper                                              | High | Fixed |
+  | B9  | db.py:176                             | unused =Dict2obj= wrapper                                                                                                                                   | delete                                                                 | Low  | Fixed |
+  | B10 | ssh.py:96-112                         | =result= unbound if =check_output= raises                                                                                                                     | explicit error path                                                    | Med  | Fixed |
+  | B11 | actions.py:35                         | builtin =exit(1)= instead of an exception                                                                                                                   | raise =CommandError=                                                     | Low  | Fixed |
+  | B12 | command.py:42-48                      | =SSHCommand.execute= returns =None=                                                                                                                           | return the result                                                      | Low  | Fixed |
   | B13 | deploy.py:419                         | stale loop variable =d= in the warning                                                                                                                      | use the current item                                                   | Low  | Obsolete (deploy removed) |
   | B14 | deploy.py:439-449                     | unbounded recursive =choose_letter=                                                                                                                         | while loop                                                             | Low  | Obsolete (deploy removed) |
-  | B15 | check.py:53-144                       | leaked/stale variables, broad excepts                                                                                                                     | tidy scopes                                                            | Low  | Code-confirmed |
-  | B16 | sink.py:132                           | =file= server required; help says optional (confirmed)                                                                                                      | resolve rest args; test both                                           | Med  | Confirmed      |
-  | B17 | sink.py:168-183                       | =single= requires a default server; passes =remote.name=                                                                                                      | per-server transfer                                                    | High | Confirmed      |
-  | B18 | config.py:280-282                     | =pulls_dir= None/absent handling is confusing                                                                                                               | explicit validation                                                    | Low  | Code-confirmed |
-  | B19 | rsync.py:165-166                      | backslash-newline inside the diff f-string                                                                                                                | build argv                                                             | Low  | Confirmed      |
-  | B20 | config.py:457                         | dead =syncpoint()= / "sync points" key                                                                                                                      | delete                                                                 | Low  | Code-confirmed |
-  | B21 | db.py:90-108,213-229                  | broad =except AttributeError= masks config errors                                                                                                           | typed models; precise checks                                           | Med  | Code-confirmed |
-  | B22 | config.py:356                         | =_server= mutates the raw YAML data                                                                                                                         | build objects                                                          | Med  | Code-confirmed |
-  | B23 | rsync.py:298                          | =error_code()= KeyError and unused                                                                                                                          | delete                                                                 | Low  | Code-confirmed |
-  | N1  | rsync.py:41-50                        | =single= uses the default server's root for every server; the fallback error handler crashes on a list                                                      | fix as B17                                                             | High | Confirmed      |
-  | N2  | sink.py:226,273                       | =click.edit(filename=Path)= breaks on Click 8.2–8.4                                                                                                         | pass =str(path)=                                                         | Med  | Confirmed      |
-  | N3  | actions.py:23-26                      | =action local= with no project actions -> =AttributeError=                                                                                                    | default =actions= to an empty mapping                                    | Med  | Confirmed      |
+  | B15 | check.py:53-144                       | leaked/stale variables, broad excepts                                                                                                                     | tidy scopes                                                            | Low  | Fixed |
+  | B16 | sink.py:132                           | =file= server required; help says optional (confirmed)                                                                                                      | resolve rest args; test both                                           | Med  | Fixed |
+  | B17 | sink.py:168-183                       | =single= requires a default server; passes =remote.name=                                                                                                      | per-server transfer                                                    | High | Fixed |
+  | B18 | config.py:280-282                     | =pulls_dir= None/absent handling is confusing                                                                                                               | explicit validation                                                    | Low  | Fixed |
+  | B19 | rsync.py:165-166                      | backslash-newline inside the diff f-string                                                                                                                | build argv                                                             | Low  | Fixed |
+  | B20 | config.py:457                         | dead =syncpoint()= / "sync points" key                                                                                                                      | delete                                                                 | Low  | Fixed |
+  | B21 | db.py:90-108,213-229                  | broad =except AttributeError= masks config errors                                                                                                           | typed models; precise checks                                           | Med  | Fixed |
+  | B22 | config.py:356                         | =_server= mutates the raw YAML data                                                                                                                         | build objects                                                          | Med  | Fixed |
+  | B23 | rsync.py:298                          | =error_code()= KeyError and unused                                                                                                                          | delete                                                                 | Low  | Fixed |
+  | N1  | rsync.py:41-50                        | =single= uses the default server's root for every server; the fallback error handler crashes on a list                                                      | fix as B17                                                             | High | Fixed |
+  | N2  | sink.py:226,273                       | =click.edit(filename=Path)= breaks on Click 8.2–8.4                                                                                                         | pass =str(path)=                                                         | Med  | Fixed |
+  | N3  | actions.py:23-26                      | =action local= with no project actions -> =AttributeError=                                                                                                    | default =actions= to an empty mapping                                    | Med  | Fixed |
   | N4  | sink.py:332-372                       | =vm= help says =SERVER IP HOSTNAME=, docs say =HOSTNAME IP=                                                                                                     | removed with the =vm= group (D7)                                         | Med  | Obsolete       |
   | N5  | vm.py:148-164                         | =check_hosts= grep pattern is reversed                                                                                                                      | removed with the =vm= group (D7)                                         | Low  | Obsolete       |
-  | N6  | rsync.py:157-174                      | =--ignore-all-space= is always added; =--compare-dest= is wrong; =less= hides git's exit status                                                                 | build the argv, fix the compare target, no pager in a pipe             | High | Confirmed      |
+  | N6  | rsync.py:157-174                      | =--ignore-all-space= is always added; =--compare-dest= is wrong; =less= hides git's exit status                                                                 | build the argv, fix the compare target, no pager in a pipe             | High | Fixed |
   | N7  | deploy.py:387                         | =display_choices= joins =dist= relative to CWD                                                                                                                | anchor at project root                                                 | Med  | Obsolete (deploy removed) |
   | N8  | deploy.py:263-278; sink.py:407,410    | =deploy init= writes =dist/= and forces =real=True=                                                                                                             | honor =--real=                                                           | High | Obsolete (deploy removed) |
-  | N9  | actions.py:37-41                      | =action local= executes without =--real=                                                                                                                      | honor dry-run                                                          | High | Confirmed      |
-  | N10 | config.py:94-97                       | =Dict2obj.__iter__= leaks a =raw= row into action listings                                                                                                    | typed models                                                           | Low  | Confirmed      |
-  | N11 | sink.py:131,162-165                   | =file diff= is offered but has no branch                                                                                                                    | implement or remove                                                    | Low  | Confirmed      |
-  | N12 | rsync.py:183-186                      | pulling a path outside the project root builds an absolute remote path                                                                                    | reject or map explicitly                                               | High | Confirmed      |
-  | N13 | rsync.py:285; db.py:135; check.py:164 | dry-run is one global boolean: rsync's valid =--dry-run= is not modelled, =db= passes =--dry-run= to =mysqldump= (invalid), and ssh/check execute unconditionally | per-tool dry-run capability; rsync executes dry-run, others print only | High | Confirmed      |
-  | N14 | sink.py:86                            | help shows literal =[red]Use[/]= because rich-click is off                                                                                                  | remove markup                                                          | Low  | Confirmed      |
-  | N15 | config.py:27-68                       | non-daemon =Spinner= thread; =stop()= sleeps                                                                                                                  | =rich= status context manager                                            | Low  | Code-confirmed |
-  | N16 | sink.py:80-88                         | =sink -s= with no command exits 2                                                                                                                           | require a command / show help                                          | Low  | Confirmed      |
-  | N17 | pyproject.toml                        | stale "Other/Proprietary" license classifier                                                                                                              | PEP 639 metadata                                                       | Low  | Confirmed      |
-  | N18 | sink/sink.py                          | no =__main__= guard; =python -m sink= prints nothing                                                                                                          | add =__main__.py=                                                        | Med  | Confirmed      |
-  | N19 | repo                                  | broken =.venv=, missing Poetry, stub =uv.lock=                                                                                                                | Stage 1                                                                | High | Confirmed      |
-  | N20 | AGENTS.md                             | false claims about =uv.lock= and Poetry                                                                                                                     | rewrite in Stage 12                                                    | Low  | Confirmed      |
-  | N21 | db.py:172-183,239-251                 | =db put= accepts a non-gzip file and gunzips remotely                                                                                                       | validate input                                                         | Med  | Confirmed      |
-  | N22 | check.py:106,122-125                  | password in argv; TLS verification disabled by default                                                                                                    | Stage 4                                                                | High | Code-confirmed |
-  | N23 | applications.py                       | passwords printed to the terminal by =misc settings=                                                                                                        | redact by default; explicit show flag                                  | Med  | Confirmed      |
-  | N24 | sink.py:189-195,198-222               | =ssh= defaults to real with inverse =-d=; =diff= and =check= never dry-run                                                                                        | one =--real/-r= contract everywhere                                      | Med  | Confirmed      |
+  | N9  | actions.py:37-41                      | =action local= executes without =--real=                                                                                                                      | honor dry-run                                                          | High | Fixed |
+  | N10 | config.py:94-97                       | =Dict2obj.__iter__= leaks a =raw= row into action listings                                                                                                    | typed models                                                           | Low  | Fixed |
+  | N11 | sink.py:131,162-165                   | =file diff= is offered but has no branch                                                                                                                    | implement or remove                                                    | Low  | Fixed |
+  | N12 | rsync.py:183-186                      | pulling a path outside the project root builds an absolute remote path                                                                                    | reject or map explicitly                                               | High | Fixed |
+  | N13 | rsync.py:285; db.py:135; check.py:164 | dry-run is one global boolean: rsync's valid =--dry-run= is not modelled, =db= passes =--dry-run= to =mysqldump= (invalid), and ssh/check execute unconditionally | per-tool dry-run capability; rsync executes dry-run, others print only | High | Fixed |
+  | N14 | sink.py:86                            | help shows literal =[red]Use[/]= because rich-click is off                                                                                                  | remove markup                                                          | Low  | Fixed |
+  | N15 | config.py:27-68                       | non-daemon =Spinner= thread; =stop()= sleeps                                                                                                                  | =rich= status context manager                                            | Low  | Fixed |
+  | N16 | sink.py:80-88                         | =sink -s= with no command exits 2                                                                                                                           | require a command / show help                                          | Low  | Fixed |
+  | N17 | pyproject.toml                        | stale "Other/Proprietary" license classifier                                                                                                              | PEP 639 metadata                                                       | Low  | Fixed |
+  | N18 | sink/sink.py                          | no =__main__= guard; =python -m sink= prints nothing                                                                                                          | add =__main__.py=                                                        | Med  | Fixed |
+  | N19 | repo                                  | broken =.venv=, missing Poetry, stub =uv.lock=                                                                                                                | Stage 1                                                                | High | Fixed |
+  | N20 | AGENTS.md                             | false claims about =uv.lock= and Poetry                                                                                                                     | rewrite in Stage 12                                                    | Low  | Fixed |
+  | N21 | db.py:172-183,239-251                 | =db put= accepts a non-gzip file and gunzips remotely                                                                                                       | validate input                                                         | Med  | Fixed |
+  | N22 | check.py:106,122-125                  | password in argv; TLS verification disabled by default                                                                                                    | Stage 4                                                                | High | Fixed |
+  | N23 | applications.py                       | passwords printed to the terminal by =misc settings=                                                                                                        | redact by default; explicit show flag                                  | Med  | Fixed |
+  | N24 | sink.py:189-195,198-222               | =ssh= defaults to real with inverse =-d=; =diff= and =check= never dry-run                                                                                        | one =--real/-r= contract everywhere                                      | Med  | Fixed |
 
 * Security catalog
   | #   | Location                                 | Issue                                                                                          | Fix                                              | Sev      |
@@ -1723,7 +1756,7 @@ Poetry/setup.py era.
   Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
   Deploy   | DONE 2026-11-25 | commits 1617e59, f7ebbbe | removed command/modules/coolname/tests/fixtures; 195 pass, 0 xfail; coverage 77.14%; fail_under 75; 0 ty errors, 16 warnings
   Stage 9  | DONE 2026-11-25 | commit d77f73e | 200 pass, 0 xfail; coverage 78.51%; fail_under 78; check field table, Rich status, no chdir; 0 ty errors, 16 warnings
-  Stage 10 | TODO | ty/ruff clean:           | coverage:
+  Stage 10 | DONE 2026-11-25 | commit a4316ef | 237 pass, 0 xfail; coverage 91.77%; fail_under 90; ANN/PTH/DTZ/RET/ARG; ty/ruff clean; import-linter 3/3
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
   Stage 12 | TODO | release tag:             | wheel sha256:
   #+end_src

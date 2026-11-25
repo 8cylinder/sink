@@ -11,6 +11,10 @@
 
 ### Changed
 
+- The source tree is fully annotated and type-checked with `ty` without
+  warning downgrades. Ruff now enforces `ANN`, `PTH`, `DTZ`, `RET`, and
+  `ARG`, and branch coverage is gated at 90%.
+- Removed the remaining dead `Transfer.error_code` helper.
 - `sink check` reports a stable table for project directories, the rsync
   binary, and each server's root/warn/automatic fields. URL probes use a Rich
   status instead of the old spinner thread, and database symlink creation no
