@@ -2,14 +2,13 @@ import shlex
 import ssl
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 import click
 
-from sink.config import Spinner, config
+from sink.config.models import Config
 from sink.credentials import remote_mysql_credentials
 from sink.shell import remote_command, run
-from sink.ui import Color, ui
+from sink.ui import Color, Spinner, ui
 
 
 class TestConfig:
@@ -17,7 +16,7 @@ class TestConfig:
     bad = click.style("[X]", fg=Color.RED.value)
     timeout = 25
 
-    def __init__(self, real=False, insecure=False):
+    def __init__(self, config: Config, real=False, insecure=False):
         self.config = config
         self.real = real
         self.insecure = insecure
@@ -26,21 +25,20 @@ class TestConfig:
         click.echo()
         click.secho("Local dirs", fg=Color.GREEN.value, bold=True)
 
-        INDENT = 2
-        for local_dir in ["pulls_dir", "log_dir", "cache_dir"]:
-            try:
-                d = Path(self.config.data["project"][local_dir])
-            except KeyError:
+        indent = 2
+        for name in ["pulls_dir", "log_dir", "cache_dir"]:
+            directory = getattr(self.config.project, name)
+            if directory is None:
                 self.out(
-                    f'{self.bad} "{local_dir}" setting in '
-                    f"{self.config.config_file} does not exist.",
-                    INDENT,
+                    f'{self.bad} "{name}" setting in '
+                    f"{self.config.path} does not exist.",
+                    indent,
                 )
                 continue
-            if d.exists():
-                self.out(f"{self.good} {d}", INDENT)
+            if directory.exists():
+                self.out(f"{self.good} {directory}", indent)
             else:
-                self.out(f"{self.bad} {d}", INDENT)
+                self.out(f"{self.bad} {directory}", indent)
 
     def test_requirements(self):
         required = ["ssh -V", "git --version", "rsync --version"]
@@ -54,30 +52,22 @@ class TestConfig:
 
     def test_servers(self, server_names=None):
         click.echo()
-        for s in self.config.servers():
-            if server_names and s.servername not in server_names:
+        for s in self.config.servers.values():
+            if server_names and s.name not in server_names:
                 continue
-            try:
-                click.echo()
-                click.secho(
-                    f"{s.servername}",
-                    fg=Color.GREEN.value,
-                    bold=True,
-                    underline=True,
-                )
-            except AttributeError:
-                pass
+            click.echo()
+            click.secho(
+                f"{s.name}",
+                fg=Color.GREEN.value,
+                bold=True,
+                underline=True,
+            )
 
             # ssh login
             for ssh in s.ssh:
                 user = ssh.username
                 url = ssh.server
 
-                try:
-                    ssh.username  # noqa: B018 - intentional attribute probe
-                    ssh.server  # noqa: B018 - intentional attribute probe
-                except AttributeError:
-                    ui.error(f"ssh values are wrong in {s.servername}")
                 if not ssh.username or not ssh.server:
                     ui.warn("missing values for ssh.", indent="  ")
                     continue
@@ -93,11 +83,10 @@ class TestConfig:
                     bad = f"root dir does not exist on server: {s.root}."
                     self.run_cmd_on_server(ssh, cmd, good, bad)
 
-                    dbs = self.config.dbs(s.mysql)
-                    for db in dbs:
+                    for db in s.databases:
                         with remote_mysql_credentials(
                             ssh,
-                            password=db.password,
+                            password=db.password or "",
                             user=db.username,
                             host=db.hostname,
                             port=_port(db),
@@ -117,11 +106,8 @@ class TestConfig:
                             bad = f"DB({db.db}): mysql error."
                             self.run_cmd_on_server(ssh, cmd, good, bad)
 
-            urls = self.config.urls(s.urls) or []
-            for u in urls:
+            for u in s.urls:
                 if not u.url:
-                    # if there is a url section in the yaml file, but
-                    # no values for it, continue.
                     continue
                 if not self.real:
                     self.out(f"+ URL({u.url})", 2)
@@ -137,10 +123,8 @@ class TestConfig:
                         u.url, timeout=self.timeout, context=ctx
                     )
                 except urllib.error.HTTPError as e:
-                    # Return code error (e.g. 404, 501, ...)
                     msg = f"{self.bad} URL({u.url}): HTTPError: {e.code}."
                 except urllib.error.URLError as e:
-                    # Not an HTTP-specific error (e.g. connection refused)
                     msg = f"{self.bad} URL({u.url}): URLError: {e.reason}."
                 except ValueError:
                     msg = f"{self.bad} URL({u.url}): Not a valid URL."
@@ -149,7 +133,6 @@ class TestConfig:
                 except TimeoutError:
                     msg = f"{self.bad} URL({u.url}) Timeout."
                 else:
-                    # 200
                     msg = f"{self.good} URL({u.url})"
                 spinner.stop()
                 self.out(msg, 2)

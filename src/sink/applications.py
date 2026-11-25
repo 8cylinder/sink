@@ -1,12 +1,10 @@
-# noinspection PyUnresolvedReferences
-
 import click
 
-from sink.config import config
+from sink.config.models import Config, Server, SSHConfig
 
 
 class Applications:
-    def __init__(self):
+    def __init__(self, config: Config):
         self.config = config
         self.apps = {
             "mysql": self._mysql,
@@ -20,8 +18,7 @@ class Applications:
         if app_name in self.apps:
             self.app = self.apps[app_name]
             return True
-        else:
-            return False
+        return False
 
     def app_settings(self):
         return self.app()
@@ -43,20 +40,23 @@ class Applications:
                 pretty += f"{field_name} - {field_value}\n"
         return pretty
 
+    @staticmethod
+    def _ssh(server: Server) -> SSHConfig:
+        return server.ssh[0] if server.ssh else SSHConfig()
+
     def _mysql(self):
         out = []
-        p = self.config.project()
-        for s in self.config.servers():
-            for db in self.config.dbs(s.mysql):
+        p = self.config.project
+        for s in self.config.servers.values():
+            ssh = self._ssh(s)
+            for db in s.databases:
                 connection = []
-                title = "--".join(
-                    [i for i in [p.name, s.servername, db.db] if i]
-                )
+                title = "--".join([i for i in [p.name, s.name, db.db] if i])
                 connection.append(["Connection Name", f"{title}"])
-                connection.append(["SSH Hostname", s.ssh.server])
-                connection.append(["SSH Username", s.ssh.username])
-                connection.append(["SSH Password", s.ssh.password])
-                connection.append(["SSH Key File", s.ssh.key])
+                connection.append(["SSH Hostname", ssh.server])
+                connection.append(["SSH Username", ssh.username])
+                connection.append(["SSH Password", ssh.password])
+                connection.append(["SSH Key File", ssh.key])
                 connection.append(["MySQL Hostname", db.hostname])
                 connection.append(["MySQL Server Port", db.port])
                 connection.append(["Username", db.username])
@@ -67,44 +67,40 @@ class Applications:
 
     def _filezilla(self):
         out = []
-        p = self.config.project()
-        for s in self.config.servers():
+        p = self.config.project
+        for s in self.config.servers.values():
+            ssh = self._ssh(s)
             connection = []
-            title = "--".join([i for i in [p.name, s.servername] if i])
+            title = "--".join([i for i in [p.name, s.name] if i])
             connection.append(["Site name", f"{title}"])
-            connection.append(["Host", s.ssh.server])
-            connection.append(["Port", s.ssh.port])
+            connection.append(["Host", ssh.server])
+            connection.append(["Port", ssh.port])
             connection.append(["Protocol", "SFTP - SSH File Transfer Protocol"])
             connection.append(["Logon Type", "Key file"])
-            connection.append(["User", s.ssh.username])
-            connection.append(["Key File", s.ssh.key])
+            connection.append(["User", ssh.username])
+            connection.append(["Key File", ssh.key])
             connection.append(["Default local directory", p.root])
             connection.append(["Default remote directory", s.root])
-            connection.append(["SSH Password", s.ssh.password])
+            connection.append(["SSH Password", ssh.password])
             out.append(connection)
         return self.pretify(out)
 
     def _nautilus(self):
         out = []
-        self.config.project()
-        for s in self.config.servers():
-            connection = f"sftp://{s.ssh.username}@{s.ssh.server}/{s.root}"
+        for s in self.config.servers.values():
+            ssh = self._ssh(s)
+            connection = f"sftp://{ssh.username}@{ssh.server}/{s.root}"
             out.append(connection)
         return "\n".join(out)
 
     def _dbeaver(self):
         out = []
-        p = self.config.project()
-        for s in self.config.servers():
-            for db in self.config.dbs(s.mysql):
+        p = self.config.project
+        for s in self.config.servers.values():
+            ssh = self._ssh(s)
+            for db in s.databases:
                 connection = []
-                title = "--".join(
-                    [i for i in [p.name, s.servername, db.db] if i]
-                )
-                "Server Host"
-                "Database"
-                "Username"
-                "Password"
+                title = "--".join([i for i in [p.name, s.name, db.db] if i])
                 connection.append(["Connection Name", f"{title}"])
                 connection.append(
                     [
@@ -127,9 +123,9 @@ class Applications:
                         "",
                     ]
                 )
-                connection.append(["Host/IP", s.ssh.server])
-                connection.append(["User Name", s.ssh.username])
-                connection.append(["Password", s.ssh.password])
-                connection.append(["Private Key", s.ssh.key])
+                connection.append(["Host/IP", ssh.server])
+                connection.append(["User Name", ssh.username])
+                connection.append(["Password", ssh.password])
+                connection.append(["Private Key", ssh.key])
                 out.append(connection)
         return self.pretify(out)

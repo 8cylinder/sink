@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Configuration is now loaded into immutable, typed models by a pure loader.
+  A per-invocation `Runtime` owns the working directory and lazily loads the
+  config; the mutable global `config` singleton and `Dict2obj` are gone.
+  Missing keys, bad YAML, unknown servers, and duplicate defaults raise typed
+  config errors with the file and key. Unknown keys warn and are ignored.
 - Commands are dry-run by default. Each action renders one command object;
   tools with a native dry-run (`rsync --dry-run`) execute that variant, while
   tools without one are printed and not spawned. Pass `--real` to execute.

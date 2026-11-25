@@ -2,26 +2,27 @@ import errno
 import os
 import shlex
 
-from sink.config import config
+from sink.config.models import Server
 from sink.errors import CommandError
 from sink.shell import Argv, remote_command, run, scp_argv
 from sink.ui import ui
 
 
 class SSH:
-    def __init__(self, server=False, user=None, dry_run=False):
+    def __init__(self, server: Server, user=None, dry_run=False):
         self.dry_run = dry_run
-        self.config = config
-        self.server = self.config.server(server)
+        self.server = server
         if user:
-            for ssh in self.server.ssh:
+            for ssh in server.ssh:
                 if ssh.name == user:
                     self.ssh = ssh
                     break
             else:
                 ui.error(f"Invalid ssh user: {user}")
         else:
-            self.ssh = self.server.ssh[0]
+            if not server.ssh:
+                ui.error(f"Server has no ssh settings ({server.name}).")
+            self.ssh = server.ssh[0]
 
     @property
     def real(self):

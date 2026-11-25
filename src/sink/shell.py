@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
 
-from sink.config import config
 from sink.ui import ui
 
 
@@ -307,7 +306,7 @@ def run(
     quiet: int = 0,
 ) -> Result:
     """Print *command* and run the variant that belongs to this mode."""
-    if quiet < 1 and not config.suppress_commands:
+    if quiet < 1:
         ui.display_cmd(command.render(real))
     if not command.can_execute(real):
         return Result(returncode=0)

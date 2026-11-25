@@ -1,7 +1,54 @@
+import random
 import sys
+import threading
+import time
 from enum import Enum
 
 import click
+
+
+class Spinner:
+    busy = False
+    delay = 0.1
+
+    @staticmethod
+    def spinning_cursor(indent):
+        cursors = [
+            "|/-\\",
+            "_.oO||Oo._",
+            "\u237a\u237b\u237c\u237d__\u237d\u237c\u237b\u237a",
+            "\u2588\u2589\u258a\u258b\u258c\u258d\u258e\u258f\u258f\u258e\u258d\u258c\u258b\u258a\u2589\u2588",
+            " \u2591\u2592\u2593\u2588\u2588\u2593\u2592\u2591 ",
+        ]
+        cursors = random.choice(cursors)
+        while True:
+            for cursor in cursors:
+                yield click.style(
+                    f"{indent}[{cursor}]", fg=str(Color.YELLOW.value)
+                )
+
+    def __init__(self, delay=None, indent=0):
+        self.indent = indent
+        indent_char = " " * indent
+        self.spinner_generator = self.spinning_cursor(indent_char)
+        if delay and float(delay):
+            self.delay = delay
+
+    def spinner_task(self):
+        while self.busy:
+            sys.stdout.write(next(self.spinner_generator))
+            sys.stdout.flush()
+            time.sleep(self.delay)
+            sys.stdout.write("\b" * (self.indent + 3))
+            sys.stdout.flush()
+
+    def start(self):
+        self.busy = True
+        threading.Thread(target=self.spinner_task).start()
+
+    def stop(self):
+        self.busy = False
+        time.sleep(self.delay)
 
 
 class Color(Enum):
@@ -17,6 +64,8 @@ class Color(Enum):
 
 
 class ui:
+    suppress = False
+
     @staticmethod
     def msg(msg):
         msg = [i.strip() for i in msg.split("\n")]
@@ -56,7 +105,7 @@ class ui:
 
     @staticmethod
     def display_cmd(cmd, indent=0, suppress_commands=False, secrets=()):
-        if suppress_commands:
+        if ui.suppress or suppress_commands:
             return
         cmd = ui.redact(cmd, secrets)
         distance = " " * indent

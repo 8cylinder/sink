@@ -2,7 +2,7 @@ import shlex
 
 import click
 
-from sink.config import config
+from sink.config.models import Project, Server
 from sink.errors import CommandError
 from sink.shell import Argv, run
 from sink.ssh import SSH
@@ -10,20 +10,18 @@ from sink.ui import ui
 
 
 class Actions:
-    def __init__(self, servername, real):
-        self.servername = servername
-        if servername == "local":
-            self.s = config.project()
-        else:
-            self.s = config.server(servername)
+    def __init__(self, project: Project, server: Server | None, real: bool):
+        self.project = project
+        self.server = server
         self.dry_run = not real
 
+    @property
+    def servername(self) -> str:
+        return self.server.name if self.server is not None else "local"
+
     def actions(self):
-        actions = getattr(self.s, "actions", None)
-        if isinstance(actions, dict):
-            return actions
-        raw = getattr(actions, "raw", None)
-        return raw if isinstance(raw, dict) else {}
+        source = self.project if self.server is None else self.server
+        return source.actions
 
     def list_actions(self):
         for name, cmd in self.actions().items():
@@ -40,7 +38,7 @@ class Actions:
             self.list_actions()
             raise CommandError(f'"{command_name}" command not found') from None
 
-        if self.servername == "local":
+        if self.server is None:
             argv = tuple(shlex.split(cmd))
             if not argv:
                 raise CommandError(f'"{command_name}" is empty')
@@ -52,6 +50,6 @@ class Actions:
                     result.stderr.strip() or f'"{command_name}" failed'
                 )
         else:
-            ssh = SSH(server=self.s.servername, dry_run=self.dry_run)
+            ssh = SSH(server=self.server, dry_run=self.dry_run)
             result = ssh.run(cmd)
             print(result)

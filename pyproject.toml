@@ -124,5 +124,43 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 55
+fail_under = 60
 show_missing = true
+
+[tool.importlinter]
+root_package = "sink"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Runtime sits above the loader"
+type = "layers"
+layers = [
+  "sink.sink",
+  "sink.runtime",
+  "sink.config.loader",
+  "sink.config.models",
+]
+
+[[tool.importlinter.contracts]]
+name = "Only Runtime loads configuration"
+type = "forbidden"
+source_modules = [
+  "sink.actions",
+  "sink.applications",
+  "sink.check",
+  "sink.credentials",
+  "sink.db",
+  "sink.deploy",
+  "sink.init",
+  "sink.rsync",
+  "sink.shell",
+  "sink.ssh",
+  "sink.ui",
+]
+forbidden_modules = ["sink.config.loader"]
+
+[[tool.importlinter.contracts]]
+name = "Models do not depend on the loader or runtime"
+type = "forbidden"
+source_modules = ["sink.config.models"]
+forbidden_modules = ["sink.config.loader", "sink.runtime"]

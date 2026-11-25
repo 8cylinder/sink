@@ -58,10 +58,6 @@ def test_missing_ssh_key_warns_but_keeps_the_config(project_factory) -> None:
     assert "ssh key does not exist: missing_key" in combined(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 5: missing keys must raise ConfigError with file and key",
-)
 def test_missing_project_root_is_a_clear_config_error(project_factory) -> None:
     project = project_factory(project_overrides={"root": None})
     result = project.invoke("file", "put", "dev")
@@ -73,10 +69,6 @@ def test_missing_project_root_is_a_clear_config_error(project_factory) -> None:
     assert "sink.yaml" in text
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 5: bad YAML must exit non-zero with a ConfigError",
-)
 def test_bad_yaml_is_reported_as_a_config_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -93,7 +85,6 @@ def test_bad_yaml_is_reported_as_a_config_error(
     assert "sink.yaml" in text
 
 
-@pytest.mark.xfail(strict=True, reason="Stage 5: unknown config keys must warn")
 def test_unknown_keys_warn_and_are_ignored(project_factory) -> None:
     project = project_factory()
     with (project.path / "sink.yaml").open("a") as file:
@@ -135,10 +126,6 @@ def test_missing_environment_variable_is_a_config_error(
     assert "SINK_MISSING_ROOT" in text
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 5: unknown servers must raise UnknownServer with known names",
-)
 def test_unknown_server_lists_known_servers(project_factory) -> None:
     project = project_factory()
     result = project.invoke("file", "put", "nope")
@@ -149,10 +136,6 @@ def test_unknown_server_lists_known_servers(project_factory) -> None:
     assert "dev" in text
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 5: multiple default servers must be rejected by the loader",
-)
 def test_multiple_default_servers_are_rejected(project_factory) -> None:
     project = project_factory(
         extra_servers={

@@ -87,7 +87,7 @@ def test_ddev_pull_failure_is_reported(project_factory) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    reason="N10/N23/S5: settings crashes on the ssh list and prints passwords",
+    reason="N23/S5: misc settings prints database passwords",
 )
 def test_misc_settings_redacts_passwords(project_factory) -> None:
     project = project_factory()

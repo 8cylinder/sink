@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from sink.config import Action, config
+from sink.config.models import Action, Project, Server
 from sink.shell import Argv, Pipeline, run
 from sink.ui import Color, ui
 
@@ -16,39 +16,48 @@ from sink.ui import Color, ui
 # https://unix.stackexchange.com/q/102211
 class Transfer:
     def __init__(
-        self, real, verbose=False, silent=False, quiet=False, server_name=None
+        self,
+        project: Project,
+        server: Server,
+        real=False,
+        verbose=False,
+        silent=False,
+        quiet=False,
     ):
         """Transfer files to and from a server with rsync
 
         verbose: adds --verbose to rsync
         silent: adds --quiet to rsync & does not display command output
         quiet: adds --quiet to rsync
-        suppress:
         """
         self.verbose = bool(verbose)
         self.real = real
-        self.config = config
-        self.prj = config.project()
-        self.server = config.server(server_name)
-        self.server_name = server_name
+        self.project = project
+        self.server = server
         self.quiet = quiet
         self.silent = silent
         self.multiple = False
 
+    def _excluded(self) -> tuple[str, ...]:
+        values = {*self.project.exclude, *self.server.exclude}
+        return tuple(sorted(value for value in values if value))
+
     def single(self, filename):
-        for server in self.config.servers():
-            locations = self._locations(filename)
-            local = locations["local"]
-            remote = locations["remote"]
-            if server.automatic:
-                server.warn = False
-                self._rsync(
-                    local,
-                    remote,
-                    Action.PUT,
-                    single=True,
-                    server=server.name,
-                )
+        xfer = Transfer(
+            self.project,
+            self.server,
+            real=self.real,
+            verbose=self.verbose,
+            silent=self.silent,
+            quiet=self.quiet,
+        )
+        locations = xfer._locations(filename)
+        xfer._rsync(
+            locations["local"],
+            locations["remote"],
+            Action.PUT,
+            single=True,
+        )
 
     def put(self, filename, extra_flags, dest_override=None):
         locations = self._locations(filename)
@@ -96,11 +105,11 @@ class Transfer:
                 return Path(root, name)
         return None
 
-    def local(self, server_name, source, dest):
-        p = self.config.project()
-        server = self.config.server(server_name)
+    def local(self, source, dest):
+        p = self.project
+        server = self.server
         rsyncb = p.rsync_binary
-        excluded = self.config.excluded(server_name)
+        excluded = self._excluded()
 
         included_list = [
             f".env.{server.name}",
@@ -108,7 +117,7 @@ class Transfer:
             f".htaccess.{server.name}",
         ]
 
-        hard_link_flag = self._hard_link_flag(dest, server_name)
+        hard_link_flag = self._hard_link_flag(dest, server.name)
 
         argv = [rsyncb, "--archive", "--verbose"]
         if hard_link_flag:
@@ -155,7 +164,6 @@ class Transfer:
         local_file = Path(local_file)
         if local_file.is_dir():
             self.multiple = True
-            # difftool = True
         with tempfile.TemporaryDirectory(suffix=f" [{server_name}]") as diffdir:
             tmp_file = f"{diffdir}/{local_file.name}"
             locations = self._locations(local_file)
@@ -179,7 +187,7 @@ class Transfer:
                 command = self._difftool_command(
                     tmp_file_fixed, local_file, diffdir
                 )
-                result = run(command, real=self.real, capture=False)
+                run(command, real=self.real, capture=False)
                 return
 
             flags = ["--ignore-all-space"]
@@ -204,7 +212,7 @@ class Transfer:
                 click.echo("Files are the same.")
 
     def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
-        gui = self.prj.difftool
+        gui = self.project.difftool
         if not gui:
             ui.error("No difftool program defined in sink.yaml")
         command = gui.format(
@@ -212,18 +220,17 @@ class Transfer:
         )
         return Argv(tuple(shlex.split(command)))
 
-    def _locations(self, filename, ignore=False, difftool=False):
-        p = self.config.project()
+    def _locations(self, filename):
+        p = self.project
         s = self.server
         local = filename
         remote = str(local)
         # remove the local project root from the file
         remote = remote.replace(str(p.root.absolute()), ".")
         # add the server root
-        try:
-            remote = Path(s.root, remote)
-        except TypeError:
-            ui.error(f"Server has no root ({s.servername}).")
+        if s.root is None:
+            ui.error(f"Server has no root ({s.name}).")
+        remote = Path(s.root, remote)
         return {
             "local": local,
             "remote": remote,
@@ -237,24 +244,18 @@ class Transfer:
         extra_flags=(),
         single=False,
         compare_to=None,
-        server=None,
         native_dry_run=True,
     ):
-        # for single(), the server is not global
-        s = self.server
-        if server:
-            s = self.config.server(server)
-
         command = self._rsync_command(
             localf,
             remotef,
             action,
-            s,
+            self.server,
             extra_flags=self._flags(extra_flags),
             compare_to=compare_to,
             native_dry_run=native_dry_run,
         )
-        self.run(command, single, action, s, remotef, localf)
+        self.run(command, single, action, self.server, remotef, localf)
 
     def _rsync_command(
         self,
@@ -267,8 +268,10 @@ class Transfer:
         compare_to=None,
         native_dry_run=True,
     ):
-        ssh = server.ssh[0]  # use the first ssh server defined
-        rsyncb = self.config.project().rsync_binary
+        if not server.ssh:
+            ui.error(f"Server has no ssh settings ({server.name}).")
+        ssh = server.ssh[0]
+        rsyncb = self.project.rsync_binary
 
         argv = [rsyncb]
 
@@ -312,7 +315,7 @@ class Transfer:
         ):
             argv.extend(["--include", include])
 
-        excluded = self.config.excluded(server.name) if self.multiple else ()
+        excluded = self._excluded() if self.multiple else ()
         for exclude in excluded:
             argv.extend(["--exclude", exclude])
 
@@ -345,7 +348,7 @@ class Transfer:
                 dim=True,
             )
             msg = click.style(
-                f": You are about to overwrite the {server.servername} "
+                f": You are about to overwrite the {server.name} "
                 f'"{remotef}" files, continue?',
                 fg=Color.YELLOW.value,
             )
@@ -360,11 +363,10 @@ class Transfer:
             click.echo(result.stdout, nl=False)
         if result.returncode:
             ui.error(f"\n{result.stderr}")
+        elif single:
+            ui.display_success(self.real, f"[{server.name}] {localf}")
         else:
-            if single:
-                ui.display_success(self.real, f"[{server.servername}] {localf}")
-            else:
-                ui.display_success(self.real)
+            ui.display_success(self.real)
 
     def error_code(self, code):
         code = str(code)
@@ -372,7 +374,7 @@ class Transfer:
             "1": "Syntax or usage error",
             "2": "Protocol incompatibility",
             "3": "Errors selecting input/output files, dirs",
-            "4": "Requested  action  not  supported:  an attempt was made to manipulate 64-bit files on a platform that cannot support them; or an option was specified that is supported by the client and not by the server.",
+            "4": "Requested  action  not  supported: an attempt was made to manipulate 64-bit files on a platform that cannot support them; or an option was specified that is supported by the client and not by the server.",
             "5": "Error starting client-server protocol",
             "6": "Daemon unable to append to log-file",
             "10": "Error in socket I/O",

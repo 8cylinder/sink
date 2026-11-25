@@ -7,8 +7,9 @@ from pathlib import Path
 
 import click
 
-from sink.config import config
+from sink.config.models import DatabaseConfig, Project, Server
 from sink.credentials import remote_mysql_credentials
+from sink.errors import CommandError
 from sink.shell import Argv, Pipeline, remote_command, run
 from sink.ui import Color, ui
 
@@ -71,38 +72,51 @@ def _env_with_password(db):
 
 
 class DB:
-    def __init__(self, real, verbose=False, quiet=False):
+    def __init__(
+        self,
+        project: Project,
+        server: Server,
+        real=False,
+        verbose=False,
+        quiet=False,
+    ):
         self.verbose = bool(verbose)
         self.real = real
-        self.config = config
+        self.project = project
+        self.server = server
         self.quiet = quiet
         self.secrets: tuple[str, ...] = ()
 
-    def dump_remote(self, dest, server):
+    def _database(self) -> DatabaseConfig:
+        if not self.server.databases:
+            raise CommandError(
+                f"Server {self.server.name} has no database configured"
+            )
+        database = self.server.databases[0]
+        self.secrets = (database.password or "",)
+        return database
+
+    def dump_remote(self, dest):
         dest = Path(dest)
-        self._pull(dest, server, local=False)
+        self._pull(dest, local=False)
 
-    def pull(self, server, tag=None):
-        p = self.config.project()
-        s = self.config.server(server)
-        self.server = s
-        db = s.mysql[0]
-        self.secrets = (db.password,)
+    def pull(self, tag=None):
+        p = self.project
+        s = self.server
+        db = self._database()
 
-        here = os.path.abspath(os.path.curdir)
-        there = config.project_root
-        relative = os.path.relpath(there, here)
-        dest_dir = os.path.join(relative, p.pulls_dir_original)
-        sqlfile = self._dest(p.name, db.db, dest_dir, s.name, tag=tag)
+        if p.pulls_dir is None:
+            raise CommandError("project.pulls_dir is not configured")
+        sqlfile = self._dest(p.name, db.db, p.pulls_dir, s.name, tag=tag)
 
-        if s.type == "lando":
+        if s.server_type == "lando":
             # lando adds the gz extension itself so we remove here
             sqlfile = Path(str(sqlfile)[:-3])
             self._pull_lando(sqlfile)
-        elif s.type == "ddev":
+        elif s.server_type == "ddev":
             self._pull_ddev(sqlfile)
         else:
-            self._pull(sqlfile, server, local=True)
+            self._pull(sqlfile, local=True)
 
     def _pull_lando(self, sqlfile):
         # suppress stderr since lando outputs update messages there
@@ -129,20 +143,20 @@ class DB:
         )
         self.run_pull_cmd(command, sqlfile, True)
 
-    def _pull(self, sqlfile, server, local=True):
-        p = self.config.project()
-        s = self.config.server(server)
-        db = s.mysql[0]
-        self.secrets = (db.password,)
+    def _pull(self, sqlfile, local=True):
+        p = self.project
+        s = self.server
+        db = self._database()
 
         if p.pulls_dir is None or not p.pulls_dir.exists():
             ui.error(f"Pulls dir not found: {p.pulls_dir}")
 
+        if not s.ssh:
+            raise CommandError(f"Server has no ssh settings ({s.name})")
         ssh = s.ssh[0]
-        mamp = getattr(s, "mamp", None)
 
-        if mamp:
-            mysqldump = os.path.join(mamp, "mysqldump")
+        if s.mamp:
+            mysqldump = os.path.join(s.mamp, "mysqldump")
             argv = [mysqldump, *_mysqldump_argv(db)[1:]]
             command = Pipeline(
                 (
@@ -158,7 +172,7 @@ class DB:
 
         with remote_mysql_credentials(
             ssh,
-            password=db.password,
+            password=db.password or "",
             user=db.username,
             host=db.hostname,
             port=_port(db),
@@ -216,20 +230,20 @@ class DB:
                 link_name.unlink()
             link_name.symlink_to(f"./{sqlfile.name}")
 
-    def load_remote(self, source, server):
+    def load_remote(self, source):
         source = Path(source)
-        self._put(server, source, local=False)
+        self._put(source, local=False)
 
-    def put(self, server, sqlfile):
-        s = self.config.server(server)
-        self.server = s
+    def put(self, sqlfile):
+        s = self.server
+        self._database()
         sql = Path(sqlfile)
-        if s.type == "lando":
+        if s.server_type == "lando":
             self._put_lando(sql)
-        elif s.type == "ddev":
+        elif s.server_type == "ddev":
             self._put_ddev(sql)
         else:
-            self._put(server, sql)
+            self._put(sql)
 
     def _put_lando(self, sql):
         command = Pipeline(
@@ -242,10 +256,11 @@ class DB:
         command = Argv(("ddev", "import-db", "--progress", f"--src={sql}"))
         self.run_put_cmd(command)
 
-    def _put(self, server, sqlfile, local=True):
-        s = self.config.server(server)
-        db = s.mysql[0]
-        self.secrets = (db.password,)
+    def _put(self, sqlfile, local=True):
+        s = self.server
+        db = self._database()
+        if not s.ssh:
+            raise CommandError(f"Server has no ssh settings ({s.name})")
         ssh = s.ssh[0]
 
         if local:
@@ -262,7 +277,7 @@ class DB:
             if self.real and result.returncode:
                 ui.error(f"{sqlfile} does not exist")
 
-        if getattr(s, "mamp", None):
+        if s.mamp:
             mysql = os.path.join(s.mamp, "mysql")
             argv = [mysql, *_mysql_argv(db)[1:]]
             command = Pipeline(
@@ -279,7 +294,7 @@ class DB:
 
         with remote_mysql_credentials(
             ssh,
-            password=db.password,
+            password=db.password or "",
             user=db.username,
             host=db.hostname,
             port=_port(db),
@@ -325,7 +340,7 @@ class DB:
                 dim=True,
             )
             msg = click.style(
-                f": You are about to overwrite the {s.servername} "
+                f": You are about to overwrite the {s.name} "
                 "database, continue?",
                 fg=Color.YELLOW.value,
             )

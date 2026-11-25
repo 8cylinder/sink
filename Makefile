@@ -1,7 +1,7 @@
 SHELL := bash
 
 .DEFAULT_GOAL := help
-.PHONY: help sync hooks fmt fmt-check lint lint-check type test secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
+.PHONY: help sync hooks fmt fmt-check lint lint-check type arch test secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -27,6 +27,9 @@ lint-check:  ## Lint without changing files
 type:  ## Type-check the project
 	uv run ty check --exit-zero-on-warning
 
+arch:  ## Check import boundaries
+	uv run lint-imports
+
 test:  ## Run tests
 	uv run pytest
 
@@ -49,7 +52,7 @@ install-man: man  ## Install the man page
 	mkdir -p "$(MANDIR)"
 	install -m 644 "$(MANPAGE)" "$(MANDIR)/sink.1"
 
-check: fmt-check lint-check type test  ## Run all checks without changing files
+check: fmt-check lint-check type arch test  ## Run all checks without changing files
 
 ci:  ## Install locked dependencies and run all checks
 	uv sync --locked --all-groups

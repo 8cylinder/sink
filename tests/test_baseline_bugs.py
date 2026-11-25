@@ -16,18 +16,12 @@ def rendered(result: Result) -> str:
     return " ".join(result.output.replace("\\", " ").split())
 
 
-@pytest.mark.xfail(
-    strict=True, reason="B1: DeployViaSymlink uses self.ssh before assignment"
-)
 def test_deploy_symlink_init(project_factory):
     project = project_factory()
     result = project.invoke("deploy", "-m", "symlink", "init", "dev")
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="B1: DeployViaRename uses self.ssh before assignment"
-)
 def test_deploy_rename_init(project_factory):
     project = project_factory()
     result = project.invoke(
@@ -42,10 +36,6 @@ def test_single_uses_the_configured_servers(project_factory):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B17: single requires a default server even though it scans all servers",
-)
 def test_single_does_not_require_a_default_server(project_factory):
     project = project_factory(default=False)
     result = project.invoke("single", "project/index.html")

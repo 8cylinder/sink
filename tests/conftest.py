@@ -10,7 +10,6 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from sink.config import config as global_config
 from sink.sink import sink
 
 
@@ -64,17 +63,6 @@ def isolated_environment(
     monkeypatch.delenv("VISUAL", raising=False)
     monkeypatch.delenv("SINK_DB_PULL", raising=False)
     monkeypatch.chdir(cwd)
-
-
-@pytest.fixture(autouse=True)
-def reset_global_config():
-    global_config.config_file = "sink.yaml"
-    global_config.data = {}
-    global_config.o = None
-    global_config.project_root = None
-    global_config.suppress = True
-    global_config.suppress_commands = False
-    yield
 
 
 def _stub_body(name: str) -> str:

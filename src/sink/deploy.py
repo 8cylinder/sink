@@ -9,7 +9,7 @@ import click
 import coolname
 import yaml
 
-from sink.config import Action, config
+from sink.config.models import Action, Project, Server
 from sink.db import DB
 from sink.rsync import Transfer
 from sink.ssh import SSH
@@ -17,23 +17,22 @@ from sink.ui import ui
 
 
 class DeployViaRename:
-    def __init__(self, servername, real=False, quiet=False):
-        self.p = config.project()
-        self.s = config.server(servername)
+    def __init__(
+        self, project: Project, server: Server, real=False, quiet=False
+    ):
+        self.p = project
+        self.s = server
         if not self.s.deploy_root:
-            ui.error(
-                f"deploy_root not set in sink.yaml for {self.s.servername}"
-            )
+            ui.error(f"deploy_root not set in sink.yaml for {self.s.name}")
         self.real = real
-        self.rsync = Transfer(real)
-        self.stamp = self._server_time(self.s)
-        self.date_file = f"SINK-DATE:{self.stamp}"
+        self.rsync = Transfer(project, server, real)
         self.quiet = quiet
-        dry_run = bool(not self.real)
-        self.ssh = SSH(dry_run=dry_run, server=self.s.servername)
+        self.ssh = SSH(server, dry_run=not real)
+        self.stamp = self._server_time()
+        self.date_file = f"SINK-DATE:{self.stamp}"
 
     def init_deploy(self, *dirs):
-        click.secho(f"\nOn remote server ({self.s.servername}) run:", bold=True)
+        click.secho(f"\nOn remote server ({self.s.name}) run:", bold=True)
         deploy_dir = Path(self.s.deploy_root, self.stamp)
         date_file = deploy_dir / self.date_file
         if not dirs:
@@ -65,7 +64,6 @@ class DeployViaRename:
             ui.error("Deploy root must be an absolute path.")
 
         ssh = self.ssh
-        # cmd = f"'mkdir {deploy_dest} && chown :{self.s.group} {deploy_dest}'"
         cmd = f"'mkdir {deploy_dest}'"
         ssh.run(cmd)
         click.echo(
@@ -74,39 +72,35 @@ class DeployViaRename:
 
         ssh.run(f"touch {self.s.deploy_root}/{self.stamp}/{self.date_file}")
 
-        xfer = Transfer(self.real, quiet=self.quiet)
+        xfer = Transfer(self.p, self.s, self.real, quiet=self.quiet)
         xfer.multiple = True
         local_root = f"{self.p.root}/"
-        xfer._rsync(local_root, deploy_dest, self.s.servername, Action.PUT)
+        xfer._rsync(local_root, deploy_dest, Action.PUT)
 
     def change_current(self, load_db=False):
         pass
 
-    def _server_time(self, server):
+    def _server_time(self):
         """Retrieve the remote server time"""
-        ssh = self.ssh
-        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
+        s_time = self.ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
         s_time = s_time.strip()
-        # deploy_name = Path(self.s.root).parts[-1]
-        # stamp = f"{deploy_name}.{s_time}"
         stamp = f"{s_time}"
         return stamp
 
 
 class DeployViaSymlink:
-    def __init__(self, servername, real=False, quiet=False):
-        self.p = config.project()
-        self.s = config.server(servername)
+    def __init__(
+        self, project: Project, server: Server, real=False, quiet=False
+    ):
+        self.p = project
+        self.s = server
         if not self.s.deploy_root:
-            ui.error(
-                f"deploy_root not set in sink.yaml for {self.s.servername}"
-            )
+            ui.error(f"deploy_root not set in sink.yaml for {self.s.name}")
         self.real = real
-        self.rsync = Transfer(real)
-        self.stamp = self.server_time(self.s)
+        self.rsync = Transfer(project, server, real)
         self.quiet = quiet
-        dry_run = bool(not self.real)
-        self.ssh = SSH(dry_run=dry_run, server=self.s.servername)
+        self.ssh = SSH(server, dry_run=not real)
+        self.stamp = self.server_time()
 
     def init_deploy(self):
         """Display bash commands to set up for deploy
@@ -120,7 +114,7 @@ class DeployViaSymlink:
         The second creates a symlink with the original <root> directory
         name that points to the new <root>.<timestamp>.original dir.
         """
-        click.secho(f"\nOn remote server ({self.s.servername}) run:", bold=True)
+        click.secho(f"\nOn remote server ({self.s.name}) run:", bold=True)
         ui.display_cmd(f"mkdir {self.s.deploy_root}")
         ui.display_cmd(
             f"sudo mv {self.s.root} {self.s.deploy_root}/{self.stamp}"
@@ -154,20 +148,19 @@ class DeployViaSymlink:
 
         previous_dest = self._get_active()
         if dump_db:
-            db = DB(real=self.real)
+            db = DB(self.p, self.s, real=self.real)
             dump_file = os.path.join(
                 previous_dest, f"DB-DUMP-{self.stamp}.sql.gz"
             )
-            db.dump_remote(dump_file, self.s.servername)
+            db.dump_remote(dump_file)
 
-        xfer = Transfer(self.real, quiet=self.quiet)
+        xfer = Transfer(self.p, self.s, self.real, quiet=self.quiet)
         xfer.multiple = True
         local_root = f"{self.p.root}/"
         compare_dir = f'--link-dest="{previous_dest}"'
         xfer._rsync(
             local_root,
             deploy_dest,
-            self.s.servername,
             Action.PUT,
             extra_flags=compare_dir,
         )
@@ -218,9 +211,9 @@ class DeployViaSymlink:
         choice = click.prompt(msg)
 
         if load_db:
-            db = DB(real=self.real)
+            db = DB(self.p, self.s, real=self.real)
             dump_file = os.path.join(data[choice], "DB-DUMP.sql.gz")
-            db.load_remote(dump_file, self.s.servername)
+            db.load_remote(dump_file)
 
         temp_symname = str(uuid.uuid1())
         # link_cmd = f"'sudo test -h {self.s.root} && sudo ln -sfn {data[choice]} {self.s.root}'"
@@ -239,10 +232,9 @@ class DeployViaSymlink:
         click.echo()
         ui.display_success(self.real)
 
-    def server_time(self, server):
+    def server_time(self):
         """Retrieve the remote server time"""
-        ssh = self.ssh
-        s_time = ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
+        s_time = self.ssh.run('date "+%y-%m-%d_%H%M%S_%Z"')
         s_time = s_time.strip()
         deploy_name = Path(self.s.root).parts[-1]
         stamp = f"{deploy_name}.{s_time}"
@@ -273,13 +265,12 @@ class DeployViaLocal:
         )
     )
 
-    def __init__(self):
-        pass
+    def __init__(self, project: Project, config_dir: Path):
+        self.project = project
+        self.config_dir = config_dir
 
     def get_dist(self) -> Path:
-        project_home = config.project_root
-        dist = Path(project_home, self.DIST_HOME)
-        return dist
+        return Path(self.config_dir, self.DIST_HOME)
 
     def init_deploy(self):
         """Build dist dir
@@ -301,7 +292,7 @@ class DeployViaLocal:
         else:
             ui.warn(f'"{dist}" already exists')
 
-    def new(self, server, real=False, note=None):
+    def new(self, server: Server, real=False, note=None):
         """Create a new deploy
 
         Create a new dir in the dist dir of all the files that should
@@ -312,18 +303,18 @@ class DeployViaLocal:
 
         now = datetime.datetime.now().isoformat(timespec="seconds")
         fancy = coolname.generate_slug(2)
-        deploy = f"{server}--{now}--{fancy}"
+        deploy = f"{server.name}--{now}--{fancy}"
         deploy = self.get_dist() / deploy
-        source = config.project().root
+        source = self.project.root
 
-        xfer = Transfer(real)
-        xfer.local(server, source, deploy)
+        xfer = Transfer(self.project, server, real)
+        xfer.local(source, deploy)
 
         if real:
             info_file = deploy / self.INFO_FILE
             yaml_content = yaml.dump(
                 {
-                    "server": server,
+                    "server": server.name,
                     "created date": now,
                     "deploy date": None,
                     "deploy name": fancy,
@@ -347,21 +338,21 @@ class DeployViaLocal:
             f.write("\n\n")
             f.write(yaml.dump(data))
 
-    def change_current(self, server, real=False, delete=False):
+    def change_current(self, server: Server, real=False, delete=False):
         """Change the current deploy to another
 
         Entry for `sink deploy switch`
         """
-        s = config.server(server)
+        s = server
         current = self.get_current_deploy(server, real)
         dist = self.get_dist()
         available = os.listdir(dist.absolute())
-        deploy = self.display_choices(available, current, server)
+        deploy = self.display_choices(available, current, server.name)
 
         yaml_file = Path(deploy["deploy dir"], self.INFO_FILE)
         if real:
             self.update_deploy_date(yaml_file)
-        xfer = Transfer(real=real, silent=False)
+        xfer = Transfer(self.project, server, real=real, silent=False)
 
         extra_flags = ""
         if delete:
@@ -375,11 +366,11 @@ class DeployViaLocal:
                 return
 
         source = Path(deploy["deploy dir"])
-        xfer.put(source, server, extra_flags, dest_override=s.root)
+        xfer.put(source, extra_flags, dest_override=s.root)
 
-    def get_current_deploy(self, server_name, real):
-        s = config.server(server_name)
-        ssh = SSH(server_name, dry_run=False)
+    def get_current_deploy(self, server: Server, real):
+        s = server
+        ssh = SSH(server, dry_run=False)
         remote_path = Path(s.root, self.INFO_FILE)
         data = {}
         with tempfile.TemporaryDirectory() as yaml_dir:
