@@ -126,11 +126,12 @@ class TestConfig:
                                 "--execute=exit",
                             ]
                             cmd = shlex.join(str(value) for value in argv) + ";"
+                            label = _db_label(db)
                             good = (
-                                f"DB({db.db}): mysql username, password "
+                                f"{label}: mysql username, password "
                                 "and db are good."
                             )
-                            bad = f"DB({db.db}): mysql error."
+                            bad = f"{label}: mysql error."
                             self.run_cmd_on_server(ssh, cmd, good, bad)
 
             for u in s.urls:
@@ -210,6 +211,14 @@ class TestConfig:
 
         self.line(True, good, spaces=2)
         return True
+
+
+def _db_label(db: DatabaseConfig) -> str:
+    """Return a database label that distinguishes credential entries."""
+    label = f"DB({db.db})"
+    if db.username:
+        label += f" as {db.username}"
+    return label
 
 
 def _port(db: DatabaseConfig) -> int | None:

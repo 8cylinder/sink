@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from helpers import combined
+from helpers import combined, commands_named
 
 
 def test_check_reports_project_and_server_fields(project_factory) -> None:
@@ -67,6 +67,35 @@ def test_check_uses_a_unicode_cross_for_failures(project_factory) -> None:
     text = combined(result)
     assert "[✗] pulls_dir" in text
     assert "[X]" not in text
+
+
+def test_check_probes_every_mysql_entry(project_factory) -> None:
+    project = project_factory(
+        server_overrides={
+            "mysql": [
+                {"username": "kfg", "password": "one", "db": "kfg"},
+                {
+                    "username": "root",
+                    "password": "two",
+                    "db": "kfg",
+                    "note": "root password",
+                },
+            ]
+        }
+    )
+
+    result = project.invoke("check", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    text = combined(result)
+    assert "DB(kfg) as kfg:" in text
+    assert "DB(kfg) as root:" in text
+    probes = [
+        command
+        for command in commands_named(project.stub_log, "ssh")
+        if "mysql " in command.args[-1]
+    ]
+    assert len(probes) == 2
 
 
 def test_check_error_output_is_compact(project_factory) -> None:
