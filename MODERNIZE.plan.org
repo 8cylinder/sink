@@ -1844,6 +1844,10 @@ is:
 - a release cannot be tagged unless the real-world suite and the manual
   staging checklist pass.
 
+The integration target is Linux servers only.  The default matrix covers the
+oldest and latest supported Ubuntu LTS releases so OpenSSH, rsync, sudo,
+shell, and distro MySQL/MariaDB client differences are exercised.
+
 Docker cannot prove absolute safety.  It removes most of the uncertainty
 around shell quoting, SSH behavior, rsync paths, MySQL authentication, and
 cleanup.  The remaining risks are tracked in Stage R8.
@@ -1914,9 +1918,11 @@ tests/integration/
 *** Services
 =server=:
 
-- Debian stable slim image.
+- Ubuntu LTS base image selected with =ARG UBUNTU_VERSION=.
 - =openssh-server=, =rsync=, =default-mysql-client=, =sudo=,
   =ca-certificates=.
+- The distro's OpenSSH, rsync, and MySQL/MariaDB client versions are
+  intentionally not pinned; the Ubuntu matrix exercises them.
 - Non-root =deploy= user.
 - =deploy ALL=(ALL) NOPASSWD:ALL= for =sudo tee= tests.
 - SSH key-only authentication; password authentication disabled.
@@ -1933,6 +1939,60 @@ tests/integration/
   - a user whose password contains =#=, quotes, backslashes, =$=, and
     spaces;
   - a restricted user for failure tests.
+
+*** Ubuntu version matrix
+The OS matrix isolates differences in OpenSSH, rsync, sudo, the shell, and the
+distro MySQL/MariaDB client.  It is separate from the database server version.
+
+| Role     | Version | Notes                                            |
+|----------+---------+--------------------------------------------------|
+| oldest   | 20.04   | Oldest LTS we still support; ESM maintenance.    |
+| latest   | 26.04   | Current LTS.                                     |
+| optional | 22.04   | Intermediate LTS for a full matrix.              |
+| optional | 24.04   | Intermediate LTS for a full matrix.              |
+
+Policy:
+
+- =SINK_TEST_UBUNTU= selects one image.  The default is the latest LTS.
+- =make integration= runs the latest LTS.
+- =make integration-oldest= runs the oldest supported LTS.
+- =make integration-matrix= runs the oldest and latest LTS.
+- =UBUNTU_VERSIONS= overrides the full list, for example
+  =UBUNTU_VERSIONS="20.04 22.04 24.04 26.04"=.
+- Update =UBUNTU_OLDEST= when an LTS leaves our support window and
+  =UBUNTU_LATEST= after a new LTS release.  If the newest LTS image is not
+  yet published, use the newest published LTS and record the substitution in
+  the stage log.
+- Do not pin OpenSSH or rsync separately; the Ubuntu version is the variable
+  under test.
+- Keep the MySQL server image fixed initially (=mysql:8.4=).  Add a separate
+  =MYSQL_VERSION= dimension later if server-version coverage is needed.
+- The smoke test records =lsb_release -ds=, =ssh -V=, =rsync --version=,
+  and =mysqldump --version= so a failure identifies the exact tool versions.
+
+=server/Dockerfile=:
+
+#+begin_src dockerfile
+ARG UBUNTU_VERSION=26.04
+FROM ubuntu:${UBUNTU_VERSION}
+# install openssh-server, rsync, default-mysql-client, sudo, ca-certificates
+#+end_src
+
+=compose.yaml=:
+
+#+begin_src yaml
+services:
+  server:
+    build:
+      context: ./server
+      args:
+        UBUNTU_VERSION: ${SINK_TEST_UBUNTU:-26.04}
+    image: sink-test-server:${SINK_TEST_UBUNTU:-26.04}
+#+end_src
+
+Use a Compose project name and image tag that include the Ubuntu version, for
+example =sink-integration-20-04-<run-id>=, so parallel matrix jobs do not
+collide.
 
 *** Harness behavior
 - One Compose stack per test session.
@@ -1964,14 +2024,29 @@ invokes the installed =sink= with =--real= where required.
 
 *** Make targets
 #+begin_src make
-integration:  ## Run Docker-backed integration tests
-	uv run pytest -m integration
+UBUNTU_OLDEST ?= 20.04
+UBUNTU_LATEST ?= 26.04
+UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
 
-integration-down:  ## Force-remove leftover integration containers
-	docker compose -f tests/integration/compose.yaml down -v --remove-orphans
+integration:  ## Run integration tests on the latest LTS
+	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration
+
+integration-oldest:  ## Run integration tests on the oldest supported LTS
+	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration
+
+integration-matrix:  ## Run the oldest and latest LTS
+	@for version in $(UBUNTU_VERSIONS); do \
+		echo "==> Ubuntu $$version"; \
+		SINK_TEST_UBUNTU=$$version uv run pytest -m integration || exit $$?; \
+	done
+
+integration-down:  ## Remove leftover integration containers
+	docker ps -aq --filter label=sink.integration=true | xargs -r docker rm -f
 #+end_src
 
-Keep =make check= unchanged.  A later =make ci-full= can run both.
+Keep =make check= unchanged.  A later =make ci-full= can run both.  Add
+=sink.integration=true= as a Compose label so =integration-down= can clean up
+containers from every Ubuntu version and every interrupted run.
 
 ** Stages
 Each stage is committed separately and stops until its exit criteria are
@@ -1998,20 +2073,28 @@ test passes.
 
 Tasks:
 - [ ] Add =tests/integration/compose.yaml=.
-- [ ] Add the =server= image and =sshd_config=.
+- [ ] Add the =server= image with =ARG UBUNTU_VERSION= and =sshd_config=.
 - [ ] Add the MySQL service and init SQL.
 - [ ] Add the session fixture: build, start, health-wait, key generation,
   =known_hosts=, teardown.
 - [ ] Add the temporary-project fixture.
-- [ ] Add =make integration= and document prerequisites.
+- [ ] Add =make integration=, =integration-oldest=, and
+  =integration-matrix=; document prerequisites.
+- [ ] Generate a per-version Compose project name and image tag.
+- [ ] Add the =sink.integration=true= label and verify
+  =make integration-down= removes leftovers.
 - [ ] Verify tests skip cleanly when Docker is absent.
-- [ ] Add one smoke test: SSH connection and =sink check= against the
-  sandbox.
+- [ ] Add one smoke test that records the Ubuntu and tool versions and
+  performs an SSH connection plus =sink check=.
 
 Exit criteria:
-- =make integration= reliably starts and stops the stack.
+- =make integration= reliably starts and stops the latest-LTS stack.
+- =make integration-oldest= passes on the oldest supported LTS.
+- =make integration-matrix= passes on both oldest and latest.
 - No leaked containers, keys, or temp files after success or failure.
 - The smoke test fails if SSH or MySQL is unreachable.
+- The smoke output identifies the Ubuntu, OpenSSH, rsync, and client
+  versions under test.
 
 *** TODO Stage R2 - Real file transfers
 *Goal:* Prove file and directory transfers are correct and safe.
@@ -2142,17 +2225,23 @@ Exit criteria:
 *Goal:* Make the integration suite part of the release process.
 
 Tasks:
-- [ ] Add a Docker-capable CI job for =make integration=.
+- [ ] Add a Docker-capable CI job for the integration suite.
+- [ ] Add a CI matrix with =ubuntu: ["20.04", "26.04"]= as separate jobs,
+  setting =SINK_TEST_UBUNTU= for each.
+- [ ] Allow an optional full matrix with 22.04 and 24.04.
 - [ ] Run on pull requests and/or nightly; document the policy.
-- [ ] Require the suite before tagging a release.
-- [ ] Cache Docker layers and pin image versions.
-- [ ] Publish a short failure report with container logs on CI failure.
+- [ ] Require both the oldest and latest LTS jobs before tagging a release.
+- [ ] Cache Docker layers per Ubuntu version and pin image digests where
+  practical.
+- [ ] Publish a short failure report with container logs and the recorded
+  tool versions on CI failure.
 - [ ] Track flaky tests explicitly; do not hide them with automatic
   reruns.
 - [ ] Add dependency/security scanning if not already covered by CI.
 
 Exit criteria:
 - A release cannot be produced with a red integration suite.
+- Oldest and latest LTS jobs are both required and green.
 - No unexplained flaky tests in the last N runs.
 
 *** TODO Stage R9 - Manual staging certification
@@ -2188,7 +2277,8 @@ For this project, "full confidence" means:
 - 100% of destructive operations map to at least one positive and one
   negative real-server test.
 - S1–S14 are verified or explicitly accepted with a documented rationale.
-- The Docker suite is green on the supported Linux matrix.
+- The Docker suite is green on the supported Ubuntu LTS matrix: at minimum
+  the oldest and latest LTS, with the full intermediate matrix on demand.
 - The manual staging checklist has passed for the release.
 - No known high-severity safety issue is open.
 - No secrets are found in output, logs, or temporary files by the test
@@ -2196,9 +2286,10 @@ For this project, "full confidence" means:
 - All residual risks have an owner and a review date.
 
 ** Residual risks Docker will not cover
-- macOS/BSD =rsync= behavior.
+- Non-Ubuntu Linux distributions and macOS/BSD local =rsync= behavior.
 - Production =sshd=, PAM, sudo, SELinux, AppArmor, and firewall policy.
-- Exact MySQL versions, plugins, and cloud IAM authentication.
+- Exact MySQL server versions, plugins, and cloud IAM authentication.  The
+  Ubuntu matrix covers the distro client, not every server version.
 - Real network latency, packet loss, and connection resets.
 - Filesystem full, quota, and inode exhaustion on the actual server.
 - Lando/DDEV local workflows.
@@ -2211,10 +2302,11 @@ Implement Stages R0–R1, then the highest-risk half of Stage R4:
 
 1. Safety matrix.
 2. Compose harness with SSH and MySQL.
-3. Successful =db pull= with a =#= password.
-4. Failed =db pull= with wrong credentials and credential cleanup.
-5. Successful =db put= with row verification.
-6. File put/pull smoke test.
+3. Ubuntu 20.04 and 26.04 smoke tests with recorded tool versions.
+4. Successful =db pull= with a =#= password on both LTS versions.
+5. Failed =db pull= with wrong credentials and credential cleanup.
+6. Successful =db put= with row verification.
+7. File put/pull smoke test.
 
 That gives the most safety value quickly, before expanding into diffing,
 adversarial inputs, and interruption tests.
