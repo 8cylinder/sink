@@ -8,9 +8,11 @@ from sink.db import DB
 from sink.runtime import Runtime
 from sink.ui import ui
 
+DB_ACTIONS = (Action.PUT.value, Action.PULL.value)
+
 
 @cli.command("db", context_settings=CONTEXT_SETTINGS, cls=AppCommand)
-@click.argument("db-action", type=click.Choice([i.value for i in Action]))
+@click.argument("db-action", type=click.Choice(DB_ACTIONS))
 @click.argument("server", type=click.STRING)
 @click.argument("sql-gz", type=click.Path(exists=True), required=False)
 @click.option(

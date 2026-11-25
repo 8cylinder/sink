@@ -37,6 +37,11 @@ dev = [
   "ruff",
   "ty",
   "import-linter",
+  "sphinx>=8",
+  "myst-parser>=4",
+  "furo>=2024",
+  "sphinx-click>=6",
+  "sphinx-autobuild>=2024",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -50,13 +55,17 @@ include = [
   "LICENSE",
   "NOTICE",
   "CONTRIBUTORS.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
   "CHANGELOG.md",
+  "docs",
   "pyproject.toml",
   "Makefile",
 ]
 exclude = [
   "**/__pycache__",
   "**/*.pyc",
+  "docs/_build",
 ]
 
 [tool.ruff]

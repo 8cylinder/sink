@@ -11,7 +11,9 @@ CLOSED: [2020-11-08 Sun 18:56]
 *** COMPLETE When using =single= ignore the "ask overwrite" yaml settings
 CLOSED: [2020-11-08 Sun 18:56]
 
-*** TODO Quiet/silent flags
+*** COMPLETE Quiet/silent flags
+CLOSED: [2026-11-25 Wed]
+Implemented as -q (hide render) and -qq (hide all output).
 - quiet: output "Succcess", server and base filename
   - eg: Success, prod, index.twig
   - eg: [Success] prod:.../dir/dir/index.twig
@@ -23,7 +25,9 @@ CLOSED: [2020-11-08 Sun 18:56]
 -q --no-command, -qq --no-output, -qqq both?
 --silent -s, for both?
 
-*** TODO Success messages
+*** COMPLETE Success messages
+CLOSED: [2026-11-25 Wed]
+Implemented [Success] SERVER: message labels.
 - file upload/download :: [Success] SERVER: upload complete
 - db put/pull :: [Success] SERVER: sql upload complete
 - single :: [Success] SERVER: <file path>
@@ -133,8 +137,9 @@ Build a vagrant vm to get a project running quickly.
   - Boss
 
 ** Future [10/23]
-*** TODO [#A] Use plumbum for shell commands
-https://github.com/tomerfiliba/plumbum
+*** DONT-DO [#A] Use plumbum for shell commands
+CLOSED: [2026-11-25 Wed]
+Superseded by the stdlib argv execution layer in shell.py.
 
 *** COMPLETE [#A] Set up virtualenv
 CLOSED: [2022-11-11 Fri 12:22]
@@ -168,11 +173,14 @@ CLOSED: [2020-12-26 Sat 12:20]
 CLOSED: [2020-12-26 Sat 12:22]
 Define difftool in sink.yaml
 
-*** TODO progress bar
-**** TODO Add flag for pv in sink.yaml so it can be used from the server
-Try =mysqlpump= if it's on the server.  It has =--watch-progress=
-
-**** TODO Check for pv locally before using
+*** COMPLETE progress bar
+CLOSED: [2026-11-25 Wed]
+**** COMPLETE Add flag for pv in sink.yaml so it can be used from the server
+CLOSED: [2026-11-25 Wed]
+=project.pv= and =project.mysqlpump= are opt-in.
+**** COMPLETE Check for pv locally before using
+CLOSED: [2026-11-25 Wed]
+Falls back to =cat= when =pv= is absent.
 
 *** DONT-DO When downloading db don't overwrite existing file
 CLOSED: [2020-12-26 Sat 12:27]
@@ -253,10 +261,9 @@ something like craft's project config (project.yaml), where you want
 to keep it from getting overwritten from your local file since it's a
 definition of the database.
 
-*** MAYBE Add actions to project
-Add the ability to run local actions as well as remote ones.  Would be
-best if yaml values could be used in the command.  If not, probably
-not worth it.
+*** COMPLETE Add actions to project
+CLOSED: [2026-11-25 Wed]
+Project actions are available as =sink action local [NAME]=.
 
 *** DONT-DO Local deploy
 CLOSED: [2026-11-25 Wed]

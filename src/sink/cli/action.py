@@ -25,7 +25,7 @@ def action(
 
     \b
     actions:
-      find-cache: find -iname '*.cache'
+      find-cache: find . -iname cache
 
     Instead of using one of the servers, you can use the special name
     'local' for a server.  This will use the commands in the project
