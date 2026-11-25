@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Block commits that contain secrets. Installed by `make hooks`.
+set -euo pipefail
+
+min_major=8
+min_minor=19
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+error: gitleaks is not installed.
+
+This repository blocks commits that contain secrets. Install gitleaks
+however you prefer, then run your commit again:
+
+  https://github.com/gitleaks/gitleaks#installing
+
+EOF
+    exit 1
+fi
+
+version="$(gitleaks version 2>/dev/null | head -n1 || true)"
+version="${version#v}"
+IFS=. read -r major minor _rest <<<"$version"
+
+if [ -z "$version" ] ||
+    [ "${major:-0}" -lt "$min_major" ] ||
+    { [ "${major:-0}" -eq "$min_major" ] && [ "${minor:-0}" -lt "$min_minor" ]; }; then
+    printf 'error: gitleaks >= %s.%s is required for `gitleaks git`.\n       found: %s\n\n' \
+        "$min_major" "$min_minor" "${version:-unknown}" >&2
+    cat >&2 <<'EOF'
+Some distributions ship an older release: Debian 13 and Ubuntu 24.04-26.04
+have 8.16, which predates that command. Install a current release:
+
+  https://github.com/gitleaks/gitleaks#installing
+
+EOF
+    exit 1
+fi
+
+exec gitleaks git --staged --redact --no-banner --verbose
