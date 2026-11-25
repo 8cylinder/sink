@@ -10,7 +10,7 @@
 - Build + install: `uv build`, then `uv tool install --force .` (or `pip install --force-reinstall dist/sink-<version>-py3-none-any.whl`).
 - `pyproject.toml` is the only manifest. Hatchling builds `src/sink`; there is no `setup.py` and no Poetry.
 - `uv.lock` is tracked and must stay committed. `.python-version` is 3.15.
-- Lint/type configuration arrives in Stage 2 of `MODERNIZE.plan.org`; do not add ad-hoc tool config.
+- Lint/type/coverage gates live in `pyproject.toml`; `make check` runs Ruff, ty, import-linter, and the 90% branch coverage suite. Do not add ad-hoc tool config.
 
 ## Critical gotchas
 
