@@ -96,14 +96,14 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =ed4cbde= (Stage 7
-    diff status refinement).  The pre-modernization tag is
+  - Branch =modernize=; last implementation commit =a15676b= (Stage 8
+    database safety).  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
-    (CLI structure and output contract), Stage 7 (transfers).  Next:
-    Stage 8 (database).
+    (CLI structure and output contract), Stage 7 (transfers), Stage 8
+    (database).  Next: Stage 9 (deploy and check).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -118,6 +118,8 @@
   - Stage 7 commits: =d84bb7b= (file ambiguity, root rejection, diff,
     ssh, and transfer contract tests), =ed4cbde= (git-difference versus
     git-failure status).
+  - Stage 8 commits: =2fbecd7= (database contract tests and config
+    keys), =a15676b= (gzip validation, pv/mysqlpump, lando/ddev errors).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -130,8 +132,8 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 184 passed, 4 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 69.91%, =fail_under = 68=; =ty=
+  - Current test baseline: 206 passed, 1 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 71.51%, =fail_under = 70=; =ty=
     has 0 errors and 24 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
@@ -1279,29 +1281,69 @@ non-TTY path is forced to be a clean no-op.
       =--real= argv does not; both printed strings equal the argv that
       executes.
 
-* Stage 8 - Database                                                            :stage_8:
+* DONE Stage 8 - Database                                                       :stage_8:
 ** Goal
 Make database pull/put safe, testable, and honest about progress and filenames.
 
 ** Tasks
-- [ ] Fix B8: no nested quotes, no password in argv.  Use the Stage 4
+- [X] Fix B8: no nested quotes, no password in argv.  Use the Stage 4
       remote credentials helper for =mysqldump= and =mysql=.
-- [ ] Validate the input up front: exists, readable, gzip magic or
+- [X] Validate the input up front: exists, readable, gzip magic or
       =.sql.gz= suffix, and the target server has a database.  Reject
       non-gzip files instead of failing midway through =gunzip=.
-- [ ] Implement =pv= support from TODO.org: detect =pv= locally, make
+- [X] Implement =pv= support from TODO.org: detect =pv= locally, make
       the progress flag opt-in in =sink.yaml=, and fall back to a plain
       pipe when it is absent.  Do not require =pv=.
-- [ ] Add =mysqlpump --watch-progress= as an opt-in remote alternative;
+- [X] Add =mysqlpump --watch-progress= as an opt-in remote alternative;
       document the difference in output.
-- [ ] Use timezone-aware timestamps for the pull filename and the
+- [X] Use timezone-aware timestamps for the pull filename and the
       =LATEST-<server>.sql.gz= symlink; keep the human-readable local
       time format.
-- [ ] Route lando/ddev commands through =shell.py= and preserve their
+- [X] Route lando/ddev commands through =shell.py= and preserve their
       stderr conventions without discarding real errors.
-- [ ] Keep the TODO MAYBE items (custom filename tokens, extended info,
+- [X] Keep the TODO MAYBE items (custom filename tokens, extended info,
       pre-pull) out of scope unless separately approved; add them to
       the backlog table instead.
+
+
+** Result
+206 tests pass, 1 is a strict =xfail=, and the integration test is
+deselected; branch coverage is 71.51% with =fail_under = 70=.  =make
+check= is green with 0 =ty= errors and 24 warnings; import-linter keeps
+all three contracts.
+
+=db put= validates the source before building or running any remote
+command: it must exist, be readable, and start with the gzip magic
+bytes.  A fake =.sql.gz= is rejected, and a server without a configured
+database raises before credential staging.  Every rejection exits
+non-zero without touching the server.
+
+Local database imports use =cat= by default.  Set =project.pv: yes= to
+use =pv --numeric= when =pv= is installed; if it is not, Sink falls back
+to =cat=.  Remote dumps use =mysqldump= by default and
+=mysqlpump --watch-progress= when =project.mysqlpump: yes= is set.
+Both are opt-in and do not add required tools.
+
+Pull filenames and the =LATEST-<server>.sql.gz= symlink use the same
+human-readable local timestamp, now derived from an aware
+=datetime.now(datetime.UTC).astimezone()=.
+
+Lando and DDEV commands still route through =shell.py=, but no longer
+discard stderr.  Their return code decides whether captured stderr is an
+error; informational stderr on success is ignored.  Failed lando/ddev
+pulls now exit non-zero and show the real error.
+
+The remote credential helper still writes a 0600 defaults-extra file
+over ssh stdin, and no database password appears in rendered commands,
+argv, or logs.  =tests/test_stage8_contract.py= covers gzip validation,
+missing databases, =cat=/=pv= selection and fallback, =mysqlpump=,
+dry-run no-spawn, real imports, and timestamp awareness.  Goldens now
+cover remote, MAMP-local, Lando, DDEV, =pv=, and =mysqlpump= pulls and
+puts.
+
+Deviation: the optional custom filename tokens, extended pull info, and
+pre-pull hooks from =TODO.org= remain backlog; they are MAYBE items and
+are not part of this stage.
 
 ** Exit criteria
 - Golden argv tests for local, remote, lando, and ddev pulls and puts.
@@ -1666,7 +1708,7 @@ Poetry/setup.py era.
   Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
   Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
   Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
-  Stage 8  | TODO | db tests:                | pv:
+  Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
   Stage 9  | TODO | deploy/check tests:      | TODO items closed:
   Stage 10 | TODO | ty/ruff clean:           | coverage:
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -

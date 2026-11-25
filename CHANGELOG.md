@@ -4,6 +4,14 @@
 
 ### Changed
 
+- `db put` validates that the source is a readable gzip file and that the
+  server has a database before touching the remote host. Local imports use
+  `cat` by default; set `project.pv: yes` to use `pv` when installed. Remote
+  dumps use `mysqldump`, or `mysqlpump --watch-progress` with
+  `project.mysqlpump: yes`.
+- Database pull timestamps are timezone-aware while keeping the existing
+  local-time filename format. Lando/DDEV failures now preserve stderr and
+  exit non-zero.
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.
