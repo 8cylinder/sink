@@ -98,7 +98,7 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; release commit =c13ef75= (release docs), annotated
+  - Branch =modernize=; release commits =c13ef75= (release docs) and =d579efa= (release notes), annotated
     tag =v0.3.0=.  All non-deferred stages are complete.  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
