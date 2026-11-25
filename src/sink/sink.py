@@ -45,9 +45,6 @@ from sink.actions import Actions
 # embed()
 
 
-__version__ = '0.2.1'
-
-
 def get_servers(ctx, args, incomplete):
     config.load_config()
     servers = [i.name for i in config.servers() if i.name.startswith(incomplete)]
@@ -78,7 +75,7 @@ CONTEXT_SETTINGS = {
 # @click.group(context_settings=CONTEXT_SETTINGS, cls=RichGroup) # RICH_CLICK
 @click.option('-s', '--suppress-commands', is_flag=True,
               help="Don't display the bash commands used.")
-@click.version_option()
+@click.version_option(package_name="sink", prog_name="sink")
 def sink(suppress_commands):
     """🐙 Tools to manage projects.
 

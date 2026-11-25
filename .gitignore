@@ -1,9 +1,36 @@
+# Project configuration and secrets
 sink.yaml
-build
-dist
-sink.egg-info
-*.pyc
-.mypy_cache
-man
-*egg*
 .secrets.org
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.ty_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Documentation builds
+docs/_build/
+man
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,25 +1,61 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "sink"
-version = "0.2.1"
+version = "0.3.0"
 description = "Sink is a command line tool for developers to help building websites."
-authors = ["sheldon <developer@8cylinder.com>"]
+readme = "README.md"
+requires-python = ">=3.15"
 license = "GPL-2.0-only"
-readme = "README.org"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Sheldon McGrandle", email = "developer@8cylinder.com" }]
+keywords = ["cli", "deployment", "rsync", "ssh", "mysql"]
+classifiers = [
+  "Environment :: Console",
+  "Programming Language :: Python :: 3.15",
+]
+dependencies = [
+  "click>=8.5",
+  "PyYAML>=6.0.4",
+  "coolname>=2.0",
+  "plumbum>=2.0",
+  "rich>=15",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-click = "^8.1.3"
-PyYAML = "^6.0"
-coolname = "^2.0.0"
-plumbum = "^1.8.0"
-rich-click = "^1.5.2"
-
-[tool.poetry.group.dev.dependencies]
-ipython = "^8.10.0"
-
-[tool.poetry.scripts]
+[project.scripts]
 sink = "sink.sink:sink"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[project.urls]
+Homepage = "https://github.com/8cylinder/sink"
+Repository = "https://github.com/8cylinder/sink"
+Issues = "https://github.com/8cylinder/sink/issues"
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "pytest-cov>=6",
+  "ruff",
+  "ty",
+  "import-linter",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sink"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/sink",
+  "tests",
+  "README.md",
+  "LICENSE",
+  "NOTICE",
+  "CONTRIBUTORS.md",
+  "pyproject.toml",
+  "Makefile",
+]
+exclude = [
+  "**/__pycache__",
+  "**/*.pyc",
+]
