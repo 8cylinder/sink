@@ -1,0 +1,2 @@
++ ddev import-db --progress --src=project/dump.sql.gz
+[Success (DRY RUN)] dev: sql upload complete

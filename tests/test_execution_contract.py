@@ -7,7 +7,7 @@ import ssl
 from pathlib import Path
 
 import pytest
-from helpers import combined, commands_named, unwrap
+from helpers import combined, commands_named, unwrap, write_gzip
 
 REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "src" / "sink"
@@ -126,8 +126,9 @@ def test_db_pull_does_not_leak_the_password(project_factory) -> None:
 
 def test_db_put_does_not_leak_the_password(project_factory) -> None:
     project = project_factory()
+    write_gzip(project.path / "project" / "dump.sql.gz")
 
-    result = project.invoke("db", "put", "dev", "project/index.html")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
 
     assert result.exit_code == 0, combined(result)
     assert "secret" not in combined(result)
@@ -157,8 +158,9 @@ def test_db_pull_real_executes_and_does_not_leak(project_factory) -> None:
 
 def test_db_put_real_executes_and_does_not_leak(project_factory) -> None:
     project = project_factory()
+    write_gzip(project.path / "project" / "dump.sql.gz")
 
-    result = project.invoke("db", "put", "dev", "project/index.html", "--real")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz", "--real")
 
     assert result.exit_code == 0, combined(result)
     assert "secret" not in combined(result)

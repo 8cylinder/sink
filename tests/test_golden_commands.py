@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 import pytest
-from helpers import combined, commands_named, unwrap
+from helpers import combined, commands_named, unwrap, write_gzip
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden"
 
@@ -83,10 +83,79 @@ def test_db_pull_golden(project_factory) -> None:
 
 def test_db_put_golden(project_factory) -> None:
     project = project_factory()
-    result = project.invoke("db", "put", "dev", "project/index.html")
+    write_gzip(project.path / "project" / "dump.sql.gz")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
 
     assert result.exit_code == 0, combined(result)
     assert_golden("db-put", combined(result), project)
+
+
+def test_db_pull_lando_golden(project_factory) -> None:
+    project = project_factory(server_type="lando")
+    result = project.invoke("db", "pull", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-pull-lando", combined(result), project)
+
+
+def test_db_pull_ddev_golden(project_factory) -> None:
+    project = project_factory(server_type="ddev")
+    result = project.invoke("db", "pull", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-pull-ddev", combined(result), project)
+
+
+def test_db_put_lando_golden(project_factory) -> None:
+    project = project_factory(server_type="lando")
+    write_gzip(project.path / "project" / "dump.sql.gz")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-put-lando", combined(result), project)
+
+
+def test_db_put_ddev_golden(project_factory) -> None:
+    project = project_factory(server_type="ddev")
+    write_gzip(project.path / "project" / "dump.sql.gz")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-put-ddev", combined(result), project)
+
+
+def test_db_put_pv_golden(project_factory) -> None:
+    project = project_factory(project_overrides={"pv": True})
+    write_gzip(project.path / "project" / "dump.sql.gz")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-put-pv", combined(result), project)
+
+
+def test_db_pull_mysqlpump_golden(project_factory) -> None:
+    project = project_factory(project_overrides={"mysqlpump": True})
+    result = project.invoke("db", "pull", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-pull-mysqlpump", combined(result), project)
+
+
+def test_db_pull_mamp_golden(project_factory) -> None:
+    project = project_factory(server_overrides={"mamp": "mamp"})
+    result = project.invoke("db", "pull", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-pull-mamp", combined(result), project)
+
+
+def test_db_put_mamp_golden(project_factory) -> None:
+    project = project_factory(server_overrides={"mamp": "mamp"})
+    write_gzip(project.path / "project" / "dump.sql.gz")
+    result = project.invoke("db", "put", "dev", "project/dump.sql.gz")
+
+    assert result.exit_code == 0, combined(result)
+    assert_golden("db-put-mamp", combined(result), project)
 
 
 def test_deploy_local_init_golden(project_factory) -> None:

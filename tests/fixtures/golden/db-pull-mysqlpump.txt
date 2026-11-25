@@ -1,0 +1,4 @@
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
++ ssh -C -T -p 2222 -i <CONFIG_DIR>/id_rsa -o ConnectTimeout=25 deploy@example.com 'mysqlpump --defaults-extra-file=/tmp/<CREDS_FILE> --watch-progress demo' | gzip -c > <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
+[Success (DRY RUN)] dev: sql download complete
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

@@ -1,0 +1,2 @@
++ cat project/dump.sql.gz | gunzip -c | MYSQL_PWD="${MYSQL_PWD}" mamp/mysql --host localhost --user dbuser demo
+[Success (DRY RUN)] dev: sql upload complete

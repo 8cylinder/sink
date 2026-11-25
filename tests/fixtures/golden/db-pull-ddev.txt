@@ -1,0 +1,2 @@
++ ddev export-db --gzip --file=<CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
+[Success (DRY RUN)] dev: sql download complete

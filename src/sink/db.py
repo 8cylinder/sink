@@ -3,6 +3,7 @@
 import datetime
 import os
 import shlex
+import shutil
 import sys
 from contextlib import contextmanager, suppress
 from pathlib import Path
@@ -52,18 +53,35 @@ def _client_options(db, credentials=None):
     return options
 
 
-def _mysqldump_argv(db, credentials=None):
-    """Build the mysqldump argv."""
-    return [
-        "mysqldump",
-        *_client_options(db, credentials),
-        "--single-transaction",
-        "--triggers",
-        "--events",
-        "--routines",
-        "--no-tablespaces",
-        db.db,
-    ]
+def _dump_argv(db, credentials=None, *, mysqlpump=False):
+    """Build a dump argv, optionally using mysqlpump's progress mode."""
+    binary = "mysqlpump" if mysqlpump else "mysqldump"
+    argv = [binary, *_client_options(db, credentials)]
+    if mysqlpump:
+        argv.extend(["--watch-progress", db.db])
+    else:
+        argv.extend(
+            [
+                "--single-transaction",
+                "--triggers",
+                "--events",
+                "--routines",
+                "--no-tablespaces",
+                db.db,
+            ]
+        )
+    return argv
+
+
+def _validate_gzip(path):
+    """Reject a file that is not gzip before any remote command runs."""
+    try:
+        with path.open("rb") as stream:
+            magic = stream.read(2)
+    except OSError as error:
+        raise CommandError(f"Cannot read {path}: {error}") from error
+    if magic != b"\x1f\x8b":
+        raise CommandError(f"{path} is not a gzip file")
 
 
 def _mysql_argv(db, credentials=None):
@@ -132,17 +150,15 @@ class DB:
             self._pull(sqlfile, local=True)
 
     def _pull_lando(self, sqlfile):
-        # suppress stderr since lando outputs update messages there
-        """Pull through Lando."""
-        command = Pipeline(
-            (Argv(("lando", "db-export", str(sqlfile))),),
-            stderr_devnull=True,
-        )
+        """Pull through Lando, keeping stderr for real failures."""
+        # Lando writes update messages to stderr even on success; the
+        # return code decides whether they are errors.
+        command = Pipeline((Argv(("lando", "db-export", str(sqlfile))),))
         self.run_pull_cmd(command, sqlfile, True)
 
     def _pull_ddev(self, sqlfile):
-        # ddev outputs informational output on stderr.
-        """Pull through DDEV."""
+        """Pull through DDEV, keeping stderr for real failures."""
+        # DDEV writes informational output to stderr even on success.
         command = Pipeline(
             (
                 Argv(
@@ -154,7 +170,6 @@ class DB:
                     )
                 ),
             ),
-            stderr_devnull=True,
         )
         self.run_pull_cmd(command, sqlfile, True)
 
@@ -173,7 +188,7 @@ class DB:
 
         if s.mamp:
             mysqldump = os.path.join(s.mamp, "mysqldump")
-            argv = [mysqldump, *_mysqldump_argv(db)[1:]]
+            argv = [mysqldump, *_dump_argv(db)[1:]]
             command = Pipeline(
                 (
                     Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
@@ -194,7 +209,9 @@ class DB:
             port=_port(db),
             real=self.real,
         ) as credentials:
-            dump_argv = _mysqldump_argv(db, credentials)
+            dump_argv = _dump_argv(
+                db, credentials, mysqlpump=self.project.mysqlpump
+            )
             if local:
                 fragment = shlex.join(dump_argv)
                 command = Pipeline(
@@ -224,10 +241,13 @@ class DB:
                 server=self.server.name,
                 message="sql download complete",
             )
-        elif result.stderr:
+        elif result.returncode:
             if ui.quiet < 2:
                 ui.err_console.print(str(sqlfile.absolute()), style="yellow")
-            ui.error(f"\n{result.stderr}", secrets=self.secrets)
+            ui.error(
+                f"\n{result.stderr or 'Command failed'}",
+                secrets=self.secrets,
+            )
         elif local and (sqlfile.exists() or Path(f"{sqlfile}.gz").exists()):
             actual = sqlfile if sqlfile.exists() else Path(f"{sqlfile}.gz")
             filename = str(actual.absolute())
@@ -247,7 +267,7 @@ class DB:
                 message="sql download complete",
             )
         elif local:
-            ui.error("Command failed", exit=False)
+            ui.error("Command failed")
 
     def run_pull_cmd(self, cmd, sqlfile, local):
         """Run a pull command and report its result."""
@@ -270,9 +290,10 @@ class DB:
 
     def put(self, sqlfile):
         """Push a local dump to the server."""
+        sql = Path(sqlfile)
+        _validate_gzip(sql)
         s = self.server
         self._database()
-        sql = Path(sqlfile)
         if s.server_type == "lando":
             self._put_lando(sql)
         elif s.server_type == "ddev":
@@ -282,16 +303,19 @@ class DB:
 
     def _put_lando(self, sql):
         """Import through Lando."""
-        command = Pipeline(
-            (Argv(("lando", "db-import", str(sql))),),
-            stderr_devnull=True,
-        )
+        command = Pipeline((Argv(("lando", "db-import", str(sql))),))
         self.run_put_cmd(command)
 
     def _put_ddev(self, sql):
         """Import through DDEV."""
         command = Argv(("ddev", "import-db", "--progress", f"--src={sql}"))
         self.run_put_cmd(command)
+
+    def _source_stage(self, sqlfile):
+        """Use pv only when configured and installed; otherwise cat."""
+        if self.project.pv and shutil.which("pv"):
+            return Argv(("pv", "--numeric", str(sqlfile)))
+        return Argv(("cat", str(sqlfile)))
 
     def _put(self, sqlfile, local=True):
         """Build and run a local or remote import pipeline."""
@@ -320,7 +344,7 @@ class DB:
             argv = [mysql, *_mysql_argv(db)[1:]]
             command = Pipeline(
                 (
-                    Argv(("pv", "--numeric", str(sqlfile))),
+                    self._source_stage(sqlfile),
                     Argv(("gunzip", "-c")),
                     Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
                 )
@@ -342,7 +366,7 @@ class DB:
             if local:
                 command = Pipeline(
                     (
-                        Argv(("pv", "--numeric", str(sqlfile))),
+                        self._source_stage(sqlfile),
                         remote_command(ssh, f"gunzip -c | {mysql}", timeout=25),
                     )
                 )
@@ -368,9 +392,12 @@ class DB:
             for line in result.stderr.splitlines()
             if line.strip() and not line.strip().isdigit()
         ]
-        if result.returncode or errors:
-            for line in errors:
-                ui.error(line, exit=False, secrets=self.secrets)
+        if result.returncode:
+            if errors:
+                for line in errors:
+                    ui.error(line, exit=False, secrets=self.secrets)
+            else:
+                ui.error("Command failed", exit=False, secrets=self.secrets)
             sys.exit(1)
         ui.display_success(
             self.real,
@@ -393,7 +420,7 @@ class DB:
 
     def _dest(self, project_name, dbname, dirname, id, tag):
         """Build the timestamped dump filename."""
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.UTC).astimezone()
         now = now.strftime("%y-%m-%d_%H-%M-%S")
         tag = f"-{tag}" if tag else ""
         name = f"{project_name}-{id}-{now}{tag}.sql.gz"

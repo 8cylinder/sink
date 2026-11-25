@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import gzip
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def write_gzip(path: Path, content: bytes = b"SELECT 1;\n") -> Path:
+    """Write a small valid gzip file and return its path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(gzip.compress(content))
+    return path
 
 
 def strip_ansi(text: str) -> str:

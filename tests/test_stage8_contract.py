@@ -5,7 +5,7 @@ from __future__ import annotations
 import gzip
 from pathlib import Path
 
-from helpers import commands_named, combined, unwrap
+from helpers import combined, commands_named, unwrap
 
 
 def gzip_dump(project, name: str = "dump.sql.gz") -> str:
@@ -115,7 +115,20 @@ def test_db_put_real_sends_the_dump(project_factory) -> None:
     assert project.stub_log.read_text() != ""
 
 
+def test_db_put_real_uses_pv_when_enabled(project_factory) -> None:
+    project = project_factory(project_overrides={"pv": True})
+    filename = gzip_dump(project)
+
+    result = project.invoke("db", "put", "dev", filename, "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert commands_named(project.stub_log, "pv")
+    assert commands_named(project.stub_log, "ssh")
+
+
 def test_db_timestamps_use_aware_datetime() -> None:
-    source = (Path(__file__).resolve().parents[1] / "src/sink/db.py").read_text()
+    source = (
+        Path(__file__).resolve().parents[1] / "src/sink/db.py"
+    ).read_text()
     assert "datetime.datetime.now()" not in source
     assert "astimezone()" in source

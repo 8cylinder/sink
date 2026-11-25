@@ -1,13 +1,10 @@
 """Red tests for behavior the modernization has not fixed yet.
 
-Every strict xfail here must fail at the assertion shown in its body.  When a
-stage fixes the bug it will XPASS, and the marker must be removed in that
-stage's fix commit.
+Regression tests for behavior that used to be covered by strict xfails.
 """
 
 from __future__ import annotations
 
-import pytest
 from helpers import combined, unwrap
 
 
@@ -25,10 +22,6 @@ def test_diff_propagates_a_git_failure(project_factory) -> None:
     assert result.exit_code != 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N21: db put accepts a non-gzip file and fails on the server",
-)
 def test_db_put_rejects_a_non_gzip_file(project_factory) -> None:
     project = project_factory()
 
@@ -38,10 +31,6 @@ def test_db_put_rejects_a_non_gzip_file(project_factory) -> None:
     assert "gzip" in combined(result).lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 8: lando stderr is discarded and a failed pull exits 0",
-)
 def test_lando_pull_failure_is_reported(project_factory) -> None:
     project = project_factory(server_type="lando")
 
@@ -60,10 +49,6 @@ def test_lando_pull_failure_is_reported(project_factory) -> None:
     assert "lando exploded" in combined(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 8: ddev stderr is discarded and a failed pull exits 0",
-)
 def test_ddev_pull_failure_is_reported(project_factory) -> None:
     project = project_factory(server_type="ddev")
 
