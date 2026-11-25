@@ -140,11 +140,11 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 238 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 91.76%, =fail_under = 90=; =ty=
+  - Current test baseline: 240 passed, 0 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 91.92%, =fail_under = 90=; =ty=
     is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
     changes: unknown-key policy =422c7a3=, check execution =d339d65=,
-    relative key locations =a0d5e52=.
+    relative key locations =a0d5e52=, compact errors =3007243=.
   - Documentation: =make docs=, =make man=, =make install-man=.  The
     sandbox has no =groff=/=man=; templates were generated and inspected.
   - CI still needs the first push; no package has been published.
@@ -1404,7 +1404,9 @@ root, =warn=, and =automatic= fields before the ssh/mysql/url probes.
 Each status line starts with a green =[✓]= or red =[✗]= marker and
 renders as =key: value= without a header row; keys and values use
 different colors.  Missing values are reported without
-aborting the remaining checks.
+aborting the remaining checks.  Probe stderr is indented under the
+failing row and printed as a compact =[Error]= line with no extra
+blank lines or space after the label.
 
 The URL probe executes directly and uses a Rich status context; check has
 no =--real= flag because its probes are read-only.  =ui.py= no longer
@@ -1808,4 +1810,6 @@ The annotated release tag is `v0.3.0`.
   Stage 10 | DONE 2026-11-25 | commit a4316ef | 237 pass, 0 xfail; coverage 91.77%; fail_under 90; ANN/PTH/DTZ/RET/ARG; ty/ruff clean; import-linter 3/3
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
   Stage 12 | DONE 2026-11-25 | release docs + tag v0.3.0 | 237 pass; docs/man clean; clean clone sync/check/build/install; smoke
+  Post-rel | DONE 2026-11-25 | commits 422c7a3, d339d65, a0d5e52 | unknown keys silent/relative; check probes always run; 238 pass; coverage 91.76%
+  Check UI | DONE 2026-11-25 | commits 16bb825, 59fc02f, 9668d75, 3007243 | omit unused dirs; colored markers; key: value rows; compact errors; 240 pass; coverage 91.92%
   #+end_src
