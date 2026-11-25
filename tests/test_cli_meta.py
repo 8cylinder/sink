@@ -152,6 +152,16 @@ def test_silent_alias_still_exists(project_factory) -> None:
     assert result.stderr == ""
 
 
+def test_suppress_commands_hides_only_the_render(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("-s", "file", "put", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    assert "+ rsync" not in result.output
+    assert "Success (DRY RUN)" in result.output
+
+
 def test_suppress_commands_is_documented() -> None:
     result = CliRunner().invoke(sink, ["--help"])
 

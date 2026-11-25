@@ -189,12 +189,12 @@ def automatic(filename, real, silent):
 @click.argument("server", shell_complete=get_servers)
 @click.argument("user", required=False)
 @click.option(
-    "--dry-run", "-d", is_flag=True, help="Do nothing, show the command only."
+    "--real", "-r", is_flag=True, help="Open an interactive ssh session."
 )
-def ssh(server, user, dry_run):
+def ssh(server, user, real):
     """SSH into a server."""
     config.load_config()
-    ssh = SSH(server=server, user=user, dry_run=dry_run)
+    ssh = SSH(server=server, user=user, dry_run=not real)
     ssh.visit_ssh()
 
 
@@ -213,7 +213,10 @@ def ssh(server, user, dry_run):
     type=click.Choice(["word", "letter"]),
     help="Refine diffs to word or letter differences.",
 )
-def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
+@click.option(
+    "--real", "-r", is_flag=True, help="Download the file and show the diff."
+)
+def diff_files(filename, server, ignore_whitespace, word_diff, difftool, real):
     """Diff a local and remote file.
 
     \b
@@ -226,7 +229,7 @@ def diff_files(filename, server, ignore_whitespace, word_diff, difftool):
         prj = config.project()
         filename = Path(prj.root)
     fx = Path(os.path.abspath(filename))
-    xfer = Transfer(real=True, server_name=server)
+    xfer = Transfer(real=real, server_name=server)
     xfer.diff(
         fx, ignore=ignore_whitespace, word_diff=word_diff, difftool=difftool
     )
@@ -288,12 +291,16 @@ def info(view):
 @sink.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("server-names", nargs=-1)
 @click.option("--required", "-r", is_flag=True)
-def check(required, server_names):
+@click.option("--real", "-R", is_flag=True, help="Run the checks.")
+@click.option(
+    "--insecure", is_flag=True, help="Do not verify TLS certificates."
+)
+def check(required, server_names, real, insecure):
     """Test server settings in config."""
     config.load_config()
     if server_names:
         server_names = [i.lower() for i in server_names]
-    tc = TestConfig()
+    tc = TestConfig(real=real, insecure=insecure)
     if required:
         tc.test_requirements()
     else:

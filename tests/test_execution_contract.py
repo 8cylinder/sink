@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+import ssl
 from pathlib import Path
 
 import pytest
@@ -12,9 +13,6 @@ REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "src" / "sink"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 4: remove every shell=True call site"
-)
 def test_no_shell_true_remains() -> None:
     offenders = [
         path.name
@@ -24,10 +22,6 @@ def test_no_shell_true_remains() -> None:
     assert offenders == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: subprocess belongs in the shell execution layer only",
-)
 def test_only_the_shell_module_imports_subprocess() -> None:
     offenders = [
         path.name
@@ -37,19 +31,12 @@ def test_only_the_shell_module_imports_subprocess() -> None:
     assert offenders == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: remove the plumbum-backed command module",
-)
 def test_command_module_and_plumbum_are_gone() -> None:
     assert not (SRC / "command.py").exists()
     pyproject = (REPO / "pyproject.toml").read_text()
     assert "plumbum" not in pyproject
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 4: check must not execute without --real"
-)
 def test_check_defaults_to_dry_run(project_factory) -> None:
     project = project_factory()
 
@@ -59,9 +46,6 @@ def test_check_defaults_to_dry_run(project_factory) -> None:
     assert project.stub_log.read_text() == ""
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 4: check must accept the shared --real flag"
-)
 def test_check_accepts_real(project_factory) -> None:
     project = project_factory()
 
@@ -71,9 +55,6 @@ def test_check_accepts_real(project_factory) -> None:
     assert project.stub_log.read_text() != ""
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 4: check must offer an explicit TLS opt-out"
-)
 def test_check_accepts_insecure(project_factory) -> None:
     project = project_factory()
 
@@ -82,19 +63,31 @@ def test_check_accepts_insecure(project_factory) -> None:
     assert result.exit_code == 0, combined(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: check must verify TLS certificates by default",
-)
-def test_check_does_not_disable_tls_verification() -> None:
-    source = (SRC / "check.py").read_text()
-    assert "CERT_NONE" not in source
+def test_check_verifies_tls_by_default(
+    project_factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = project_factory(urls=[{"url": "https://example.test"}])
+    contexts: list[ssl.SSLContext] = []
+
+    def fake_urlopen(url, timeout=None, context=None):
+        contexts.append(context)
+        return object()
+
+    monkeypatch.setattr("sink.check.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("sink.check.Spinner.start", lambda self: None)
+    monkeypatch.setattr("sink.check.Spinner.stop", lambda self: None)
+
+    result = project.invoke("check", "dev", "--real")
+    assert result.exit_code == 0, combined(result)
+    assert contexts[0].verify_mode == ssl.CERT_REQUIRED
+    assert contexts[0].check_hostname is True
+
+    contexts.clear()
+    result = project.invoke("check", "dev", "--real", "--insecure")
+    assert result.exit_code == 0, combined(result)
+    assert contexts[0].verify_mode == ssl.CERT_NONE
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: diff must print both commands and touch nothing by default",
-)
 def test_diff_defaults_to_print_only(project_factory) -> None:
     project = project_factory()
 
@@ -107,23 +100,20 @@ def test_diff_defaults_to_print_only(project_factory) -> None:
     assert "git" in text
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: diff must accept the shared --real flag",
-)
 def test_diff_accepts_real(project_factory) -> None:
     project = project_factory()
 
     result = project.invoke("diff", "dev", "project/index.html", "--real")
 
     assert result.exit_code == 0, combined(result)
-    assert [c.name for c in commands_named(project.stub_log, "rsync")]
-    assert [c.name for c in commands_named(project.stub_log, "git")]
+    assert [c.name for c in commands_named(project.stub_log, "rsync")], (
+        combined(result) + "\n" + project.stub_log.read_text()
+    )
+    assert [c.name for c in commands_named(project.stub_log, "git")], (
+        combined(result) + "\n" + project.stub_log.read_text()
+    )
 
 
-@pytest.mark.xfail(
-    strict=True, reason="S1/S7: db pull renders the database password"
-)
 def test_db_pull_does_not_leak_the_password(project_factory) -> None:
     project = project_factory()
 
@@ -134,9 +124,6 @@ def test_db_pull_does_not_leak_the_password(project_factory) -> None:
     assert "secret" not in project.stub_log.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="S1/S7: db put renders the database password"
-)
 def test_db_put_does_not_leak_the_password(project_factory) -> None:
     project = project_factory()
 
@@ -147,9 +134,6 @@ def test_db_put_does_not_leak_the_password(project_factory) -> None:
     assert "secret" not in project.stub_log.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="S1/S7: check renders the database password"
-)
 def test_check_does_not_leak_the_password(project_factory) -> None:
     project = project_factory()
 
@@ -160,10 +144,37 @@ def test_check_does_not_leak_the_password(project_factory) -> None:
     assert "secret" not in project.stub_log.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 4: display wrapping currently splits quoted arguments",
-)
+def test_db_pull_real_executes_and_does_not_leak(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("db", "pull", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert "secret" not in combined(result)
+    assert "secret" not in project.stub_log.read_text()
+    assert "ssh" in [c.name for c in commands_named(project.stub_log, "ssh")]
+
+
+def test_db_put_real_executes_and_does_not_leak(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("db", "put", "dev", "project/index.html", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert "secret" not in combined(result)
+    assert "secret" not in project.stub_log.read_text()
+    assert "ssh" in [c.name for c in commands_named(project.stub_log, "ssh")]
+
+
+def test_action_local_runs_with_real(project_factory) -> None:
+    project = project_factory(project_actions={"hello": "touch action-ran"})
+
+    result = project.invoke("action", "local", "hello", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert (project.path / "action-ran").exists()
+
+
 def test_file_put_renders_the_argv_that_executes(project_factory) -> None:
     project = project_factory()
 

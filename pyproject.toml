@@ -20,7 +20,6 @@ dependencies = [
   "click>=8.5",
   "PyYAML>=6.0.4",
   "coolname>=2.0",
-  "plumbum>=2.0",
   "rich>=15",
 ]
 
@@ -89,11 +88,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S603", "S607"]
 "src/sink/**" = [
-  "S602",  # subprocess shell=True: removed in Stage 4
-  "S603",  # subprocess call: removed in Stage 4
-  "S604",  # subprocess shell=True: removed in Stage 4
-  "S607",  # partial executable path: removed in Stage 4
-  "S310",  # urllib URL open: reviewed in Stage 4
+  "S603",  # subprocess call: confined to shell.py
+  "S607",  # partial executable path: rsync/ssh/scp/mysql names
+  "S310",  # urllib URL open in check
   "S311",  # non-crypto random for the spinner
 ]
 
@@ -126,5 +123,5 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 35
+fail_under = 55
 show_missing = true

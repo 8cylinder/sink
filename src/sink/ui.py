@@ -1,7 +1,5 @@
-import os
 import sys
 from enum import Enum
-from textwrap import TextWrapper
 
 import click
 
@@ -37,7 +35,8 @@ class ui:
         click.echo(f"{indent}{w} {m}", err=True)
 
     @staticmethod
-    def error(msg, exit=True, indent=0):
+    def error(msg, exit=True, indent=0, secrets=()):
+        msg = ui.redact(msg, secrets)
         distance = ""
         if indent:
             distance = " " * indent
@@ -49,31 +48,19 @@ class ui:
             sys.exit(1)
 
     @staticmethod
-    def display_cmd(cmd, indent=0, suppress_commands=False):
+    def redact(text, secrets=()):
+        for secret in secrets:
+            if secret:
+                text = text.replace(str(secret), "********")
+        return text
+
+    @staticmethod
+    def display_cmd(cmd, indent=0, suppress_commands=False, secrets=()):
         if suppress_commands:
             return
-        try:
-            console_width = os.get_terminal_size().columns
-        except OSError:
-            console_width = 80
-        if not console_width:
-            console_width = 80
-        indent = " " * indent
-        leader = "+ "
-        initial_indent = indent + leader
-        subsequent_indent = indent + (" " * len(leader))
-        w = TextWrapper(
-            initial_indent=initial_indent,
-            subsequent_indent=subsequent_indent,
-            break_on_hyphens=False,
-            break_long_words=False,
-            width=(console_width - len(subsequent_indent)),
-        )
-        lines = w.wrap(cmd)
-        # Add a space & backslash to the end of each line then remove it from
-        # the end of the joined string.
-        para = "\n".join([f"{i} \\" for i in lines])[:-2]
-        click.secho(f"{para}", fg=Color.YELLOW.value, dim=True)
+        cmd = ui.redact(cmd, secrets)
+        distance = " " * indent
+        click.secho(f"{distance}+ {cmd}", fg=Color.YELLOW.value, dim=True)
 
     @staticmethod
     def display_success(real, extra=None):

@@ -80,11 +80,18 @@ def reset_global_config():
 def _stub_body(name: str) -> str:
     key = name.upper().replace("-", "_")
     return f"""#!/usr/bin/env bash
-printf 'CMD %s\\n' "{name}" >> "$STUB_LOG"
-for arg in "$@"; do
-  printf 'ARG %s\\n' "$arg" >> "$STUB_LOG"
+lock="$STUB_LOG.lock"
+while ! mkdir "$lock" 2>/dev/null; do
+  sleep 0.001 2>/dev/null || sleep 1
 done
-printf 'END\\n' >> "$STUB_LOG"
+trap 'rmdir "$lock" 2>/dev/null' EXIT
+{{
+  printf 'CMD %s\\n' "{name}"
+  for arg in "$@"; do
+    printf 'ARG %s\\n' "$arg"
+  done
+  printf 'END\\n'
+}} >> "$STUB_LOG"
 if [ -n "${{STUB_OUT_{key}:-}}" ]; then
   printf '%s' "$STUB_OUT_{key}"
 fi

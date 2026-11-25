@@ -1,6 +1,7 @@
 import contextlib
 import os
 import random
+import re
 import sys
 import threading
 import time
@@ -10,7 +11,7 @@ from pathlib import Path
 import click
 import yaml
 
-# from sink.command import Command
+from sink.errors import ConfigError
 from sink.ui import Color, ui
 
 
@@ -219,6 +220,11 @@ class Configuration:
                 print("Something went wrong while parsing the yaml file.")
             exit()
 
+        try:
+            data = self._expand_env(data)
+        except ConfigError as error:
+            ui.error(f"ConfigError: {error}")
+
         # take the name of the server and add it to the server data
         # structure for easier extraction.
         try:
@@ -235,6 +241,29 @@ class Configuration:
             self.o = Dict2obj(**data)
         else:
             ui.error("sink.yaml appears to have no data")
+
+    def _expand_env(self, value):
+        """Expand ${ENV_VAR} references in strings, lists, and mappings."""
+        if isinstance(value, dict):
+            return {key: self._expand_env(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._expand_env(item) for item in value]
+        if not isinstance(value, str):
+            return value
+
+        pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+        def replace(match):
+            name = match.group(1)
+            try:
+                return os.environ[name]
+            except KeyError:
+                raise ConfigError(
+                    f'environment variable "${{{name}}}" is not set '
+                    f"(referenced by {self.config_file})"
+                ) from None
+
+        return pattern.sub(replace, value)
 
     def find_config(self, cur):
         """Walk up the dir tree to find a config file"""
@@ -466,13 +495,8 @@ class Configuration:
         except KeyError:
             pass
 
-        all = project_ex + server_ex
-        all = set(all)
-        all = sorted(all)
-        all = " ".join([f'--exclude="{i}"' for i in all])
-        # all = ','.join([f"'{i}'" for i in all])
-        # all = f'--exclude={{{all}}}'
-        return all
+        all_excludes = project_ex + server_ex
+        return tuple(sorted(set(all_excludes)))
 
 
 config = Configuration()

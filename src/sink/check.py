@@ -1,16 +1,14 @@
-# import os
-# import sys
-# import re
+import shlex
 import ssl
-import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-# import datetime
 import click
 
 from sink.config import Spinner, config
+from sink.credentials import remote_mysql_credentials
+from sink.shell import remote_command, run
 from sink.ui import Color, ui
 
 
@@ -19,8 +17,10 @@ class TestConfig:
     bad = click.style("[X]", fg=Color.RED.value)
     timeout = 25
 
-    def __init__(self):
+    def __init__(self, real=False, insecure=False):
         self.config = config
+        self.real = real
+        self.insecure = insecure
 
     def test_project(self):
         click.echo()
@@ -32,7 +32,8 @@ class TestConfig:
                 d = Path(self.config.data["project"][local_dir])
             except KeyError:
                 self.out(
-                    f'{self.bad} "{local_dir}" setting in {self.config.config_file} does not exist.',
+                    f'{self.bad} "{local_dir}" setting in '
+                    f"{self.config.config_file} does not exist.",
                     INDENT,
                 )
                 continue
@@ -72,14 +73,8 @@ class TestConfig:
                 user = ssh.username
                 url = ssh.server
 
-                key = ""
-                if ssh.key:
-                    key = f' -i "{ssh.key}"'
-
-                # print('>>>', ssh)
                 try:
                     ssh.username  # noqa: B018 - intentional attribute probe
-                    # s.ssh.password
                     ssh.server  # noqa: B018 - intentional attribute probe
                 except AttributeError:
                     ui.error(f"ssh values are wrong in {s.servername}")
@@ -91,47 +86,53 @@ class TestConfig:
                 good = f"ssh login good ({ssh.username})."
                 bad = f'ssh login failed for "{user}@{url}".'
 
-                port = ""
-                if ssh.port:
-                    port = f"-p {ssh.port}"
-
-                if self.run_cmd_on_server(
-                    user, url, cmd, good, bad, port, key=key
-                ):
+                if self.run_cmd_on_server(ssh, cmd, good, bad):
                     # root
-                    cmd = f'cd "{s.root}"'
+                    cmd = f"cd {shlex.quote(str(s.root))}"
                     good = "root dir exists."
                     bad = f"root dir does not exist on server: {s.root}."
-                    self.run_cmd_on_server(
-                        user, url, cmd, good, bad, port, key=key
-                    )
+                    self.run_cmd_on_server(ssh, cmd, good, bad)
 
                     dbs = self.config.dbs(s.mysql)
                     for db in dbs:
-                        host = ""
-                        if db.hostname:
-                            host = f"--host={db.hostname}"
-                        cmd = f'mysql --user={db.username} --password="{db.password}" {host} {db.db} --execute="exit";'
-                        good = f"DB({db.db}): mysql username, password and db are good."
-                        bad = f"DB({db.db}): mysql error."
-                        self.run_cmd_on_server(
-                            user, url, cmd, good, bad, port, key=key
-                        )
+                        with remote_mysql_credentials(
+                            ssh,
+                            password=db.password,
+                            user=db.username,
+                            host=db.hostname,
+                            port=_port(db),
+                            real=self.real,
+                        ) as credentials:
+                            argv = [
+                                "mysql",
+                                credentials.option,
+                                db.db,
+                                "--execute=exit",
+                            ]
+                            cmd = shlex.join(argv) + ";"
+                            good = (
+                                f"DB({db.db}): mysql username, password "
+                                "and db are good."
+                            )
+                            bad = f"DB({db.db}): mysql error."
+                            self.run_cmd_on_server(ssh, cmd, good, bad)
 
-            urls = self.config.urls(s.urls)
+            urls = self.config.urls(s.urls) or []
             for u in urls:
                 if not u.url:
                     # if there is a url section in the yaml file, but
                     # no values for it, continue.
                     continue
+                if not self.real:
+                    self.out(f"+ URL({u.url})", 2)
+                    continue
                 spinner = Spinner(indent=2, delay=0.1)
                 spinner.start()
                 try:
-                    # urllib checks the cert and if it's self signed,
-                    # it errors with a ValueError.  This will ignore that.
                     ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
+                    if self.insecure:
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
                     urllib.request.urlopen(
                         u.url, timeout=self.timeout, context=ctx
                     )
@@ -147,8 +148,6 @@ class TestConfig:
                     msg = f"AttributeError? {u.url} {e}"
                 except TimeoutError:
                     msg = f"{self.bad} URL({u.url}) Timeout."
-                # except:  # socket.timeout:
-                # msg = f'{self.bad} some error {u.url}.'
                 else:
                     # 200
                     msg = f"{self.good} URL({u.url})"
@@ -159,38 +158,28 @@ class TestConfig:
         indent = " " * spaces
         click.echo(f"{indent}{msg}")
 
-    def run_cmd_on_server(self, user, url, cmd, good, bad, port, key=""):
-
-        cmd = f"""ssh {port} -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout {self.timeout}'{key} {user}@{url} '{cmd}' """
-        # print(cmd)
-        # exit()
-        result = self.run_cmd(cmd, good, bad)
-        if not result:
-            print(
-                "        You might need to run ssh command outside of sink to add to known_hosts: sink ssh <server> -d"
-            )
-        return result
-
-    def run_cmd(self, cmd, good, bad):
-
-        spinner = Spinner(indent=2, delay=0.1)
-        spinner.start()
-        result = subprocess.run(
-            cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL
+    def run_cmd_on_server(self, ssh, cmd, good, bad):
+        command = remote_command(
+            ssh,
+            cmd,
+            batch=True,
+            timeout=self.timeout,
         )
-        spinner.stop()
-        if result.returncode:
-            # click.echo(f'    {self.bad} {bad} (error: {result.returncode})')
-            self.out(f"{self.bad} {bad} (error: {result.returncode})", 2)
-            ui.display_cmd(
-                cmd, indent=8, suppress_commands=config.suppress_commands
-            )
-            ui.error(f"\n{result.stderr.decode('utf-8')}", exit=False, indent=8)
-            return False
-        else:
-            # click.echo(f'    {self.good} {good}')
-            self.out(f"{self.good} {good}", 2)
-            ui.display_cmd(
-                cmd, indent=6, suppress_commands=config.suppress_commands
-            )
+        result = run(command, real=self.real, capture=True)
+        if not self.real:
             return True
+        if result.returncode:
+            self.out(f"{self.bad} {bad} (error: {result.returncode})", 2)
+            if result.stderr:
+                ui.error(result.stderr, exit=False, indent=8)
+            return False
+
+        self.out(f"{self.good} {good}", 2)
+        return True
+
+
+def _port(db):
+    try:
+        return int(db.port)
+    except AttributeError, TypeError, ValueError:
+        return None

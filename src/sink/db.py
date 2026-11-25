@@ -1,14 +1,15 @@
 import datetime
-import io
 import os
-import subprocess
+import shlex
 import sys
 from contextlib import contextmanager, suppress
 from pathlib import Path
 
 import click
 
-from sink.config import Dict2obj, config
+from sink.config import config
+from sink.credentials import remote_mysql_credentials
+from sink.shell import Argv, Pipeline, remote_command, run
 from sink.ui import Color, ui
 
 
@@ -22,13 +23,60 @@ def cd(newdir):
         os.chdir(prevdir)
 
 
+def _port(db):
+    try:
+        return int(db.port)
+    except AttributeError, TypeError, ValueError:
+        return None
+
+
+def _client_options(db, credentials=None):
+    if credentials is not None:
+        return [credentials.option]
+    options = []
+    if db.hostname:
+        options.extend(["--host", db.hostname])
+    if db.username:
+        options.extend(["--user", db.username])
+    port = _port(db)
+    if port and port != 3306:
+        options.extend(["--port", str(port)])
+    if db.skip_secure_auth:
+        options.append("--skip-secure-auth")
+    return options
+
+
+def _mysqldump_argv(db, credentials=None):
+    return [
+        "mysqldump",
+        *_client_options(db, credentials),
+        "--single-transaction",
+        "--triggers",
+        "--events",
+        "--routines",
+        "--no-tablespaces",
+        db.db,
+    ]
+
+
+def _mysql_argv(db, credentials=None):
+    return ["mysql", *_client_options(db, credentials), db.db]
+
+
+def _env_with_password(db):
+    env = os.environ.copy()
+    if db.password:
+        env["MYSQL_PWD"] = db.password
+    return env
+
+
 class DB:
     def __init__(self, real, verbose=False, quiet=False):
         self.verbose = bool(verbose)
         self.real = real
-        self.dryrun = "" if real else "--dry-run"
         self.config = config
         self.quiet = quiet
+        self.secrets: tuple[str, ...] = ()
 
     def dump_remote(self, dest, server):
         dest = Path(dest)
@@ -39,6 +87,7 @@ class DB:
         s = self.config.server(server)
         self.server = s
         db = s.mysql[0]
+        self.secrets = (db.password,)
 
         here = os.path.abspath(os.path.curdir)
         there = config.project_root
@@ -56,98 +105,105 @@ class DB:
             self._pull(sqlfile, server, local=True)
 
     def _pull_lando(self, sqlfile):
-        # suppress sterr since lando outputs update messages there
-        cmd = f"""lando db-export {sqlfile} 2>/dev/null"""
-        self.run_pull_cmd(cmd, sqlfile, True)
+        # suppress stderr since lando outputs update messages there
+        command = Pipeline(
+            (Argv(("lando", "db-export", str(sqlfile))),),
+            stderr_devnull=True,
+        )
+        self.run_pull_cmd(command, sqlfile, True)
 
     def _pull_ddev(self, sqlfile):
-        # ddev outputs informational output on stderr.  This causes
-        # the command to look like it has failed.  So we discard
-        # stderr, this will ofcourse hide usefull error messages.
-        cmd = f"""ddev export-db --gzip --file={sqlfile} 2>/dev/null"""
-        self.run_pull_cmd(cmd, sqlfile, True)
+        # ddev outputs informational output on stderr.
+        command = Pipeline(
+            (
+                Argv(
+                    (
+                        "ddev",
+                        "export-db",
+                        "--gzip",
+                        f"--file={sqlfile}",
+                    )
+                ),
+            ),
+            stderr_devnull=True,
+        )
+        self.run_pull_cmd(command, sqlfile, True)
 
     def _pull(self, sqlfile, server, local=True):
         p = self.config.project()
         s = self.config.server(server)
         db = s.mysql[0]
+        self.secrets = (db.password,)
 
         if p.pulls_dir is None or not p.pulls_dir.exists():
             ui.error(f"Pulls dir not found: {p.pulls_dir}")
 
         ssh = s.ssh[0]
-        identity = f'-i "{ssh.key}"' if ssh.key else ""
+        mamp = getattr(s, "mamp", None)
 
-        hostname = ""
-        try:
-            if db.hostname:
-                hostname = f"--host={db.hostname}"
-        except AttributeError:
-            hostname = ""
+        if mamp:
+            mysqldump = os.path.join(mamp, "mysqldump")
+            argv = [mysqldump, *_mysqldump_argv(db)[1:]]
+            command = Pipeline(
+                (Argv(tuple(argv)), Argv(("gzip", "-c"))),
+                stdout_path=Path(sqlfile),
+            )
+            env = _env_with_password(db)
+            result = run(command, real=self.real, capture=True, env=env)
+            self._report_pull(result, Path(sqlfile), local)
+            return
 
-        skip_secure = ""
-        try:
-            if db.skip_secure_auth:
-                skip_secure = "--skip-secure-auth"
-        except AttributeError:
-            skip_secure = ""
+        with remote_mysql_credentials(
+            ssh,
+            password=db.password,
+            user=db.username,
+            host=db.hostname,
+            port=_port(db),
+            real=self.real,
+        ) as credentials:
+            dump_argv = _mysqldump_argv(db, credentials)
+            if local:
+                fragment = shlex.join(dump_argv)
+                command = Pipeline(
+                    (
+                        remote_command(
+                            ssh, fragment, compress=True, timeout=25
+                        ),
+                        Argv(("gzip", "-c")),
+                    ),
+                    stdout_path=Path(sqlfile),
+                )
+            else:
+                destination = shlex.quote(str(sqlfile))
+                fragment = (
+                    f"{shlex.join(dump_argv)} | gzip -c | "
+                    f"sudo tee {destination} >/dev/null"
+                )
+                command = remote_command(ssh, fragment, compress=True)
+            result = run(command, real=self.real, capture=True)
+            self._report_pull(result, Path(sqlfile), local)
 
-        mysqldump = "mysqldump"
-        try:
-            mamp_path = s.mamp
-            mysqldump = os.path.join(mamp_path, mysqldump)
-        except AttributeError:
-            mamp_path = ""
-
-        port = ""
-        if ssh.port:
-            port = f"-p {ssh.port}"
-
-        cmd = [
-            f"""ssh {port} -C -T {identity} {ssh.username}@{ssh.server}""",
-            f'''export MYSQL_PWD="{db.password}"; {mysqldump} {self.dryrun} {hostname} {skip_secure} --user={db.username} --single-transaction --triggers --events --routines --no-tablespaces {db.db}''',
-            f'''| gzip -c > "{sqlfile}"''',
-        ]
-
-        if mamp_path:
-            cmd = f"""{cmd[1]} {cmd[2]}"""
-        elif local:
-            cmd = f"""{cmd[0]} '{cmd[1]}' {cmd[2]}"""
-        else:
-            cmd = f"""{cmd[0]} '{cmd[1]} | gzip -c | sudo tee "{sqlfile}" >/dev/null'"""
-        cmd = " ".join(cmd.split())
-        self.run_pull_cmd(cmd, sqlfile, local)
-
-    def run_pull_cmd(self, cmd, sqlfile, local):
-        sink_db_pull = "SINK_DB_PULL"
-        os.environ[sink_db_pull] = ""
-        if not self.quiet:
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-        if self.real:
-            result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-
-            lando_file = Path(f"{sqlfile}.gz")
-            error_msg = result.stderr.decode("utf-8")
-            if error_msg:
-                click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
-                ui.error(f"\n{error_msg}")
-            elif local and (sqlfile.exists() or lando_file.exists()):
-                filename = str(sqlfile.absolute())
-                click.secho(filename, fg=Color.GREEN.value)
-                if not self.quiet:
-                    ui.display_success(self.real)
-                os.environ[sink_db_pull] = str(sqlfile.absolute())
-            elif local:
-                click.secho("Command failed", fg=Color.RED.value)
-        else:
+    def _report_pull(self, result, sqlfile, local):
+        if not self.real:
+            ui.display_success(self.real)
+        elif result.stderr:
+            click.secho(str(sqlfile.absolute()), fg=Color.YELLOW.value)
+            ui.error(f"\n{result.stderr}", secrets=self.secrets)
+        elif local and (sqlfile.exists() or Path(f"{sqlfile}.gz").exists()):
+            actual = sqlfile if sqlfile.exists() else Path(f"{sqlfile}.gz")
+            filename = str(actual.absolute())
+            click.secho(filename, fg=Color.GREEN.value)
             if not self.quiet:
                 ui.display_success(self.real)
+            self.make_symlink(actual)
+        elif not local and result.ok:
+            ui.display_success(self.real)
+        elif local:
+            click.secho("Command failed", fg=Color.RED.value)
 
-        if not self.dryrun:
-            if sqlfile.exists():
-                self.make_symlink(sqlfile)
-            elif lando_file.exists():
-                self.make_symlink(lando_file)
+    def run_pull_cmd(self, cmd, sqlfile, local):
+        result = run(cmd, real=self.real, capture=True)
+        self._report_pull(result, Path(sqlfile), local)
 
     def make_symlink(self, sqlfile):
         link_name = Path(f"LATEST-{self.server.name}.sql.gz")
@@ -159,12 +215,11 @@ class DB:
 
     def load_remote(self, source, server):
         source = Path(source)
-        self._put(source, server, local=True)
+        self._put(server, source, local=False)
 
     def put(self, server, sqlfile):
         s = self.config.server(server)
         self.server = s
-        Dict2obj(**dict(s.mysql[0]))
         sql = Path(sqlfile)
         if s.type == "lando":
             self._put_lando(sql)
@@ -174,144 +229,111 @@ class DB:
             self._put(server, sql)
 
     def _put_lando(self, sql):
-        cmd = f"""lando db-import {sql} 2>/dev/null"""
-        self.run_put_cmd(cmd, progress=False)
+        command = Pipeline(
+            (Argv(("lando", "db-import", str(sql))),),
+            stderr_devnull=True,
+        )
+        self.run_put_cmd(command)
 
     def _put_ddev(self, sql):
-        cmd = f"""ddev import-db --progress --src={sql}"""
-        self.run_put_cmd(cmd, progress=False)
+        command = Argv(("ddev", "import-db", "--progress", f"--src={sql}"))
+        self.run_put_cmd(command)
 
     def _put(self, server, sqlfile, local=True):
         s = self.config.server(server)
         db = s.mysql[0]
-
+        self.secrets = (db.password,)
         ssh = s.ssh[0]
-        identity = f'-i "{ssh.key}"' if ssh.key else ""
 
         if local:
             if not sqlfile.exists():
                 ui.error(f"{sqlfile} does not exist")
         else:
-            cmd = f'''ssh -C -T {identity} {ssh.username}@{ssh.server} "test -f {sqlfile}"'''
-            result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-            if result.returncode:
+            command = remote_command(
+                ssh,
+                f"test -f {shlex.quote(str(sqlfile))}",
+                batch=True,
+                timeout=25,
+            )
+            result = run(command, real=self.real, capture=True)
+            if self.real and result.returncode:
                 ui.error(f"{sqlfile} does not exist")
 
-        skip_secure = ""
-        try:
-            if db.skip_secure_auth:
-                skip_secure = "--skip-secure-auth"
-        except AttributeError:
-            skip_secure = ""
-
-        port = ""
-        if ssh.port:
-            port = f"-p {ssh.port}"
-
-        mysql = "mysql"
-        try:
-            mamp_path = s.mamp  # mamp: '/Applications/MAMP/Library/bin'
-            mysql = os.path.join(mamp_path, mysql)
-        except AttributeError:
-            mamp_path = ""
-
-        if mamp_path:
-            cmd = [
-                f'''export MYSQL_PWD="{db.password}";''',
-                f"""pv --numeric {sqlfile}""",
-                # f'''cat {sqlfile}''',
-                f"""| gunzip -c | {mysql} {skip_secure} --user={db.username} --password=root {db.db}""",
-            ]
-            cmd = f"""{cmd[0]} {cmd[1]} {cmd[2]}"""
-        elif local:
-            cmd = [
-                f"""pv --numeric {sqlfile}""",
-                # f'''cat {sqlfile}''',
-                f"""| ssh {port} {identity} {ssh.username}@{ssh.server}""",
-                f'''export MYSQL_PWD="{db.password}"; gunzip -c | {mysql} {skip_secure} --user={db.username} {db.db}''',
-            ]
-            cmd = f"""{cmd[0]} {cmd[1]} '{cmd[2]}'"""
-        else:
-            cmd = f'''ssh {port} -T {identity} {ssh.username}@{ssh.server}
-                      "export MYSQL_PWD="{db.password}"; zcat {sqlfile} | mysql --user={db.username} {db.db}"'''
-            cmd = " ".join(cmd.split())
-        self.run_put_cmd(cmd)
-
-    def run_put_cmd(self, cmd, progress=True):
-        s = self.server
-        if self.real:
-            doit = True
-            if s.warn:
-                doit = False
-                warn = click.style(
-                    " WARNING: ",
-                    bg=Color.YELLOW.value,
-                    fg=Color.RED.value,
-                    bold=True,
-                    dim=True,
+        if getattr(s, "mamp", None):
+            mysql = os.path.join(s.mamp, "mysql")
+            argv = [mysql, *_mysql_argv(db)[1:]]
+            command = Pipeline(
+                (
+                    Argv(("pv", "--numeric", str(sqlfile))),
+                    Argv(("gunzip", "-c")),
+                    Argv(tuple(argv)),
                 )
-                msg = click.style(
-                    f": You are about to overwrite the {s.servername} database, continue?",
-                    fg=Color.YELLOW.value,
+            )
+            env = _env_with_password(db)
+            result = run(command, real=self.real, capture=True, env=env)
+            self._report_put(result)
+            return
+
+        with remote_mysql_credentials(
+            ssh,
+            password=db.password,
+            user=db.username,
+            host=db.hostname,
+            port=_port(db),
+            real=self.real,
+        ) as credentials:
+            mysql = shlex.join(_mysql_argv(db, credentials))
+            if local:
+                command = Pipeline(
+                    (
+                        Argv(("pv", "--numeric", str(sqlfile))),
+                        remote_command(ssh, f"gunzip -c | {mysql}", timeout=25),
+                    )
                 )
-                msg = warn + msg
-                if click.confirm(msg):
-                    doit = True
+            else:
+                fragment = f"zcat {shlex.quote(str(sqlfile))} | {mysql}"
+                command = remote_command(ssh, fragment, timeout=25)
+            result = run(command, real=self.real, capture=True)
+            self._report_put(result)
 
-            if doit:
-                ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-                error_msgs = []
-                if progress:
-                    p = subprocess.Popen(
-                        cmd,
-                        shell=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    )
-
-                    char = "\u25a0"
-                    with click.progressbar(
-                        length=100,
-                        width=0,
-                        show_eta=True,
-                        info_sep=click.style(" | ", fg="blue"),
-                        empty_char=click.style(char, fg="blue"),
-                        fill_char=click.style(char, fg="bright_blue"),
-                        bar_template="%(bar)s %(info)s",
-                    ) as bar:
-                        last = 0
-                        for line in io.TextIOWrapper(
-                            p.stderr, encoding="utf-8"
-                        ):
-                            try:
-                                percent = int(line)
-                            except ValueError:
-                                error_msgs.append(line.rstrip())
-                                continue
-                            step = percent - last
-                            bar.update(step)
-                            last = percent
-
-                else:
-                    result = subprocess.run(
-                        cmd, shell=True, stderr=subprocess.PIPE
-                    )
-                    error_msgs.append(result.stderr.decode("utf-8"))
-                if error_msgs:
-                    [ui.error(i, exit=False) for i in error_msgs]
-                    sys.exit(1)
-                else:
-                    ui.display_success(self.real)
-
-        else:
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
+    def _report_put(self, result):
+        if not self.real:
             ui.display_success(self.real)
+            return
+        errors = [
+            line
+            for line in result.stderr.splitlines()
+            if line.strip() and not line.strip().isdigit()
+        ]
+        if result.returncode or errors:
+            for line in errors:
+                ui.error(line, exit=False, secrets=self.secrets)
+            sys.exit(1)
+        ui.display_success(self.real)
+
+    def run_put_cmd(self, cmd):
+        s = self.server
+        if self.real and s.warn:
+            warn = click.style(
+                " WARNING: ",
+                bg=Color.YELLOW.value,
+                fg=Color.RED.value,
+                bold=True,
+                dim=True,
+            )
+            msg = click.style(
+                f": You are about to overwrite the {s.servername} "
+                "database, continue?",
+                fg=Color.YELLOW.value,
+            )
+            if not click.confirm(warn + msg):
+                return
+        result = run(cmd, real=self.real, capture=True)
+        self._report_put(result)
 
     def _dest(self, project_name, dbname, dirname, id, tag):
         now = datetime.datetime.now()
         now = now.strftime("%y-%m-%d_%H-%M-%S")
         tag = f"-{tag}" if tag else ""
         name = f"{project_name}-{id}-{now}{tag}.sql.gz"
-        p = Path(dirname, name)  # .absolute().resolve()
-        return p
+        return Path(dirname, name)

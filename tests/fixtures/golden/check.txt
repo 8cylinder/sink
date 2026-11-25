@@ -1,7 +1,6 @@
 dev
-[✓] ssh login good (deploy).
-+ ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout 25' -i "<CONFIG_DIR>/id_rsa" deploy@example.com 'exit'
-[✓] root dir exists.
-+ ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout 25' -i "<CONFIG_DIR>/id_rsa" deploy@example.com 'cd "/var/www/demo"'
-[✓] DB(demo): mysql username, password and db are good.
-+ ssh -p 2222 -o BatchMode=yes -o 'StrictHostKeyChecking=yes' -o 'ConnectTimeout 25' -i "<CONFIG_DIR>/id_rsa" deploy@example.com 'mysql --user=dbuser --password="secret" --host=localhost demo --execute="exit";'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com exit
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'mysql --defaults-extra-file=/tmp/<CREDS_FILE> demo --execute=exit;'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

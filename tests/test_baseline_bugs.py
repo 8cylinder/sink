@@ -36,9 +36,6 @@ def test_deploy_rename_init(project_factory):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="B17/N1: single passes the filename as a server name"
-)
 def test_single_uses_the_configured_servers(project_factory):
     project = project_factory()
     result = project.invoke("single", "project/index.html")
@@ -65,19 +62,12 @@ def test_file_put_uses_the_default_server(project_factory):
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N3: action local crashes when the project has no actions",
-)
 def test_action_local_without_project_actions(project_factory):
     project = project_factory()
     result = project.invoke("action", "local")
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.xfail(
-    strict=True, reason="N9: action local executes without --real"
-)
 def test_action_local_honors_dry_run(project_factory):
     project = project_factory(project_actions={"hello": "touch action-ran"})
     result = project.invoke("action", "local", "hello")
@@ -95,20 +85,12 @@ def test_deploy_local_init_honors_dry_run(project_factory):
     assert not (project.path / "dist").exists()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N13: db pull renders mysqldump --dry-run, which mysqldump does not support",
-)
 def test_db_pull_renders_a_valid_mysqldump_command(project_factory):
     project = project_factory()
     result = project.invoke("db", "pull", "dev")
     assert "mysqldump --dry-run" not in rendered(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="N24: ssh executes by default instead of rendering the command",
-)
 def test_ssh_defaults_to_dry_run(project_factory):
     project = project_factory()
     project.invoke("ssh", "dev")

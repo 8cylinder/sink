@@ -1,13 +1,14 @@
 import glob
 import os
 import re
-import subprocess
+import shlex
 import tempfile
 from pathlib import Path
 
 import click
 
 from sink.config import Action, config
+from sink.shell import Argv, Pipeline, run
 from sink.ui import Color, ui
 
 
@@ -26,12 +27,9 @@ class Transfer:
         """
         self.verbose = bool(verbose)
         self.real = real
-        self.dryrun = "" if real else "--dry-run"
-        # self.config = Config(suppress_config_location=quiet)  # fixme
         self.config = config
         self.prj = config.project()
         self.server = config.server(server_name)
-        # self.ssh = self.server.ssh[0]
         self.server_name = server_name
         self.quiet = quiet
         self.silent = silent
@@ -43,10 +41,13 @@ class Transfer:
             local = locations["local"]
             remote = locations["remote"]
             if server.automatic:
-                # print(local, remote, server.name, Action.PUT)
                 server.warn = False
                 self._rsync(
-                    local, remote, Action.PUT, single=True, server=remote.name
+                    local,
+                    remote,
+                    Action.PUT,
+                    single=True,
+                    server=server.name,
                 )
 
     def put(self, filename, extra_flags, dest_override=None):
@@ -60,7 +61,7 @@ class Transfer:
         remote = locations["remote"]
         if dest_override:
             remote = dest_override
-        self._rsync(local, remote, Action.PUT, extra_flags)
+        self._rsync(local, remote, Action.PUT, self._flags(extra_flags))
 
     def pull(self, filename, extra_flags):
         locations = self._locations(filename)
@@ -71,25 +72,29 @@ class Transfer:
         if local.is_dir():
             remote = f"{remote}/"
             self.multiple = True
-        self._rsync(local, remote, Action.PULL, extra_flags)
+        self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
+
+    @staticmethod
+    def _flags(extra_flags):
+        if not extra_flags:
+            return ()
+        if isinstance(extra_flags, str):
+            return tuple(shlex.split(extra_flags))
+        return tuple(extra_flags)
 
     def _hard_link_flag(self, dest, server_name):
         parent = dest.parent
-        # dirs = os.listdir(parent)
-        # from IPython import embed; embed()
         dirs = glob.glob(f"{parent.absolute()}/{server_name}*")
-        flag = ""
-        if dirs:
-            last = next(sorted(dirs, reverse=True))
-            last = parent / last
-            flag = f"--link-dest={last.absolute()}"
-        return flag
+        if not dirs:
+            return None
+        last = Path(next(sorted(dirs, reverse=True)))
+        return last.absolute()
 
     def _find(self, name, path):
         for root, _dirs, files in os.walk(path):
             if name in files:
                 return Path(root, name)
-                # return os.path.join(root, name)
+        return None
 
     def local(self, server_name, source, dest):
         p = self.config.project()
@@ -102,14 +107,21 @@ class Transfer:
             f"robots.txt.{server.name}",
             f".htaccess.{server.name}",
         ]
-        included = " ".join([f'--include="{i}"' for i in included_list])
 
         hard_link_flag = self._hard_link_flag(dest, server_name)
 
-        cmd = f"{rsyncb} --archive --verbose {hard_link_flag} {self.dryrun} {included} {excluded} {source}/ {dest}"
+        argv = [rsyncb, "--archive", "--verbose"]
+        if hard_link_flag:
+            argv.extend(["--link-dest", str(hard_link_flag)])
+        for include in included_list:
+            argv.extend(["--include", include])
+        for exclude in excluded:
+            argv.extend(["--exclude", exclude])
+        argv.extend([f"{source}/", str(dest)])
 
+        command = Argv(tuple(argv), dry_run_flag="--dry-run")
         self.run(
-            cmd,
+            command,
             single=False,
             action=Action.PUT,
             server=server,
@@ -117,10 +129,11 @@ class Transfer:
             localf=source,
         )
 
-        # make symlinks to included files or rename them by droping the .server
-        if not self.dryrun:
-            for f in included_list:
-                conf_file = self._find(f, dest)
+        # make symlinks to included files or rename them by dropping the
+        # .server suffix
+        if self.real:
+            for name in included_list:
+                conf_file = self._find(name, dest)
                 if conf_file:
                     base_name = re.sub(rf"\.{server.name}$", "", str(conf_file))
                     base_name = Path(base_name)
@@ -148,44 +161,59 @@ class Transfer:
             locations = self._locations(local_file)
             remotef = locations["remote"]
 
-            self._rsync(diffdir, remotef, Action.DIFF, compare_to=local_file)
+            # The downloaded file is required for the diff, so the default
+            # mode prints the real transfer instead of rsync's dry run.
+            self._rsync(
+                diffdir,
+                remotef,
+                Action.DIFF,
+                compare_to=local_file,
+                native_dry_run=False,
+            )
 
             tmp_file_fixed = tmp_file
             if self.multiple:
                 tmp_file_fixed = diffdir
 
             if difftool:
-                gui = self.prj.difftool
-                if gui:
-                    cmd = gui.format(
-                        remote=f'"{tmp_file_fixed}"', local=f'"{local_file}"'
-                    )
-                else:
-                    ui.error("No difftool program defined in sink.yaml")
-            else:
-                flags = []
-                if ignore:
-                    flags.append("--ignore-all-space")  # --ignore-space-change
-                if word_diff == "word":
-                    flags.append("--word-diff=color")
-                elif word_diff == "letter":
-                    flags.append("--word-diff=color --word-diff-regex=.")
-                flags = " ".join(flags)
+                command = self._difftool_command(
+                    tmp_file_fixed, local_file, diffdir
+                )
+                result = run(command, real=self.real, capture=False)
+                return
 
-                cmd = f"""git --no-pager diff --color=always {flags} --diff-algorithm=minimal --ignore-all-space\
-                          '{tmp_file_fixed}' '{local_file}' | less"""
+            flags = ["--ignore-all-space"]
+            if word_diff == "word":
+                flags.append("--word-diff=color")
+            elif word_diff == "letter":
+                flags.extend(["--word-diff=color", "--word-diff-regex=."])
 
-            # cmd = f'vimdiff -R {tmp_file_fixed} {local_file}'
-            # cmd = ' '.join(cmd.split())
-
-            ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-            result = subprocess.run(cmd, shell=True)
-            if not difftool and result.returncode == 0:
+            argv = [
+                "git",
+                "--no-pager",
+                "diff",
+                "--color=always",
+                *flags,
+                "--diff-algorithm=minimal",
+                tmp_file_fixed,
+                str(local_file),
+            ]
+            pipeline = Pipeline((Argv(tuple(argv)), Argv(("less",))))
+            result = run(pipeline, real=self.real, capture=False)
+            if self.real and result.returncode == 0:
                 click.echo("Files are the same.")
+
+    def _difftool_command(self, tmp_file_fixed, local_file, diffdir):
+        gui = self.prj.difftool
+        if not gui:
+            ui.error("No difftool program defined in sink.yaml")
+        command = gui.format(
+            remote=f'"{tmp_file_fixed}"', local=f'"{local_file}"'
+        )
+        return Argv(tuple(shlex.split(command)))
 
     def _locations(self, filename, ignore=False, difftool=False):
         p = self.config.project()
-        # s = self.config.server(server)
         s = self.server
         local = filename
         remote = str(local)
@@ -196,135 +224,147 @@ class Transfer:
             remote = Path(s.root, remote)
         except TypeError:
             ui.error(f"Server has no root ({s.servername}).")
-        file_locations = {
+        return {
             "local": local,
             "remote": remote,
         }
-        return file_locations
 
     def _rsync(
         self,
         localf,
         remotef,
         action,
-        extra_flags="",
+        extra_flags=(),
         single=False,
         compare_to=None,
         server=None,
+        native_dry_run=True,
     ):
-
         # for single(), the server is not global
-        # print('>>>', self.server, server)
         s = self.server
         if server:
             s = self.config.server(server)
 
-        ssh = s.ssh[0]  # use the first ssh server defined
+        command = self._rsync_command(
+            localf,
+            remotef,
+            action,
+            s,
+            extra_flags=self._flags(extra_flags),
+            compare_to=compare_to,
+            native_dry_run=native_dry_run,
+        )
+        self.run(command, single, action, s, remotef, localf)
 
-        identity = ""
+    def _rsync_command(
+        self,
+        localf,
+        remotef,
+        action,
+        server,
+        *,
+        extra_flags=(),
+        compare_to=None,
+        native_dry_run=True,
+    ):
+        ssh = server.ssh[0]  # use the first ssh server defined
+        rsyncb = self.config.project().rsync_binary
+
+        argv = [rsyncb]
+
+        rsh = ["ssh"]
+        if ssh.port:
+            rsh.extend(["-p", str(ssh.port)])
         if ssh.key:
-            identity = f'--rsh="ssh -i {ssh.key}"'
+            rsh.extend(["-i", ssh.key])
+        if len(rsh) > 1:
+            argv.extend(["--rsh", " ".join(rsh)])
 
-        included = [
-            f".env.{s.name}",
-            f"robots.txt.{s.name}",
-            f".htaccess.{s.name}",
-        ]
-        included = " ".join([f'--include="{i}"' for i in included])
-
-        excluded = ""
-        recursive = ""
-        if self.multiple:
-            excluded = self.config.excluded(self.server)
-            recursive = "--recursive"
-
-        group = ""
-        if action == Action.PUT and (s.group or s.user):
+        if action == Action.PUT and (server.group or server.user):
             # To have rsync change owner or group, sudo will probably
             # have to be used.  The '--rsync-path' needs to be set to
             # "sudo rsync".  Also the '--group' and '--owner' flags
             # have to be used as well, otherwise '--chown' will be
             # ignored.
             # https://askubuntu.com/a/719440
-            group_flag = "--group" if s.group else ""
-            user_flag = "--owner" if s.user else ""
-            # group = f'{group_flag} {user_flag} --rsync-path="sudo rsync" --chown={s.user or ""}:{s.group or ""}'
-            group = f"{group_flag} {user_flag} --chown={s.user or ''}:{s.group or ''}"
+            if server.group:
+                argv.append("--group")
+            if server.user:
+                argv.append("--owner")
+            argv.append(f"--chown={server.user or ''}:{server.group or ''}")
+
+        argv.extend(
+            [*extra_flags, "--itemize-changes", "--links", "--compress"]
+        )
+        argv.append("--checksum")
 
         if self.silent or self.quiet:
-            extra_flags += " --quiet "
-
-        verbose_flag = ""
+            argv.append("--quiet")
         if self.verbose:
-            verbose_flag = "--verbose"
+            argv.append("--verbose")
+        if self.multiple:
+            argv.append("--recursive")
 
-        port = ""
-        if ssh.port:
-            # https://stackoverflow.com/a/4630407
-            port = f'-e "ssh -p {ssh.port}"'
+        for include in (
+            f".env.{server.name}",
+            f"robots.txt.{server.name}",
+            f".htaccess.{server.name}",
+        ):
+            argv.extend(["--include", include])
 
-        rsyncb = self.config.project().rsync_binary
+        excluded = self.config.excluded(server.name) if self.multiple else ()
+        for exclude in excluded:
+            argv.extend(["--exclude", exclude])
 
-        # --no-perms --no-owner --no-group --no-times --ignore-times
-        # flags = ['--verbose', '--compress', '--checksum', '--recursive']
-        cmd = f"""{rsyncb} {self.dryrun} {port} {identity} {group} {extra_flags} {verbose_flag} --itemize-changes
-                  --links --compress --checksum {recursive} {included} {excluded}"""
-
+        host = f"{ssh.username}@{ssh.server}"
         if action == Action.PUT:
-            cmd = f"""{cmd} '{localf}' {ssh.username}@{ssh.server}:{remotef}"""
+            argv.extend([str(localf), f"{host}:{remotef}"])
         elif action == Action.PULL:
-            cmd = (
-                f"""{cmd} '{ssh.username}@{ssh.server}:{remotef}' '{localf}' """
-            )
+            argv.extend([f"{host}:{remotef}", str(localf)])
         elif action == Action.DIFF:
             if self.multiple:
-                remotef = str(remotef) + "/"
-            cmd = f"""{cmd} --compare-dest='{compare_to}' '{ssh.username}@{ssh.server}:{remotef}' '{localf}' """
+                remotef = f"{remotef}/"
+            if compare_to is not None:
+                argv.append(f"--compare-dest={compare_to}")
+            argv.extend([f"{host}:{remotef}", str(localf)])
 
-        cmd = " ".join(cmd.split())  # remove extra spaces
-        # print(cmd);exit()
-        self.run(cmd, single, action, s, remotef, localf)
+        return Argv(
+            tuple(argv),
+            dry_run_flag="--dry-run" if native_dry_run else None,
+        )
 
-    def run(self, cmd, single, action, server, remotef, localf):
+    def run(self, command, single, action, server, remotef, localf):
         doit = True
-        # if the server has warn = True, then pause here to query the user.
-        if not single:  # noqa: SIM102 - keep the two guards readable
-            if action == Action.PUT and server.warn and self.real:
-                doit = False
-                warn = click.style(
-                    " WARNING: ",
-                    bg=Color.YELLOW.value,
-                    fg=Color.RED.value,
-                    bold=True,
-                    dim=True,
-                )
-                msg = click.style(
-                    f': You are about to overwrite the {server.servername} "{remotef}" files, continue?',
-                    fg=Color.YELLOW.value,
-                )
-                msg = warn + msg
-                if click.confirm(msg):
-                    doit = True
+        if not single and action == Action.PUT and server.warn and self.real:
+            doit = False
+            warn = click.style(
+                " WARNING: ",
+                bg=Color.YELLOW.value,
+                fg=Color.RED.value,
+                bold=True,
+                dim=True,
+            )
+            msg = click.style(
+                f": You are about to overwrite the {server.servername} "
+                f'"{remotef}" files, continue?',
+                fg=Color.YELLOW.value,
+            )
+            if click.confirm(warn + msg):
+                doit = True
 
-        if doit:
-            result = subprocess.run(cmd, shell=True, stderr=subprocess.PIPE)
-            if result.returncode:
-                if not self.silent:
-                    ui.display_cmd(
-                        cmd, suppress_commands=config.suppress_commands
-                    )
-                ui.error(f"\n{result.stderr.decode('utf-8')}")
+        if not doit:
+            return
+
+        result = run(command, real=self.real, capture=True)
+        if result.stdout:
+            click.echo(result.stdout, nl=False)
+        if result.returncode:
+            ui.error(f"\n{result.stderr}")
+        else:
+            if single:
+                ui.display_success(self.real, f"[{server.servername}] {localf}")
             else:
-                if not self.silent:
-                    ui.display_cmd(
-                        cmd, suppress_commands=config.suppress_commands
-                    )
-                if single:
-                    ui.display_success(
-                        self.real, f"[{server.servername}] {localf}"
-                    )
-                else:
-                    ui.display_success(self.real)
+                ui.display_success(self.real)
 
     def error_code(self, code):
         code = str(code)

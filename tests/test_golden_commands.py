@@ -34,6 +34,7 @@ def normalize(text: str, project) -> str:
         "dev--<DEPLOY_STAMP>",
         text,
     )
+    text = re.sub(r"sink-mysql-[0-9a-f]+\.cnf", "<CREDS_FILE>", text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
     return "\n".join(lines).strip("\n") + "\n"
 
@@ -143,10 +144,11 @@ def test_file_put_real_omits_dry_run(project_factory) -> None:
     assert not rsync[0].dry_run
 
 
-def test_single_currently_crashes(project_factory) -> None:
-    """Characterization of B17/N1 before Stage 7 fixes it."""
+def test_single_uses_the_automatic_server(project_factory) -> None:
+    """Characterization: one automatic server is sent the file in dry-run."""
     project = project_factory()
     result = project.invoke("single", "project/index.html")
 
-    assert result.exit_code == 1
-    assert isinstance(result.exception, AttributeError)
+    assert result.exit_code == 0, combined(result)
+    assert "Success (DRY RUN)" in combined(result)
+    assert [c.name for c in commands_named(project.stub_log, "rsync")]

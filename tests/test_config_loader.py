@@ -24,7 +24,10 @@ def test_valid_config_resolves_relative_paths_and_ssh_key(
     args = rsync[0].args
 
     assert f"{project.path / 'project'}/" in args
-    assert f"--rsh=ssh -i {project.path / 'id_rsa'}" in args
+    assert "--rsh" in args
+    rsh = args[args.index("--rsh") + 1]
+    assert f"-i {project.path / 'id_rsa'}" in rsh
+    assert "-p 2222" in rsh
     assert "deploy@example.com:/var/www/demo" in args
     assert rsync[0].dry_run
 
@@ -104,9 +107,6 @@ def test_unknown_keys_warn_and_are_ignored(project_factory) -> None:
     assert "bogus" in text
 
 
-@pytest.mark.xfail(
-    strict=True, reason="Stage 5: ${ENV_VAR} interpolation is not implemented"
-)
 def test_environment_variables_are_expanded(
     project_factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -119,10 +119,6 @@ def test_environment_variables_are_expanded(
     assert result.output.strip() == '"expanded"'
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Stage 5: a missing ${ENV_VAR} must raise ConfigError",
-)
 def test_missing_environment_variable_is_a_config_error(
     project_factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,2 +1,4 @@
-+ ssh -p 2222 -C -T -i "<CONFIG_DIR>/id_rsa" deploy@example.com 'export MYSQL_PWD="secret"; mysqldump --dry-run --host=localhost --user=dbuser --single-transaction --triggers --events --routines --no-tablespaces demo' | gzip -c > "pulls/demo-dev-<DB_STAMP>.sql.gz"
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
++ ssh -C -T -p 2222 -i <CONFIG_DIR>/id_rsa -o ConnectTimeout=25 deploy@example.com 'mysqldump --defaults-extra-file=/tmp/<CREDS_FILE> --single-transaction --triggers --events --routines --no-tablespaces demo' | gzip -c > pulls/demo-dev-<DB_STAMP>.sql.gz
 Success (DRY RUN)
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

@@ -1,8 +1,10 @@
 import errno
 import os
-import subprocess
+import shlex
 
 from sink.config import config
+from sink.errors import CommandError
+from sink.shell import Argv, remote_command, run, scp_argv
 from sink.ui import ui
 
 
@@ -21,95 +23,46 @@ class SSH:
         else:
             self.ssh = self.server.ssh[0]
 
+    @property
+    def real(self):
+        return not self.dry_run
+
     def visit_ssh(self):
-        identity = self.get_key()
-        port = ""
-        if self.ssh.port:
-            port = f"-p {self.ssh.port}"
-
-        cd_cmd = ""
+        fragment = ""
         if self.server.root:
-            cd_cmd = f'"cd {self.server.root}; bash"'
-
-        cmd = f"""ssh -t {port} {identity} {self.ssh.username}@{self.ssh.server} {cd_cmd}"""
-        cmd = " ".join(cmd.split())
-
-        self.run_cmd(cmd, self.dry_run)
+            fragment = f"cd {shlex.quote(str(self.server.root))}; bash"
+        command = remote_command(self.ssh, fragment, tty=True)
+        run(command, real=self.real, capture=False)
 
     def scp_put(self, localfile):
-        # s = self.config.server(server)
-
-        identity = self.get_key()
-
-        port = ""
-        if self.ssh.port:
-            port = f"-P {self.ssh.port}"
-
-        cmd = f"""scp {port} -o 'ConnectTimeout 10' {identity}
-            {localfile} {self.ssh.username}@{self.ssh.server}"""
-        cmd = " ".join(cmd.split())
-
-        self.run_cmd(cmd, self.dry_run)
+        remote = f"{self.ssh.username}@{self.ssh.server}"
+        argv = scp_argv(self.ssh, str(localfile), remote)
+        run(Argv(argv), real=self.real, capture=False)
 
     def scp_pull(self, remotefile, dest):
-        identity = self.get_key()
-        port = ""
-        if self.ssh.port:
-            port = f"-P {self.ssh.port}"
-
-        cmd = f"""scp {port} -o 'ConnectTimeout 10' {identity}
-            {self.ssh.username}@{self.ssh.server}:{remotefile} {dest}"""
-        cmd = " ".join(cmd.split())
-        self.run_cmd(cmd, self.dry_run)
+        remote = f"{self.ssh.username}@{self.ssh.server}:{remotefile}"
+        argv = scp_argv(self.ssh, remote, str(dest))
+        run(Argv(argv), real=self.real, capture=False)
 
     def run(self, remote_cmd):
-        identity = self.get_key()
-
-        port = ""
-        if self.ssh.port:
-            port = f"-p {self.ssh.port}"
-
-        cmd = f"""ssh {port} {identity} {self.ssh.username}@{self.ssh.server} {remote_cmd}"""
-        cmd = " ".join(cmd.split())
-
-        result = self.run_cmd_result(cmd, self.dry_run)
-        return result
+        command = remote_command(
+            self.ssh,
+            remote_cmd,
+            batch=True,
+            timeout=25,
+        )
+        result = run(command, real=self.real, capture=True)
+        if self.real and result.returncode:
+            raise CommandError(result.stderr.strip() or "remote command failed")
+        return result.stdout
 
     def get_key(self):
         if not self.ssh.key:
             identity = ""
         elif os.path.exists(self.ssh.key):
             identity = f'-i "{self.ssh.key}"'
-            # click.echo(f'Using identity: "{server.ssh.key}"')
         else:
             raise FileNotFoundError(
                 errno.ENOENT, os.strerror(errno.ENOENT), self.ssh.key
             )
-            # ui.error(f'ssh key does no exist: {server.ssh.key}')
         return identity
-
-    def run_cmd(self, cmd, dry_run):
-        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-        if not dry_run:
-            subprocess.run(cmd, shell=True)
-
-    def run_cmd_result(self, cmd, dry_run):
-        ui.display_cmd(cmd, suppress_commands=config.suppress_commands)
-        if dry_run:
-            return ""
-        else:
-            try:
-                result = subprocess.check_output(
-                    cmd,
-                    shell=True,
-                    # stderr=subprocess.PIPE)
-                    stderr=subprocess.STDOUT,
-                )
-            except subprocess.CalledProcessError as e:
-                # subprocess.STDOUT returns error msg but
-                # subprocess.PIPE does not.
-                ui.error(
-                    "On remote server: {}".format(e.output.decode("utf-8"))
-                )
-            decoded = result.decode("utf-8")
-            return decoded

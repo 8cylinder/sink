@@ -159,15 +159,6 @@ wheels = [
 ]
 
 [[package]]
-name = "plumbum"
-version = "2.0.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6c/d2/578712a979a50e9aba08ea173a38e7598461130d3c9899f176373bc03280/plumbum-2.0.2.tar.gz", hash = "sha256:233751d7819c9e6743ec1c2405927eb4fa52a284c7b894bd10e28106a9309a92", size = 390799, upload-time = "2026-07-22T04:13:12.157Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/55/fdd01894807d20fb6181f13590ae247585b10e909b42e6ada833379fe520/plumbum-2.0.2-py3-none-any.whl", hash = "sha256:a865771826c1d2cce0ca8b2a2c48aa0447ed7a518859e389a95f158e9c369547", size = 168804, upload-time = "2026-07-22T04:13:10.76Z" },
-]
-
-[[package]]
 name = "pygments"
 version = "2.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -277,7 +268,6 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "coolname" },
-    { name = "plumbum" },
     { name = "pyyaml" },
     { name = "rich" },
 ]
@@ -295,7 +285,6 @@ dev = [
 requires-dist = [
     { name = "click", specifier = ">=8.5" },
     { name = "coolname", specifier = ">=2.0" },
-    { name = "plumbum", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0.4" },
     { name = "rich", specifier = ">=15" },
 ]
