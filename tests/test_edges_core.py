@@ -118,6 +118,20 @@ def test_ssh_errors(tmp_path: Path) -> None:
         )
 
 
+def test_ui_labels_have_no_inner_colon(capsys) -> None:
+    ui.configure(color="never", quiet=0)
+
+    ui.notice("notice")
+    ui.warn("warning")
+
+    text = capsys.readouterr()
+    output = text.out + text.err
+    assert "[Notice] notice" in output
+    assert "[Warning] warning" in output
+    assert "[Notice:]" not in output
+    assert "[Warning:]" not in output
+
+
 def test_ui_helpers(capsys) -> None:
     ui.configure(color="never", quiet=0, verbose=1)
     ui.heading("heading", underline=True)

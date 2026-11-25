@@ -111,7 +111,7 @@ class ui:
         if ui.quiet >= 2:
             return
         ui.err_console.print(
-            Text(f"[Notice:] {msg}", style="blue"), soft_wrap=True
+            Text(f"[Notice] {msg}", style="blue"), soft_wrap=True
         )
 
     @staticmethod
@@ -120,7 +120,7 @@ class ui:
         if ui.quiet >= 2:
             return
         ui.err_console.print(
-            Text(f"{indent}[Warning:] {msg}", style="yellow"), soft_wrap=True
+            Text(f"{indent}[Warning] {msg}", style="yellow"), soft_wrap=True
         )
 
     @staticmethod
