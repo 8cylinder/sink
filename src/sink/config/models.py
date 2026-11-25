@@ -82,6 +82,8 @@ class Project:
     difftool: str | None = None
     exclude: tuple[str, ...] = ()
     actions: Mapping[str, str] = field(default_factory=dict)
+    pv: bool = False
+    mysqlpump: bool = False
     note: str | None = None
 
 

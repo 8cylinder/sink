@@ -39,6 +39,8 @@ PROJECT_KEYS = {
     "difftool",
     "exclude",
     "actions",
+    "pv",
+    "mysqlpump",
     "note",
 }
 SERVER_KEYS = {
@@ -193,6 +195,8 @@ def _project(data: Any, path: Path, warnings: list[str]) -> Project:
         difftool=_string(data.get("difftool"), path, "project.difftool"),
         exclude=_string_tuple(data.get("exclude"), path, "project.exclude"),
         actions=_actions(data.get("actions"), path, "project.actions"),
+        pv=_boolean(data.get("pv"), path, "project.pv"),
+        mysqlpump=_boolean(data.get("mysqlpump"), path, "project.mysqlpump"),
         note=_string(data.get("note"), path, "project.note"),
     )
 

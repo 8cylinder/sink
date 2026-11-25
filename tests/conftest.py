@@ -106,6 +106,7 @@ STUB_NAMES = (
     "scp",
     "mysql",
     "mysqldump",
+    "mysqlpump",
     "git",
     "less",
     "pv",
