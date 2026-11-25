@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tomllib
@@ -19,7 +20,9 @@ REPO = Path(__file__).resolve().parents[1]
 
 def project_version() -> str:
     with (REPO / "pyproject.toml").open("rb") as file:
-        return tomllib.load(file)["project"]["version"]
+        value = tomllib.load(file)["project"]["version"]
+    assert isinstance(value, str)
+    return value
 
 
 def test_version_matches_pyproject() -> None:
@@ -55,6 +58,13 @@ def test_not_in_a_project() -> None:
 
     assert result.exit_code == 1
     assert "You are not in a project" in combined(result)
+
+
+def test_home_and_xdg_dirs_are_isolated(tmp_path: Path) -> None:
+    assert Path.home() == tmp_path / "home"
+    assert os.environ["XDG_CONFIG_HOME"] == str(tmp_path / ".config")
+    assert os.environ["XDG_DATA_HOME"] == str(tmp_path / ".data")
+    assert os.environ["XDG_CACHE_HOME"] == str(tmp_path / ".cache")
 
 
 def test_no_arguments_shows_help() -> None:
