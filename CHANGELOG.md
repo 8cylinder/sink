@@ -11,6 +11,10 @@
 
 ### Changed
 
+- `sink check` reports a stable table for project directories, the rsync
+  binary, and each server's root/warn/automatic fields. URL probes use a Rich
+  status instead of the old spinner thread, and database symlink creation no
+  longer changes the process working directory.
 - `db put` validates that the source is a readable gzip file and that the
   server has a database before touching the remote host. Local imports use
   `cat` by default; set `project.pv: yes` to use `pv` when installed. Remote

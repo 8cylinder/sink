@@ -167,11 +167,6 @@ def test_diff_golden(project_factory) -> None:
 
 
 def test_check_golden(project_factory, monkeypatch: pytest.MonkeyPatch) -> None:
-    # The spinner is a thread writing cursor frames; freeze it so the
-    # characterization only covers the rendered probes and status lines.
-    monkeypatch.setattr("sink.check.Spinner.start", lambda self: None)
-    monkeypatch.setattr("sink.check.Spinner.stop", lambda self: None)
-
     project = project_factory()
     result = project.invoke("check", "dev")
 

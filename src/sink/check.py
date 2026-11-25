@@ -1,14 +1,16 @@
 """Check server, database, and URL configuration."""
 
 import shlex
+import shutil
 import ssl
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from sink.config.models import Config
 from sink.credentials import remote_mysql_credentials
 from sink.shell import remote_command, run
-from sink.ui import Spinner, ui
+from sink.ui import ui
 
 
 class TestConfig:
@@ -24,24 +26,31 @@ class TestConfig:
         self.insecure = insecure
 
     def test_project(self):
-        """Check that project-local directories exist."""
+        """Check project dirs and the configured rsync binary."""
         ui.echo()
         ui.heading("Local dirs")
 
-        indent = 2
+        rows = []
         for name in ["pulls_dir", "log_dir", "cache_dir"]:
             directory = getattr(self.config.project, name)
             if directory is None:
-                self.out(
-                    f'{self.bad} "{name}" setting in '
-                    f"{self.config.path} does not exist.",
-                    indent,
-                )
-                continue
-            if directory.exists():
-                self.out(f"{self.good} {directory}", indent)
+                rows.append((name, "(not configured)", "not configured"))
             else:
-                self.out(f"{self.bad} {directory}", indent)
+                status = "ok" if directory.exists() else "missing"
+                rows.append((name, str(directory), status))
+
+        rsync = self.config.project.rsync_binary
+        resolved = shutil.which(rsync)
+        if resolved is None and Path(rsync).is_file():
+            resolved = str(Path(rsync).resolve())
+        rows.append(
+            (
+                "rsync_binary",
+                resolved or rsync,
+                "ok" if resolved else "missing",
+            )
+        )
+        self.table(rows)
 
     def test_requirements(self):
         """Print the local tool-version command."""
@@ -62,6 +71,17 @@ class TestConfig:
                 continue
             ui.echo()
             ui.heading(s.name, underline=True)
+            self.table(
+                [
+                    (
+                        "root",
+                        str(s.root) if s.root else "(not configured)",
+                        "ok" if s.root else "not configured",
+                    ),
+                    ("warn", str(s.warn), "ok"),
+                    ("automatic", str(s.automatic), "ok"),
+                ]
+            )
 
             # ssh login
             for ssh in s.ssh:
@@ -112,32 +132,51 @@ class TestConfig:
                 if not self.real:
                     self.out(f"+ URL({u.url})", 2)
                     continue
-                spinner = Spinner(indent=2, delay=0.1)
-                spinner.start()
-                try:
-                    # Default verifies the certificate chain and hostname;
-                    # --insecure is the explicit opt-out for self-signed sites.
-                    ctx = ssl.create_default_context()
-                    if self.insecure:
-                        ctx.check_hostname = False
-                        ctx.verify_mode = ssl.CERT_NONE
-                    urllib.request.urlopen(
-                        u.url, timeout=self.timeout, context=ctx
-                    )
-                except urllib.error.HTTPError as e:
-                    msg = f"{self.bad} URL({u.url}): HTTPError: {e.code}."
-                except urllib.error.URLError as e:
-                    msg = f"{self.bad} URL({u.url}): URLError: {e.reason}."
-                except ValueError:
-                    msg = f"{self.bad} URL({u.url}): Not a valid URL."
-                except AttributeError as e:
-                    msg = f"AttributeError? {u.url} {e}"
-                except TimeoutError:
-                    msg = f"{self.bad} URL({u.url}) Timeout."
-                else:
-                    msg = f"{self.good} URL({u.url})"
-                spinner.stop()
+                with ui.status(f"Checking {u.url}"):
+                    try:
+                        # Default verifies the certificate chain and hostname;
+                        # --insecure is the explicit opt-out for self-signed sites.
+                        ctx = ssl.create_default_context()
+                        if self.insecure:
+                            ctx.check_hostname = False
+                            ctx.verify_mode = ssl.CERT_NONE
+                        urllib.request.urlopen(
+                            u.url, timeout=self.timeout, context=ctx
+                        )
+                    except urllib.error.HTTPError as e:
+                        msg = f"{self.bad} URL({u.url}): HTTPError: {e.code}."
+                    except urllib.error.URLError as e:
+                        msg = f"{self.bad} URL({u.url}): URLError: {e.reason}."
+                    except ValueError:
+                        msg = f"{self.bad} URL({u.url}): Not a valid URL."
+                    except AttributeError as e:
+                        msg = f"AttributeError? {u.url} {e}"
+                    except TimeoutError:
+                        msg = f"{self.bad} URL({u.url}) Timeout."
+                    else:
+                        msg = f"{self.good} URL({u.url})"
                 self.out(msg, 2)
+
+    def table(self, rows):
+        """Print a stable Setting/Value/Status table."""
+        name_width = max(
+            (len(name) for name, _value, _status in rows), default=8
+        )
+        value_width = max(
+            (len(value) for _name, value, _status in rows), default=5
+        )
+        self.out(
+            f"{'Setting'.ljust(name_width)}  "
+            f"{'Value'.ljust(value_width)}  Status",
+            2,
+        )
+        for name, value, status in rows:
+            mark = self.good if status == "ok" else self.bad
+            self.out(
+                f"{name.ljust(name_width)}  {value.ljust(value_width)}  "
+                f"{mark} {status}",
+                2,
+            )
 
     def out(self, msg, spaces):
         """Print an indented status line."""

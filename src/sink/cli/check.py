@@ -22,4 +22,5 @@ def check(rt, required, server_names, real, insecure):
     if required:
         tc.test_requirements()
     else:
+        tc.test_project()
         tc.test_servers(server_names)

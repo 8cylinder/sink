@@ -39,7 +39,7 @@ def unwrap(text: str) -> str:
 
     ``ui.display_cmd`` wraps long commands with a backslash/newline pair.
     Splitting that text with ``shlex`` is not useful until the continuation
-    is joined again.  Spinner backspaces are also removed so ``check``
+    is joined again.  Stray backspaces are also removed so ``check``
     output is stable.
     """
     text = strip_ansi(text).replace("\x08", "")

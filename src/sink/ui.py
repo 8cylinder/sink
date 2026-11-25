@@ -1,62 +1,12 @@
 """Rich console output, status labels, and redaction."""
 
 import os
-import random
 import sys
-import threading
-import time
+from contextlib import contextmanager
 
 import click
 from rich.console import Console
 from rich.text import Text
-
-
-class Spinner:
-    """Small threaded terminal spinner."""
-
-    busy = False
-    delay = 0.1
-
-    @staticmethod
-    def spinning_cursor(indent):
-        """Yield spinner frames at the requested indent."""
-        cursors = [
-            "|/-\\",
-            "_.oO||Oo._",
-            "\u237a\u237b\u237c\u237d__\u237d\u237c\u237b\u237a",
-            "\u2588\u2589\u258a\u258b\u258c\u258d\u258e\u258f\u258f\u258e\u258d\u258c\u258b\u258a\u2589\u2588",
-            " \u2591\u2592\u2593\u2588\u2588\u2593\u2592\u2591 ",
-        ]
-        cursors = random.choice(cursors)
-        while True:
-            for cursor in cursors:
-                yield f"{indent}[{cursor}]"
-
-    def __init__(self, delay=None, indent=0):
-        self.indent = indent
-        indent_char = " " * indent
-        self.spinner_generator = self.spinning_cursor(indent_char)
-        if delay and float(delay):
-            self.delay = delay
-
-    def spinner_task(self):
-        """Write spinner frames until stopped."""
-        while self.busy:
-            sys.stdout.write(next(self.spinner_generator))
-            sys.stdout.flush()
-            time.sleep(self.delay)
-            sys.stdout.write("\b" * (self.indent + 3))
-            sys.stdout.flush()
-
-    def start(self):
-        """Start the spinner thread."""
-        self.busy = True
-        threading.Thread(target=self.spinner_task).start()
-
-    def stop(self):
-        """Stop the spinner thread."""
-        self.busy = False
-        time.sleep(self.delay)
 
 
 class ui:
@@ -104,6 +54,16 @@ class ui:
             cls.err_console = Console(
                 stderr=True, no_color=no_color, highlight=False
             )
+
+    @classmethod
+    @contextmanager
+    def status(cls, message):
+        """Show a Rich status spinner unless output is fully suppressed."""
+        if cls.quiet >= 2:
+            yield None
+            return
+        with cls.console.status(message) as status:
+            yield status
 
     @staticmethod
     def heading(msg, *, underline=False):

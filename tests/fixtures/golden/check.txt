@@ -1,4 +1,16 @@
+Local dirs
+Setting Value Status
+pulls_dir <CONFIG_DIR>/pulls [✓] ok
+log_dir (not configured) [X] not configured
+cache_dir (not configured) [X] not configured
+rsync_binary <CONFIG_DIR>/bin/rsync [✓] ok
+
+
 dev
+Setting Value Status
+root /var/www/demo [✓] ok
+warn False [✓] ok
+automatic True [✓] ok
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com exit
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'

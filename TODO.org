@@ -108,7 +108,8 @@ The deploy workflow was removed (D11).
 CLOSED: [2026-11-25 Wed]
 The deploy workflow was removed (D11).
 
-*** TODO Check more values
+*** COMPLETE Check more values
+CLOSED: [2026-11-25 Wed]
 - rsync_binary
 - pulls_dir
 - show warn & automatic status for each server

@@ -5,7 +5,7 @@ import os
 import shlex
 import shutil
 import sys
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from pathlib import Path
 
 import click
@@ -15,17 +15,6 @@ from sink.credentials import remote_mysql_credentials
 from sink.errors import CommandError
 from sink.shell import Argv, Pipeline, remote_command, run
 from sink.ui import ui
-
-
-@contextmanager
-def cd(newdir):
-    """Temporarily change directory and always restore it."""
-    prevdir = os.getcwd()
-    os.chdir(os.path.expanduser(newdir))
-    try:
-        yield
-    finally:
-        os.chdir(prevdir)
 
 
 def _port(db):
@@ -276,12 +265,11 @@ class DB:
 
     def make_symlink(self, sqlfile):
         """Point ``LATEST-<server>.sql.gz`` at the newest dump."""
-        link_name = Path(f"LATEST-{self.server.name}.sql.gz")
-        with cd(sqlfile.parent):
-            with suppress(FileNotFoundError):
-                # The latest file may not exist yet.
-                link_name.unlink()
-            link_name.symlink_to(f"./{sqlfile.name}")
+        link_name = sqlfile.parent / f"LATEST-{self.server.name}.sql.gz"
+        with suppress(FileNotFoundError):
+            # The latest file may not exist yet.
+            link_name.unlink()
+        link_name.symlink_to(f"./{sqlfile.name}")
 
     def load_remote(self, source):
         """Load a dump that already exists on the server."""

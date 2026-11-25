@@ -74,8 +74,6 @@ def test_check_verifies_tls_by_default(
         return object()
 
     monkeypatch.setattr("sink.check.urllib.request.urlopen", fake_urlopen)
-    monkeypatch.setattr("sink.check.Spinner.start", lambda self: None)
-    monkeypatch.setattr("sink.check.Spinner.stop", lambda self: None)
 
     result = project.invoke("check", "dev", "--real")
     assert result.exit_code == 0, combined(result)
