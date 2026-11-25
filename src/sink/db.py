@@ -145,7 +145,10 @@ class DB:
             mysqldump = os.path.join(mamp, "mysqldump")
             argv = [mysqldump, *_mysqldump_argv(db)[1:]]
             command = Pipeline(
-                (Argv(tuple(argv)), Argv(("gzip", "-c"))),
+                (
+                    Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
+                    Argv(("gzip", "-c")),
+                ),
                 stdout_path=Path(sqlfile),
             )
             env = _env_with_password(db)
@@ -266,7 +269,7 @@ class DB:
                 (
                     Argv(("pv", "--numeric", str(sqlfile))),
                     Argv(("gunzip", "-c")),
-                    Argv(tuple(argv)),
+                    Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
                 )
             )
             env = _env_with_password(db)
