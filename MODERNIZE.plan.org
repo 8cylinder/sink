@@ -531,6 +531,15 @@ or mysql.
    =strict=True= matters: if a stale =xfail= starts passing, pytest reports
    XPASS and fails the suite, forcing the marker to be removed.
 
+   *Applicability*: this applies to every behavior change or bug fix from
+   Stage 3 through Stage 10, and to Stage 11 if it is ever resumed.  Pure
+   documentation, CI YAML, formatting, dependency bumps, and type-only changes
+   are exempt, but they must still keep =make check= green.  Pure refactors
+   require a passing characterization test commit before the refactor, then
+   the refactor itself.  Stage 12 is documentation/release work and does not
+   need red tests for prose; any packaging or metadata change still gets a
+   test if it can regress.
+
 ** Tasks
 - [ ] =tests/conftest.py=: a temporary project fixture that writes a
       =sink.yaml=, sets =HOME=, =XDG_CONFIG_HOME=, and =XDG_DATA_HOME=
