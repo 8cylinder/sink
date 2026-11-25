@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -272,6 +273,9 @@ def _execute_pipeline(
     previous: subprocess.Popen[str] | None = None
     output_file: IO[str] | None = None
     error_file: IO[str] | None = None
+    error_capture: IO[bytes] | None = None
+    output_text = ""
+    error_text = ""
 
     try:
         if stdout is not None:
@@ -292,7 +296,13 @@ def _execute_pipeline(
         elif stderr is not None:
             error_target = stderr
         elif capture:
-            error_target = subprocess.PIPE
+            # communicate() only reads the last stage, so earlier stages
+            # would lose their stderr if each got a separate PIPE.  Give
+            # every stage the same file and read it once they all finish.
+            error_capture = tempfile.TemporaryFile(  # noqa: SIM115 - closed below
+                mode="w+b"
+            )
+            error_target = error_capture
         else:
             error_target = None
 
@@ -317,17 +327,22 @@ def _execute_pipeline(
 
         if previous is None:
             raise RuntimeError("pipeline did not start")
-        # Only the final process writes to the caller's output; earlier
-        # processes are drained/wait'ed below so their stderr is not lost.
+        # Only the final process writes to the caller's stdout.  Every
+        # stage writes stderr to the same destination, which is read after
+        # all of them exit.
         output_text, error_text = previous.communicate(input=input)
+        for process in processes[:-1]:
+            process.wait()
+        if error_capture is not None:
+            error_capture.seek(0)
+            error_text = error_capture.read().decode(errors="replace")
     finally:
         if output_file is not None:
             output_file.close()
         if error_file is not None:
             error_file.close()
-
-    for process in processes[:-1]:
-        process.wait()
+        if error_capture is not None:
+            error_capture.close()
 
     if output_text is None:
         output_text = ""

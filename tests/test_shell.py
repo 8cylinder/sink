@@ -145,6 +145,35 @@ def test_pipeline_reports_a_failing_producer() -> None:
     assert result.returncode == 3
 
 
+def test_pipeline_keeps_stderr_from_every_stage() -> None:
+    pipeline = Pipeline(
+        (
+            Argv(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys; print('producer failed', file=sys.stderr); "
+                    "sys.exit(3)",
+                )
+            ),
+            Argv(
+                (
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); "
+                    "print('consumer note', file=sys.stderr)",
+                )
+            ),
+        )
+    )
+
+    result = pipeline.execute(real=True, capture=True)
+
+    assert result.returncode == 3
+    assert "producer failed" in result.stderr
+    assert "consumer note" in result.stderr
+
+
 def test_remote_command_quotes_the_fragment() -> None:
     ssh = SimpleNamespace(username="deploy", server="example.com", port=2222)
     command = remote_command(ssh, "echo hi", batch=True)
