@@ -298,26 +298,32 @@
      docs/
    #+end_src
 
-* Stage 0 - Baseline and safety net                                             :stage_0:
+* DONE Stage 0 - Baseline and safety net                                        :stage_0:
 ** Goal
 Freeze the current behavior so the refactor is bisectable and every
 later change can be compared against a known state.  No product code
 changes in this stage.
 
 ** Tasks
-- [ ] Create a branch and an annotated tag for the baseline; record
+- [X] Create a branch and an annotated tag for the baseline; record
       =git rev-parse HEAD=, =uv --version=, and =python --version= in
       the stage log.
-- [ ] Capture =sink -h= and =sink <command> -h= for every command into
+- [X] Capture =sink -h= and =sink <command> -h= for every command into
       =tests/fixtures/help/= (plain text, ANSI stripped).
-- [ ] Capture dry-run output for =file put=, =file pull=, =db pull=,
+- [X] Capture dry-run output for =file put=, =file pull=, =db pull=,
       =db put=, =diff=, =deploy= (all methods), and =check= against a
       throwaway project.
-- [ ] Add the reproduction snippets from this plan to
+- [X] Add the reproduction snippets from this plan to
       =tests/fixtures/bugs/= as =xfail= tests (or documented skipped
       tests) so each fix flips a test.
-- [ ] Confirm the repository is clean apart from =app-base.org= and
-      commit the baseline artifacts.
+- [X] Confirm the repository is clean and commit the baseline artifacts.
+
+** Result
+Branch =modernize=, annotated tag =baseline-2026-11-25= (commit
+=064973c=).  Captured 21 help fixtures and 12 dry-run fixtures under
+=tests/fixtures/=, plus 12 strict =xfail= reproductions in
+=tests/test_baseline_bugs.py=.  The baseline suite reports
+=12 xfailed=; no source behavior changed.  Commit =611eaf1=.
 
 ** Exit criteria
 - Baseline help and command fixtures are committed.
@@ -1314,7 +1320,7 @@ Poetry/setup.py era.
   deviation from this plan.
 
   #+begin_src text
-  Stage 0  | TODO | baseline tag:            | fixtures:
+  Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
   Stage 1  | TODO | uv/hatchling commit:     | wheel:
   Stage 2  | TODO | CI run:                  | gitleaks:
   Stage 3  | TODO | test count:              | coverage:
