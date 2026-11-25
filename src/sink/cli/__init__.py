@@ -159,7 +159,6 @@ from sink.cli import (  # noqa: E402, F401
     action,
     check,
     db,
-    deploy,
     diff,
     file,
     info,

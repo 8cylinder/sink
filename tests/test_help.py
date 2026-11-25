@@ -60,4 +60,3 @@ def test_help_option_is_registered_on_every_command() -> None:
 def test_command_paths_are_not_empty() -> None:
     assert COMMAND_PATHS
     assert ("misc", "init") in COMMAND_PATHS
-    assert ("deploy", "new") in COMMAND_PATHS

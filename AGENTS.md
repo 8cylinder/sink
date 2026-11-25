@@ -1,6 +1,6 @@
 # AGENTS.md
 
-`sink` is a Python/Click CLI that manages remote website projects (file/db sync, diff, deploy, ssh, check) driven by a `sink.yaml` config. It targets Linux remote servers via `rsync`, `ssh`, and `mysql`.
+`sink` is a Python/Click CLI that manages remote website projects (file/db sync, diff, ssh, check) driven by a `sink.yaml` config. It targets Linux remote servers via `rsync`, `ssh`, and `mysql`.
 
 ## Commands
 
@@ -19,14 +19,17 @@
 - **`sink.yaml` is gitignored** and found by walking up from CWD. Commands fail with "You are not in a project" if no config is found. Create one with `uv run sink misc init > sink.yaml`.
 - The tool shells out to real `rsync`/`ssh`/`mysql` against remote servers; only run destructive commands with `--real` when intended.
 - The legacy `vm` group, `sink/vm.py`, and `sink/resources/Vagrantfile` were removed. Do not reintroduce them; VM provisioning is out of scope (see D7 in `MODERNIZE.plan.org`).
-- The current `config` object is still the pre-modernization mutable singleton. Stage 5 replaces it with typed models, a pure loader, and an injected `Runtime`; do not build new code on the singleton.
+- Configuration is loaded into immutable typed models by `src/sink/config/loader.py`; commands receive a `Runtime` through `ctx.obj`. Do not reintroduce a global config singleton.
 
 ## Layout
 
-- `src/sink/sink.py` — all Click commands and the CLI entrypoint (`sink.sink:sink`).
-- `src/sink/config.py` — loads/validates `sink.yaml` (project + servers); most other modules read the shared `config` singleton. Stage 5 changes this.
-- `src/sink/rsync.py`, `db.py`, `ssh.py`, `check.py`, `deploy.py`, `actions.py`, `applications.py`, `command.py` — per-feature logic.
-- `src/sink/ui.py` — themed console output helpers (`ui.error`, `ui.warn`, `ui.notice`). Stage 6 moves this to Rich.
+- `src/sink/cli/` — Click command tree and entrypoint (`sink.cli:main`), one module per command group.
+- `src/sink/config/` — typed models and the pure YAML loader (`models.py`, `loader.py`).
+- `src/sink/runtime.py` — lazy config, cwd, and output flags.
+- `src/sink/shell.py`, `credentials.py` — argv execution and out-of-band database credentials.
+- `src/sink/rsync.py`, `db.py`, `ssh.py`, `check.py`, `actions.py`, `applications.py` — per-feature logic.
+- `src/sink/ui.py`, `completions.py`, `logging.py` — Rich output, static completions, and diagnostics.
+- Every Python file has a module docstring; classes/functions are documented and tricky control flow is commented. `tests/test_docstrings.py` enforces this.
 - `src/sink/__main__.py` — `python -m sink`.
 - `tests/` — pytest suite, baseline fixtures, and `xfail` reproductions.
 - `MODERNIZE.plan.org` — staged modernization plan; read it before making structural changes.

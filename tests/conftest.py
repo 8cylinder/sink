@@ -153,7 +153,6 @@ def project_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
         server: dict[str, Any] = {
             "root": "/var/www/demo",
-            "deploy_root": "/var/www/deploys",
             "default": default,
             "automatic": automatic,
             "warn": warn,

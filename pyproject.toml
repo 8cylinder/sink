@@ -11,7 +11,7 @@ requires-python = ">=3.15"
 license = "GPL-2.0-only"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Sheldon McGrandle", email = "developer@8cylinder.com" }]
-keywords = ["cli", "deployment", "rsync", "ssh", "mysql"]
+keywords = ["cli", "rsync", "ssh", "mysql"]
 classifiers = [
   "Environment :: Console",
   "Programming Language :: Python :: 3.15",
@@ -19,7 +19,6 @@ classifiers = [
 dependencies = [
   "click>=8.5",
   "PyYAML>=6.0.4",
-  "coolname>=2.0",
   "rich>=15",
 ]
 
@@ -124,7 +123,7 @@ branch = true
 source = ["sink"]
 
 [tool.coverage.report]
-fail_under = 70
+fail_under = 75
 show_missing = true
 
 [tool.importlinter]
@@ -150,7 +149,6 @@ source_modules = [
   "sink.check",
   "sink.credentials",
   "sink.db",
-  "sink.deploy",
   "sink.init",
   "sink.rsync",
   "sink.shell",

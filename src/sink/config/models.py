@@ -93,7 +93,6 @@ class Server:
 
     name: str
     root: Path | None = None
-    deploy_root: Path | None = None
     server_type: str | None = None
     warn: bool = False
     default: bool = False

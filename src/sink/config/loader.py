@@ -49,6 +49,7 @@ SERVER_KEYS = {
     "servername",
     "note",
     "root",
+    # Legacy deploy_root is accepted and ignored so old configs load cleanly.
     "deploy_root",
     "warn",
     "default",
@@ -243,9 +244,6 @@ def _server(
     return Server(
         name=name,
         root=_optional_remote_path(data.get("root"), path, f"{where}.root"),
-        deploy_root=_optional_remote_path(
-            data.get("deploy_root"), path, f"{where}.deploy_root"
-        ),
         server_type=_string(data.get("type"), path, f"{where}.type"),
         warn=_boolean(data.get("warn"), path, f"{where}.warn"),
         default=_boolean(data.get("default"), path, f"{where}.default"),

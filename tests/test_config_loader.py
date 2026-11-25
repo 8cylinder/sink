@@ -141,7 +141,6 @@ def test_multiple_default_servers_are_rejected(project_factory) -> None:
         extra_servers={
             "prod": {
                 "root": "/var/www/prod",
-                "deploy_root": "/var/www/deploys",
                 "default": True,
                 "automatic": False,
                 "ssh": [
@@ -153,7 +152,7 @@ def test_multiple_default_servers_are_rejected(project_factory) -> None:
             }
         }
     )
-    result = project.invoke("deploy", "-m", "local", "new", "dev")
+    result = project.invoke("misc", "api", "project", "name")
 
     assert result.exit_code != 0
     text = combined(result)

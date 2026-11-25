@@ -2,6 +2,13 @@
 
 ## Unreleased (0.3.0)
 
+### Removed
+
+- Removed the `deploy` command group and all deploy implementations
+  (`deploy.py`, `cli/deploy.py`), the `coolname` dependency, deploy tests,
+  fixtures, and the `deploy_root` model field. Legacy `deploy_root` keys in
+  existing `sink.yaml` files are accepted and ignored.
+
 ### Changed
 
 - `db put` validates that the source is a readable gzip file and that the

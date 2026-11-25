@@ -17,7 +17,6 @@ from sink.errors import ConfigError, NoDefaultServer, UnknownServer
 def document(**server_overrides: Any) -> dict[str, Any]:
     server = {
         "root": "/var/www/demo",
-        "deploy_root": "/var/www/deploys",
         "default": True,
         "automatic": True,
         "exclude": ["storage/logs"],

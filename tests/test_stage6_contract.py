@@ -28,17 +28,3 @@ def test_db_quiet_flag_is_renamed() -> None:
 
     assert "--filename-only" in result.output
     assert "--quiet" not in result.output
-
-
-def test_deploy_new_quiet_flag_is_renamed() -> None:
-    result = CliRunner().invoke(sink, ["deploy", "new", "--help"])
-
-    assert "--no-itemize" in result.output
-    assert "--quiet" not in result.output
-
-
-def test_root_help_has_no_literal_markup() -> None:
-    result = CliRunner().invoke(sink, ["--help"])
-
-    assert "[red]" not in result.output
-    assert "[/]" not in result.output

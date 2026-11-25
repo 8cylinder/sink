@@ -2,7 +2,7 @@
 
 These pin the current dry-run text before the execution-layer refactor.  The
 normalizer removes only values that change on every run: the fixture path,
-timestamps, temporary diff directories, and generated deploy codenames.
+timestamps, temporary diff directories, and credential paths.
 """
 
 from __future__ import annotations
@@ -156,22 +156,6 @@ def test_db_put_mamp_golden(project_factory) -> None:
 
     assert result.exit_code == 0, combined(result)
     assert_golden("db-put-mamp", combined(result), project)
-
-
-def test_deploy_local_init_golden(project_factory) -> None:
-    project = project_factory()
-    result = project.invoke("deploy", "-m", "local", "init", "dev")
-
-    assert result.exit_code == 0, combined(result)
-    assert_golden("deploy-local-init", combined(result), project)
-
-
-def test_deploy_local_new_golden(project_factory) -> None:
-    project = project_factory()
-    result = project.invoke("deploy", "-m", "local", "new", "dev")
-
-    assert result.exit_code == 0, combined(result)
-    assert_golden("deploy-local-new", combined(result), project)
 
 
 def test_diff_golden(project_factory) -> None:

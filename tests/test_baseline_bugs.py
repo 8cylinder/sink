@@ -7,27 +7,12 @@ prompting removal of the marker.
 
 from __future__ import annotations
 
-import pytest
 from click.testing import Result
 
 
 def rendered(result: Result) -> str:
     """Flatten the wrapped command display for substring assertions."""
     return " ".join(result.output.replace("\\", " ").split())
-
-
-def test_deploy_symlink_init(project_factory):
-    project = project_factory()
-    result = project.invoke("deploy", "-m", "symlink", "init", "dev")
-    assert result.exit_code == 0, result.output
-
-
-def test_deploy_rename_init(project_factory):
-    project = project_factory()
-    result = project.invoke(
-        "deploy", "-m", "rename", "init", "dev", "public_html"
-    )
-    assert result.exit_code == 0, result.output
 
 
 def test_single_uses_the_configured_servers(project_factory):
@@ -59,16 +44,6 @@ def test_action_local_honors_dry_run(project_factory):
     result = project.invoke("action", "local", "hello")
     assert result.exit_code == 0, result.output
     assert not (project.path / "action-ran").exists()
-
-
-@pytest.mark.xfail(
-    strict=True, reason="N8: deploy local init creates dist/ without --real"
-)
-def test_deploy_local_init_honors_dry_run(project_factory):
-    project = project_factory()
-    result = project.invoke("deploy", "-m", "local", "init", "dev")
-    assert result.exit_code == 0, result.output
-    assert not (project.path / "dist").exists()
 
 
 def test_db_pull_renders_a_valid_mysqldump_command(project_factory):

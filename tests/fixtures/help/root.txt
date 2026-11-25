@@ -18,5 +18,4 @@ Commands:
   info    View or edit the config file.
   check   Test server settings in config.
   action  Run a pre defined command on the server.
-  deploy  [Group] Deploy site to server with rollback.
   misc    [Group] Misc stuff.

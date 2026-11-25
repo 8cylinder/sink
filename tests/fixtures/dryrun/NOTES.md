@@ -27,10 +27,6 @@ $ sink <args>
 | `db-pull.txt` | `db pull dev` | 0 | **Known bug (N13).** Rendered `mysqldump` includes `--dry-run`, which `mysqldump` does not support. Timestamp in the generated filename is captured at run time. |
 | `db-put.txt` | `db put dev project/index.html` | 0 | Renders `pv ... \| ssh ... gunzip -c \| mysql`. |
 | `diff.txt` | `diff dev project/index.html` | 0 | Renders `rsync --compare-dest` then `git diff \| less`. Temp dir name is random per run. |
-| `deploy-symlink-init.txt` | `deploy -m symlink init dev` | 1 | **Crash (B1).** `AttributeError: 'DeployViaSymlink' object has no attribute 'ssh'` at `sink/deploy.py:225`. Traceback in the fixture file. |
-| `deploy-rename-init.txt` | `deploy -m rename init dev public_html` | 1 | **Crash (B1).** `AttributeError: 'DeployViaRename' object has no attribute 'ssh'` at `sink/deploy.py:90`. Traceback in the fixture file. |
-| `deploy-local-init.txt` | `deploy -m local init dev` | 0 | **Known bug (N8).** Creates `dist/` even without `--real`, and prints only `Warning: DIST (dist) dir does not exist, creating it.` with no rendered command. `dist/` removed after capture so the run is repeatable. |
-| `deploy-local-new.txt` | `deploy -m local new dev` | 0 | Renders `rsync --archive --verbose --dry-run`. Destination dir name contains a generated codename and timestamp. |
 | `check.txt` | `check dev` | 0 | Executes the three `ssh` probes against the stubs (see `stub.log`); output contains spinner backspace characters. |
 
 ## Nondeterministic content
@@ -40,7 +36,6 @@ normalization before being used as golden files:
 
 - `db-pull.txt`: generated SQL filename timestamp (`demo-dev-YY-MM-DD_HH-MM-SS.sql.gz`).
 - `diff.txt`: `mktemp`-style directory name (`/tmp/tmpXXXXXXXX [dev]`).
-- `deploy-local-new.txt`: generated codename + ISO timestamp directory.
 - `check.txt`: spinner control characters (`\x08`).
 
 Absolute paths also embed `/tmp/sink-stage0/project`, the scratch fixture root.

@@ -1,2 +1,0 @@
-+ rsync --dry-run --archive --verbose --include .env.dev --include robots.txt.dev --include .htaccess.dev --exclude .env --exclude .git --exclude storage/logs <PROJECT_ROOT>/ <CONFIG_DIR>/dist/dev--<DEPLOY_STAMP>
-[Success (DRY RUN)] dev: upload complete

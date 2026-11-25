@@ -7,7 +7,6 @@ from helpers import combined, commands_named, unwrap
 EXTRA_SERVER = {
     "prod": {
         "root": "/var/www/prod",
-        "deploy_root": "/var/www/deploys",
         "default": False,
         "automatic": True,
         "warn": False,

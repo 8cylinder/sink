@@ -23,10 +23,6 @@ class TransferError(CommandError):
     """An rsync/ssh transfer failed."""
 
 
-class DeployError(CommandError):
-    """A deploy action failed."""
-
-
 class NotFoundError(SinkError):
     """A requested value or resource does not exist."""
 

@@ -96,13 +96,17 @@ Traceback (most recent call last):
 TypeError: expected string or bytes-like object
 #+end_src
 
-*** TODO Put DEPLOY-INFO.yaml in site root
-We don't always have permisssion to put it the parent dir
+*** DONT-DO Put DEPLOY-INFO.yaml in site root
+CLOSED: [2026-11-25 Wed]
+The deploy workflow was removed (D11).
 
-*** TODO Exclude DEPLOY-INFO.yaml when using normal file transfers
+*** DONT-DO Exclude DEPLOY-INFO.yaml when using normal file transfers
+CLOSED: [2026-11-25 Wed]
+The deploy workflow was removed (D11).
 
-*** TODO Deploy warnings unnecessarily occur multiple times
-For sites that have =warn: true=
+*** DONT-DO Deploy warnings unnecessarily occur multiple times
+CLOSED: [2026-11-25 Wed]
+The deploy workflow was removed (D11).
 
 *** TODO Check more values
 - rsync_binary
@@ -253,7 +257,10 @@ Add the ability to run local actions as well as remote ones.  Would be
 best if yaml values could be used in the command.  If not, probably
 not worth it.
 
-*** MAYBE Local deploy
+*** DONT-DO Local deploy
+CLOSED: [2026-11-25 Wed]
+The deploy workflow was removed (D11).
+
 Do a local deploy to a dist dir with rsync --link-dest to create a dir
 with numbered/dated hardlinked dirs.
 

@@ -1,8 +1,5 @@
 """Build and run rsync transfers."""
 
-import glob
-import os
-import re
 import shlex
 import sys
 import tempfile
@@ -101,69 +98,6 @@ class Transfer:
         if isinstance(extra_flags, str):
             return tuple(shlex.split(extra_flags))
         return tuple(extra_flags)
-
-    def _hard_link_flag(self, dest, server_name):
-        """Find the newest deploy for ``--link-dest``."""
-        parent = dest.parent
-        dirs = glob.glob(f"{parent.absolute()}/{server_name}*")
-        if not dirs:
-            return None
-        last = Path(next(sorted(dirs, reverse=True)))
-        return last.absolute()
-
-    def _find(self, name, path):
-        """Find a file by name under a directory."""
-        for root, _dirs, files in os.walk(path):
-            if name in files:
-                return Path(root, name)
-        return None
-
-    def local(self, source, dest):
-        """Copy into a local deploy directory."""
-        p = self.project
-        server = self.server
-        rsyncb = p.rsync_binary
-        excluded = self._excluded()
-
-        included_list = [
-            f".env.{server.name}",
-            f"robots.txt.{server.name}",
-            f".htaccess.{server.name}",
-        ]
-
-        hard_link_flag = self._hard_link_flag(dest, server.name)
-
-        argv = [rsyncb, "--archive", "--verbose"]
-        if hard_link_flag:
-            argv.extend(["--link-dest", str(hard_link_flag)])
-        for include in included_list:
-            argv.extend(["--include", include])
-        for exclude in excluded:
-            argv.extend(["--exclude", exclude])
-        argv.extend([f"{source}/", str(dest)])
-
-        command = Argv(tuple(argv), dry_run_flag="--dry-run")
-        self.run(
-            command,
-            single=False,
-            action=Action.PUT,
-            server=server,
-            remotef=dest,
-            localf=source,
-        )
-
-        # make symlinks to included files or rename them by dropping the
-        # .server suffix
-        if self.real:
-            for name in included_list:
-                conf_file = self._find(name, dest)
-                if conf_file:
-                    base_name = re.sub(rf"\.{server.name}$", "", str(conf_file))
-                    base_name = Path(base_name)
-                    base_name.symlink_to(conf_file.name)
-                    print(
-                        f"Symlink created to {conf_file.name} from {base_name}"
-                    )
 
     def diff_multiple_servers(self, local_file, servers):
         # for server in servers:
