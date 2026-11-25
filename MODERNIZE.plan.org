@@ -95,6 +95,35 @@
   None.  All structural decisions are closed; remaining choices are ordinary
   implementation details inside the stages.
 
+* Resume here (handoff 2026-11-25)
+  - Branch =modernize=; last implementation commit =f1a4899= (Stage 2
+    docs).  The pre-modernization tag is =baseline-2026-11-25= at =064973c=.
+  - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
+    gates).  Next: Stage 3 (test harness).
+  - From a fresh clone:
+    #+begin_src bash
+    git switch modernize
+    uv sync --all-groups
+    uv run pytest -q
+    make check
+    #+end_src
+    =make ci= also runs the full-history gitleaks scan; install
+    =gitleaks >= 8.19= first (CI uses 8.30.1).
+  - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
+    needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
+    cache was read-only; a normal machine does not.
+  - Current test baseline: 5 passed, 11 strict =xfail=, branch coverage
+    38.88%, =fail_under = 35=; =ty= has 0 errors and 37 warnings
+    (exit-zero-on-warning until Stage 10).
+  - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
+    no =vm= group.  License =GPL-2.0-only=.
+  - Open follow-ups: first GitHub Actions run is pending a push;
+    =.github/CODEOWNERS= defaults to =@8cylinder= (confirm); repository
+    security settings still need admin approval.
+  - Test-first rule: see Stage 3.  Every Stage 3+ fix is a =test= commit
+    with a strict =xfail=, followed by a =fix= commit that removes the
+    marker.
+
 * Baseline (verified 2026-11-25)
 ** Repository and environment
    - =pyproject.toml= is Poetry-only: =name = "sink"=, =version = "0.2.1"=,
@@ -473,6 +502,35 @@ Build the safety net the original code never had, before the behavioral
 refactors.  Tests must be hermetic: no real home directory, network, rsync, ssh,
 or mysql.
 
+** Test-first workflow (required from Stage 3 onward)
+   The goal is to prove a test failed before the fix, while keeping every
+   commit bisectable (no red commits in history).
+
+   1. Write the test from this plan, =TODO.org=, and the public CLI contract,
+      not from the implementation.  Assert public behavior: exit code, output,
+      generated command text, and files created/not created.
+   2. *Test commit*: add the test marked
+      =@pytest.mark.xfail(strict=True, reason="Bxx: ...")= and commit it.
+      =make check= stays green because the failure is expected.
+   3. *Red proof*: run the new test with
+      =pytest --runxfail -q <nodeid>= (or temporarily remove the marker in the
+      working tree) and confirm it fails at the intended assertion, not on an
+      import, fixture, or typo.  Record that reason in the commit message or
+      stage log.
+   4. *Fix commit*: implement the change, remove the =xfail= marker, run the
+      test green, and run =make check=.
+   5. Characterization and refactor tests are the exception: they encode
+      current behavior and pass from the start.  Commit them before the
+      refactor and keep them green.
+   6. Never rewrite an existing assertion to match current output unless this
+      plan says the behavior changes.  Make that a separate =test:= commit with
+      the reason.
+   7. For high-risk fixes, use a separate test-author context that reads only
+      this plan and the public CLI contract, not =src/sink=.
+
+   =strict=True= matters: if a stale =xfail= starts passing, pytest reports
+   XPASS and fails the suite, forcing the marker to be removed.
+
 ** Tasks
 - [ ] =tests/conftest.py=: a temporary project fixture that writes a
       =sink.yaml=, sets =HOME=, =XDG_CONFIG_HOME=, and =XDG_DATA_HOME=
@@ -494,12 +552,24 @@ or mysql.
       a network; skip them by default.
 - [ ] Keep the Stage 0 =xfail= tests; each later stage removes the
       marker when it fixes the bug.
+- [ ] Add passing entrypoint tests: =sink vm= is gone, =--version=
+      matches =pyproject.toml=, =python -m sink= works, and every help
+      command exits 0 with no ANSI.
+- [ ] Add passing characterization tests for the current dry-run command
+      text for =file=, =db=, =deploy=, =diff=, and =single=; normalize
+      paths and temp names.
+- [ ] Add red strict-=xfail= tests for unsupported behavior not yet
+      covered: optional =file= server, =diff= exit status, =ssh= default
+      dry-run, deploy warning dedupe, =db= input validation, and
+      lando/ddev paths.
 
 ** Exit criteria
 - =uv run pytest= passes on the unmodified code (expected failures are
       explicit =xfail=).
 - No test reads the real home directory or network.
 - Coverage is measured and reported; the ratchet baseline is recorded.
+- Every Stage 3+ fix has a =test:= commit with a strict =xfail= before
+      its =fix:= commit, and the =--runxfail= red proof is recorded.
 
 * Stage 4 - Execution layer and secret handling                                 :stage_4:
 ** Goal
