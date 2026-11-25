@@ -18,7 +18,8 @@
   with the key and value in different colors. Probe errors print a compact
   indented `[Error]` line without surrounding blank lines. Database status
   lines include the username so multiple entries for the same database are
-  distinguishable.
+  distinguishable. Diagnostic labels read `[Warning]` and `[Notice]` without
+  a trailing colon inside the brackets.
 - The source tree is fully annotated and type-checked with `ty` without
   warning downgrades. Ruff now enforces `ANN`, `PTH`, `DTZ`, `RET`, and
   `ARG`, and branch coverage is gated at 90%.
