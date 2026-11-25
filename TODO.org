@@ -300,3 +300,16 @@ sink deploy clean  # rsync --delete?
 *** DONE Allow multiple ssh accounts
 CLOSED: [2022-11-11 Fri 10:29]
 Make the same as db, check each one, but only use the first one for actions
+
+* Backlog
+  Items that remain intentionally out of scope for the 0.3.0 modernization.
+
+  | Item | Notes |
+  |------+-------|
+  | External exclusion files | MAYBE; see detailed notes above. |
+  | DB download details | MAYBE; save metadata beside the dump. |
+  | Upload a bashrc for ssh sessions | MAYBE; for restricted servers. |
+  | Custom db pull filename | MAYBE; token-based names. |
+  | Pre-pull before put | MAYBE; protect project config files. |
+  | click-option-group | Not needed for the current command tree. |
+  | Laravel Forge plugin | Out of scope. |

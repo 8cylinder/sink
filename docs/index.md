@@ -15,7 +15,10 @@ development
 ## Quick start
 
 ```console
-uv tool install sink
+git clone git@github.com:8cylinder/sink.git
+cd sink
+uv sync --all-groups
+uv tool install --editable .
 sink misc init > sink.yaml
 sink -h
 ```

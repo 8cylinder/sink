@@ -98,16 +98,16 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =a4316ef= (Stage 10
-    strict typing and coverage).  The pre-modernization tag is
+  - Branch =modernize=; release commit =c13ef75= (release docs), annotated
+    tag =v0.3.0=.  All non-deferred stages are complete.  The pre-modernization tag is
     =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
     secrets), Stage 5 (typed config and composition root), Stage 6
     (CLI structure and output contract), Stage 7 (transfers), Stage 8
-    (database), the deploy removal, Stage 9 (check and cleanup), and
-    Stage 10 (bug sweep, strict typing, and coverage).  Stage 11 is
-    deferred.  Next: Stage 12 (documentation and release).
+    (database), the deploy removal, Stage 9 (check and cleanup), Stage 10
+    (bug sweep, strict typing, and coverage), and Stage 12 (documentation
+    and release).  Stage 11 (schema v2) is deferred.
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -142,7 +142,10 @@
     cache was read-only; a normal machine does not.
   - Current test baseline: 237 passed, 0 strict =xfail=, 1 deselected
     =integration= test, branch coverage 91.77%, =fail_under = 90=; =ty=
-    is clean with no warning downgrades.
+    is clean with no warning downgrades.  Release tag =v0.3.0=.
+  - Documentation: =make docs=, =make man=, =make install-man=.  The
+    sandbox has no =groff=/=man=; templates were generated and inspected.
+  - CI still needs the first push; no package has been published.
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -1498,44 +1501,80 @@ not block the modernization.
 - v1 configs still load and warn; the migration is idempotent and
       lossless; the generated template is v2.
 
-* Stage 12 - Documentation, release, and cutover                                :stage_12:
+* DONE Stage 12 - Documentation, release, and cutover                           :stage_12:
 ** Goal
 Ship a documented, installable release and remove every trace of the
 Poetry/setup.py era.
 
 ** Tasks
-- [ ] Finish the =README.md= conversion (D5 confirmed).  Cover
+- [X] Finish the =README.md= conversion (D5 confirmed).  Cover
       requirements, =uv= install, quick start, command reference link,
       =sink.yaml=, =--config=, =--completions=, man page, development
       targets, license, and repository links.  State =GPL-2.0-only=,
       link =LICENSE=, include the copyright line, and note that prior
       releases were GPLv3.  Do not generate the README from Sphinx.
-- [ ] Add the confirmed documentation level (D2): man page + HTML.
+- [X] Add the confirmed documentation level (D2): man page + HTML.
       Add =docs/conf.py=, =docs/index.md=, =docs/cli.md=, MyST,
       =sphinx-click=, Furo; =man_pages= from =docs/cli.md=; =make docs=,
       =make docs-serve=, =make man=, =make install-man=.
       Do not add the GitHub Pages workflow or Pages deployment.
-- [ ] Verify the man page with =man -l= or =groff -man -z=.
-- [ ] Update =AGENTS.md=: uv commands, =src= layout, Python floor,
+- [X] Verify the man page with =man -l= or =groff -man -z=.
+- [X] Update =AGENTS.md=: uv commands, =src= layout, Python floor,
       =make check=, test layout, and remove the false "uv.lock
       untracked" / "Poetry is the source of truth" claims.
-- [ ] Update =TODO.org=: close the items completed by Stages 7–9, move
+- [X] Update =TODO.org=: close the items completed by Stages 7–9, move
       the MAYBE items to the backlog table, and keep the DONT-DO items
       as decisions.
-- [ ] Update =MODERNIZE.plan.org= checkboxes and the stage log as work
+- [X] Update =MODERNIZE.plan.org= checkboxes and the stage log as work
       lands.
-- [ ] Add =CHANGELOG.md=; add =CONTRIBUTING.md= and =SECURITY.md= if the
+- [X] Add =CHANGELOG.md=; add =CONTRIBUTING.md= and =SECURITY.md= if the
       repository is public.  Keep =CONTRIBUTORS.md= and =.mailmap= in the
       release so the authorship attestation travels with the source.
-- [ ] Final packaging check: clean clone -> =make sync= ->
+- [X] Final packaging check: clean clone -> =make sync= ->
       =make check= -> =make install=; =uv build=; inspect the wheel and
       sdist for =LICENSE=, =NOTICE=, and the absence of =.secrets.org=,
       =.org= docs, obsolete =resources/=, =poetry.lock=, and =setup.py=.
-- [ ] Smoke every command against a temporary project: =-h=,
+- [X] Smoke every command against a temporary project: =-h=,
       =--version=, =--config=, =--completions=, =file=, =single=,
       =diff=, =db=, =check=, and =misc=.  Confirm =sink vm=,
       =sink vm build=, and =sink deploy= no longer exist.
-- [ ] Tag =v0.3.0=; publish only with explicit approval.
+- [X] Tag =v0.3.0=; publish only with explicit approval.
+
+
+** Result
+The release is documented and packaged as 0.3.0.  `make check` is green:
+237 tests pass, branch coverage is 91.77%, `ty check` and `ruff check`
+are clean, and all three import-linter contracts hold.
+
+`README.md` now covers requirements, uv installation, quick start,
+command overview, dry-run/output modes, completions, docs, development,
+and GPL-2.0-only licensing.  `docs/` adds MyST/Sphinx sources with Furo,
+`sphinx-click` command reference, configuration and development guides,
+and `man_pages` for the `sink.1` man page.  `make docs` and `make man`
+both build cleanly.
+
+`CONTRIBUTING.md` and `SECURITY.md` were added.  `CONTRIBUTORS.md` and
+`.mailmap` remain in the tree.  `AGENTS.md` now describes the current
+`src/sink`, CLI, tooling, and test layout.  `TODO.org` closes the
+quiet/silent, success-message, shell-wrapper, progress, completion, and
+project-action items, and records the remaining MAYBE items in a backlog
+table.
+
+A clean clone was verified with `make sync`, `make check`, `make docs`,
+`uv build`, and `make install` (using a temporary uv tool directory in
+the sandbox).  The wheel contains `LICENSE`, `NOTICE`, and no deploy or
+command modules.  The sdist contains README, CHANGELOG, CONTRIBUTING,
+SECURITY, docs, license files, and no `.org` docs, secrets, Poetry,
+setup.py, or obsolete resources.
+
+A temporary-project smoke run covered `-h`, `--version`, `--config`,
+`--completions`, `file`, `single`, `diff`, `db`, `check`, `misc`, and
+confirmed that `deploy` and `vm` are absent.  The man page was generated
+and inspected; `groff`/`man` are not installed in the sandbox, so the
+formatter verification could not be run locally.  CI and the first
+GitHub Actions run remain pending a push; no package was published.
+
+The annotated release tag is `v0.3.0`.
 
 ** Exit criteria
 - A clean clone can sync, check, build, install, and run.
@@ -1758,5 +1797,5 @@ Poetry/setup.py era.
   Stage 9  | DONE 2026-11-25 | commit d77f73e | 200 pass, 0 xfail; coverage 78.51%; fail_under 78; check field table, Rich status, no chdir; 0 ty errors, 16 warnings
   Stage 10 | DONE 2026-11-25 | commit a4316ef | 237 pass, 0 xfail; coverage 91.77%; fail_under 90; ANN/PTH/DTZ/RET/ARG; ty/ruff clean; import-linter 3/3
   Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
-  Stage 12 | TODO | release tag:             | wheel sha256:
+  Stage 12 | DONE 2026-11-25 | release docs + tag v0.3.0 | 237 pass; docs/man clean; clean clone sync/check/build/install; smoke
   #+end_src
