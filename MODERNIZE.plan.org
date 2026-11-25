@@ -96,12 +96,13 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =78b5dd6= (Stage 4
-    packaging).  The pre-modernization tag is =baseline-2026-11-25= at
-    =064973c=.
+  - Branch =modernize=; last implementation commit =ec79862= (Stage 5
+    typed config and Runtime).  The pre-modernization tag is
+    =baseline-2026-11-25= at =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
     gates), Stage 3 (test harness), Stage 4 (execution layer and
-    secrets).  Next: Stage 5 (typed config and composition root).
+    secrets), Stage 5 (typed config and composition root).  Next:
+    Stage 6 (CLI structure and output contract).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
@@ -109,6 +110,8 @@
   - Stage 4 commits: =ccb5876= (execution/secret contract tests),
     =8d366b4= (shell layer, credentials, argv migration), =e1ff40e=
     (local MYSQL_PWD display), =78b5dd6= (sdist changelog).
+  - Stage 5 commits: =87e0626= (structural contract tests), =ec79862=
+    (typed models, pure loader, Runtime migration).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -121,9 +124,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 100 passed, 23 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 61.93%, =fail_under = 55=; =ty=
-    has 0 errors and 33 warnings (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 132 passed, 15 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 66.42%, =fail_under = 60=; =ty=
+    has 0 errors and 22 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -717,7 +720,7 @@ Stage 9.
 - No generated command, log line, or argv contains a password or key.
 - Golden tests pin the exact copy-pasteable text for every command.
 
-* Stage 5 - Typed config and composition root                                   :stage_5:
+* DONE Stage 5 - Typed config and composition root                              :stage_5:
 ** Goal
 Replace the mutable global =config= and =Dict2obj= with immutable
 dataclasses, a pure loader, and a single injected =Runtime=.
@@ -924,31 +927,71 @@ def load(bootstrap: Bootstrap) -> Config: ...
 this only for a genuine selector-inside-the-config case.
 
 ** Migration tasks
-- [ ] Add =src/sink/config/models.py= (=Project=, =Server=,
+- [X] Add =src/sink/config/models.py= (=Project=, =Server=,
       =SSHConfig=, =DatabaseConfig=, =URLConfig=, =ActionConfig=,
       =Config=; all =frozen=True, slots=True=).
-- [ ] Add =src/sink/config/loader.py= (=find_config=, =load=, validation,
+- [X] Add =src/sink/config/loader.py= (=find_config=, =load=, validation,
       path/ssh-key resolution, =${ENV_VAR}=, default-server selection).
-- [ ] Add =src/sink/errors.py= (=SinkError=, =ConfigError=,
+- [X] Add =src/sink/errors.py= (=SinkError=, =ConfigError=,
       =CommandError=, =TransferError=, =DeployError=, =NotFoundError=,
       =NoDefaultServer=, =UnknownServer=, =NotInProject=).
-- [ ] Add =src/sink/runtime.py= (=Runtime=, lazy cached =config=,
+- [X] Add =src/sink/runtime.py= (=Runtime=, lazy cached =config=,
       consoles, =quiet=, =suppress_commands=).
-- [ ] Keep a temporary =Configuration= adapter around =Config= while
+- [X] Keep a temporary =Configuration= adapter around =Config= while
       commands are converted; delete it before the stage exits.
-- [ ] Convert command modules to =@click.pass_obj= and narrow feature
+- [X] Convert command modules to =@click.pass_obj= and narrow feature
       arguments; use =ctx.meta= for nested group options.
-- [ ] Delete =Dict2obj=, the =config= singleton, =to_dict=,
+- [X] Delete =Dict2obj=, the =config= singleton, =to_dict=,
       =syncpoint=, and every =config.load_config()= call.
-- [ ] Make =excluded()= return =tuple[str, ...]=; make =server.databases=
+- [X] Make =excluded()= return =tuple[str, ...]=; make =server.databases=
       and =server.ssh= tuples.
-- [ ] Add =import-linter= with the layering contract: =sink.cli= ->
+- [X] Add =import-linter= with the layering contract: =sink.cli= ->
       =sink.runtime=; feature modules -> =sink.config.models=; only
       =sink.runtime= -> =sink.config.loader=.
-- [ ] Add loader tests (valid, invalid, missing, unknown keys, env vars,
+- [X] Add loader tests (valid, invalid, missing, unknown keys, env vars,
       relative paths, ssh keys, default server) and Runtime tests.
-- [ ] Add a test that builds a =Config= literal and injects it through
+- [X] Add a test that builds a =Config= literal and injects it through
       =CliRunner(obj=...)=; no global reset or monkeypatching.
+
+
+** Result
+132 tests pass, 15 are strict =xfail=, and the integration test is
+deselected; branch coverage is 66.42% with =fail_under = 60= (the Stage 6
+target was reached during the refactor).  =make check= is green with 0
+=ty= errors and 22 warnings.  =uv run lint-imports= keeps all three
+contracts: Runtime sits above the loader, only Runtime directly imports
+the loader, and the models do not depend on the loader or Runtime.
+
+=src/sink/config/models.py= defines frozen, slotted =Project=,
+=Server=, =SSHConfig=, =DatabaseConfig=, =URLConfig=, =ActionConfig=,
+and =Config=.  =src/sink/config/loader.py= is the only YAML reader:
+it expands =${ENV_VAR}=, validates types and required keys, resolves
+relative paths and ssh keys, collects unknown-key and missing-key
+warnings, and selects the default server.  =src/sink/runtime.py= owns
+the lazily loaded, cached config and emits loader warnings once.
+
+The mutable =config= singleton, =Configuration=, =Dict2obj=,
+=load_config()=, =syncpoint=, and the old =config.py= module are gone.
+Every command receives =Runtime= through =ctx.obj=; the deploy group
+stores its method in =ctx.meta=.  Feature constructors now take narrow
+values: =Transfer(Project, Server)=, =DB(Project, Server)=,
+=SSH(Server)=, =Actions(Project, Server | None)=, and
+=Applications(Config)=.  =single= iterates automatic servers and no
+longer requires a default server; the deploy rename/symlink init paths
+also stopped using =self.ssh= before assignment.
+
+=import-linter= is configured in =pyproject.toml= and =make check= now
+runs the =arch= target.  =tests/test_loader_api.py=,
+=tests/test_runtime.py=, and =tests/test_composition.py= cover the
+models, loader, lazy Runtime, injected =CliRunner(obj=...)=, and the
+constructor boundaries.  The old global-reset fixture was removed from
+=tests/conftest.py=.
+
+Deviations: the root =--config= and =--completions= flags still land in
+Stage 6, as originally scheduled; the Runtime architecture already keeps
+them config-free.  =file= still requires an explicit server (B16, Stage
+7), =deploy init= still writes without =--real= (N8, Stage 9), and
+secret redaction in =misc api=/=misc settings= remains Stage 6.
 
 ** Exit criteria
 - Zero =Dict2obj= references; no module-level config instance; no
@@ -1495,7 +1538,7 @@ Poetry/setup.py era.
   Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
   Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
   Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
-  Stage 5  | TODO | Dict2obj refs: 0         | loader tests:
+  Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
   Stage 6  | TODO | commands split:          | help tests:
   Stage 7  | TODO | transfer tests:          | single repro:
   Stage 8  | TODO | db tests:                | pv:
