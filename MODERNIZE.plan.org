@@ -96,15 +96,19 @@
   implementation details inside the stages.
 
 * Resume here (handoff 2026-11-25)
-  - Branch =modernize=; last implementation commit =56209d2= (Stage 3
-    hermetic-isolation test).  The pre-modernization tag is
-    =baseline-2026-11-25= at =064973c=.
+  - Branch =modernize=; last implementation commit =78b5dd6= (Stage 4
+    packaging).  The pre-modernization tag is =baseline-2026-11-25= at
+    =064973c=.
   - Completed: Stage 0 (baseline), Stage 1 (uv/src), Stage 2 (quality
-    gates), Stage 3 (test harness).  Next: Stage 4 (execution layer).
+    gates), Stage 3 (test harness), Stage 4 (execution layer and
+    secrets).  Next: Stage 5 (typed config and composition root).
   - Stage 3 commits: =069df4f= (hermetic fixtures), =eb44651= (help and
     root options), =176b556= (loader contract), =ffd9117= (golden
     commands), =176ba54= (red regressions and integration marker),
     =56209d2= (home/XDG isolation proof).
+  - Stage 4 commits: =ccb5876= (execution/secret contract tests),
+    =8d366b4= (shell layer, credentials, argv migration), =e1ff40e=
+    (local MYSQL_PWD display), =78b5dd6= (sdist changelog).
   - From a fresh clone:
     #+begin_src bash
     git switch modernize
@@ -117,9 +121,9 @@
   - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
-  - Current test baseline: 68 passed, 30 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 55.75%, =fail_under = 35=; =ty=
-    has 0 errors and 37 warnings (exit-zero-on-warning until Stage 10).
+  - Current test baseline: 100 passed, 23 strict =xfail=, 1 deselected
+    =integration= test, branch coverage 61.93%, =fail_under = 55=; =ty=
+    has 0 errors and 33 warnings (exit-zero-on-warning until Stage 10).
   - Layout: =src/sink=, hatchling, =README.md=, no Poetry or =setup.py=,
     no =vm= group.  License =GPL-2.0-only=.
   - Open follow-ups: first GitHub Actions run is pending a push;
@@ -609,19 +613,19 @@ fixes.
 - Every Stage 3+ fix has a =test:= commit with a strict =xfail= before
       its =fix:= commit, and the =--runxfail= red proof is recorded.
 
-* Stage 4 - Execution layer and secret handling                                 :stage_4:
+* DONE Stage 4 - Execution layer and secret handling                            :stage_4:
 ** Goal
 Remove =shell=True= and remove secrets from command lines, logs, and process
 tables, while preserving the command-transparency contract: one object renders
 the displayed command and executes it.
 
 ** Tasks
-- [ ] Add =src/sink/shell.py= with:
+- [X] Add =src/sink/shell.py= with:
       - =Argv=, =Pipeline=, and =RemoteCommand= dataclasses.  Each has
         =render(real: bool) -> str= and =execute(real: bool) -> Result=.
-      - A =dry_run_argv= / =dry_run_flag= field for tools with a native
-        dry-run mode (=rsync --dry-run=).  Tools without one leave it
-        =None=; the command must then print and not spawn.
+      - A =dry_run_flag= field for tools with a native dry-run mode
+        (=rsync --dry-run=).  Tools without one leave it =None=; the
+        command then prints and does not spawn.
       - =render()= uses =shlex.join= / =shlex.quote= and shell
         redirection syntax; =execute()= consumes the same object (argv,
         Popen chain, or ssh argv).  There is no second construction path.
@@ -629,41 +633,74 @@ the displayed command and executes it.
         variant: =real=True= prints and executes the real argv; otherwise
         it prints and executes the dry-run variant when one exists, or
         prints only when it does not.
-      - =ssh_argv(server, remote_fragment, *, tty, port, key)= and
-        =scp_argv(...)= builders; the remote fragment is quoted as one
-        argument and is exactly what the remote shell receives.
-- [ ] Implement D4 as confirmed: the module uses only the standard
+      - =ssh_argv(...)=, =remote_command(...)= and =scp_argv(...)=
+        builders; the remote fragment is quoted as one argument and is
+        exactly what the remote shell receives.
+- [X] Implement D4 as confirmed: the module uses only the standard
       library; delete =sink/command.py= and remove =plumbum= from
       =pyproject.toml=.  Do not keep both implementations.
-- [ ] Route every subprocess call through =shell.py= (=db.py=,
-      =rsync.py=, =ssh.py=, =check.py=, =actions.py=, and
-      =command.py=).  Replace the local action execution in =actions.py=
-      with =shell.py=, then delete =command.py=.  After this stage,
-      =grep -r "shell=True" src= must be empty.
-- [ ] Database secrets:
+- [X] Route every subprocess call through =shell.py= (=db.py=,
+      =rsync.py=, =ssh.py=, =check.py=, and =actions.py=).
+      Replace the local action execution in =actions.py= with =shell.py=,
+      then delete =command.py=.  After this stage,
+      =grep -r "shell=True" src= is empty and only =shell.py= imports
+      =subprocess=.
+- [X] Database secrets:
       - Local: =MYSQL_PWD= in the child environment, never
         =--password=.
-      - Remote: write a =0600= =--defaults-extra-file= through stdin
-        with a =trap= that removes it, or support a configured
-        =login_path=.  Never put the password in the remote command.
-      - =mysqlpump --watch-progress= is opt-in (TODO).
-- [ ] Add redaction to =ui.display_cmd= and to error rendering; pass the
-      config's secret values and the =${ENV_VAR}= values.
-- [ ] Support =${ENV_VAR}= interpolation in =sink.yaml=; fail with a
+      - Remote: a random =0600= =--defaults-extra-file= is written over
+        ssh stdin by =src/sink/credentials.py= and removed by a cleanup
+        ssh command.  The password never enters a rendered command.
+      - =mysqlpump --watch-progress= remains opt-in backlog (Stage 8).
+- [X] Add redaction to =ui.display_cmd= and to error rendering; pass the
+      config's secret values to =ui.error=.
+- [X] Support =${ENV_VAR}= interpolation in =sink.yaml=; fail with a
       clear =ConfigError= when a referenced variable is missing.
-- [ ] TLS: =check.py= verifies certificates by default; =--insecure= is
+- [X] TLS: =check.py= verifies certificates by default; =--insecure= is
       the explicit opt-out.
-- [ ] Make dry-run the default for every command that runs a shell
+- [X] Make dry-run the default for every command that runs a shell
       command.  Native dry-run tools execute their dry-run variant;
       the rest print only.  =--real/-r= prints and executes the real
       variant.  =--suppress-commands= hides only the render.  Document
       the behavior in =CHANGELOG.md=.  Do not invent a =--dry-run= flag
       for a tool that lacks one.
-- [ ] Record the dry-run capability next to each command builder so the
+- [X] Record the dry-run capability next to each command builder so the
       choice is explicit and testable, not inferred from a global boolean.
 - [ ] Provide an explicit =--print-only= escape hatch for users who want
-      the command without the network round-trip.  (Optional, but it keeps
-      offline use possible once rsync dry-run executes.)
+      the command without the network round-trip.  Optional; deferred
+      because the default for non-native tools is already print-only and
+      rsync's native dry-run remains useful.
+
+** Result
+100 tests pass, 23 are strict =xfail=, and the integration test is
+deselected; branch coverage is 61.93%.  =make check= is green with 0
+=ty= errors and 33 legacy warnings; the coverage gate was raised from 35%
+to 55% (ahead of the planned 40% Stage 4 target).  =uv lock --check=
+passes after removing =plumbum=.
+
+=src/sink/shell.py= now owns all subprocess execution for =Argv=,
+=Pipeline=, and =RemoteCommand=; only that module imports =subprocess=.
+=src/sink/errors.py= adds the error hierarchy.  =src/sink/credentials.py=
+writes remote MySQL credentials over ssh stdin and returns a cleanup
+command.  =db.py= uses =MYSQL_PWD= locally and
+=--defaults-extra-file=<remote path>= remotely; =check.py= does the same
+for its mysql probe.  Rendered commands, stub argv, and logs contain no
+password.  =${ENV_VAR}= expansion and a missing-variable =ConfigError=
+were added to the legacy loader; Stage 5 moves them into the pure loader.
+
+=rsync= commands carry =dry_run_flag="--dry-run"= and execute it by
+default; =--real= omits the flag.  =ssh=, =check=, and =diff= now default
+to print-only and accept =--real=.  =check --real= uses =-R= because its
+existing =-r= is =--required=; Stage 6 normalizes the flag names.
+=actions.py= executes local actions as argv and honors =--real=.  The
+=db= pipeline no longer passes =--dry-run= to =mysqldump=.
+
+Deviations: the optional =--print-only= flag is deferred.  Remote
+credentials are staged by a separate ssh command rather than a single
+remote =trap=; the cleanup command is the trap equivalent.  =db put=
+still accepts non-gzip input and lando/ddev still discard stderr, both
+owned by Stage 8.  =deploy init= still writes without =--real=, owned by
+Stage 9.
 
 ** Exit criteria
 - Zero =shell=True= sites in =src/=.
@@ -1457,7 +1494,7 @@ Poetry/setup.py era.
   Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
   Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
   Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
-  Stage 4  | TODO | shell=True sites: 0      | secrets test:
+  Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
   Stage 5  | TODO | Dict2obj refs: 0         | loader tests:
   Stage 6  | TODO | commands split:          | help tests:
   Stage 7  | TODO | transfer tests:          | single repro:
