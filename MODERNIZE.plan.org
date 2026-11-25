@@ -141,8 +141,9 @@
     needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
     cache was read-only; a normal machine does not.
   - Current test baseline: 237 passed, 0 strict =xfail=, 1 deselected
-    =integration= test, branch coverage 91.77%, =fail_under = 90=; =ty=
-    is clean with no warning downgrades.  Release tag =v0.3.0=.
+    =integration= test, branch coverage 91.80%, =fail_under = 90=; =ty=
+    is clean with no warning downgrades.  Release tag =v0.3.0=; the
+    post-release unknown-key change is commit =422c7a3=.
   - Documentation: =make docs=, =make man=, =make install-man=.  The
     sandbox has no =groff=/=man=; templates were generated and inspected.
   - CI still needs the first push; no package has been published.
