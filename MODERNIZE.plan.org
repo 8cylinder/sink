@@ -141,8 +141,8 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 263 passed, 0 strict =xfail=, 50 deselected
-  =integration= tests, branch coverage 93.77%, =fail_under = 90=; =ty=
+- Current test baseline: 264 passed, 0 strict =xfail=, 50 deselected
+  =integration= tests, branch coverage 93.96%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
@@ -1827,7 +1827,7 @@ deviation from this plan.
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
   R-Run    | DONE 2026-11-26 | 37 Docker tests pass on Ubuntu 20.04 and 26.04
   R-Tests2 | WIP  2026-11-26 | 12 new R2/R3/R6/R7 tests (49 total); pending matrix run
-  Interrupt| DONE 2026-11-26 | commit 40f925c | remove rsync .NAME.* temps on SIGINT pull; 263 pass; coverage 93.77%
+  Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | remove rsync .NAME.* temps on failed/interrupted pull; 264 pass; coverage 93.96%
 #+end_src
 
 * Real world testing
@@ -1897,7 +1897,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   overwrite, failed dumps left on disk, and hostile project/server names
   escaping =pulls_dir=.
 - [X] The SIGINT pull test found leftover rsync temp files; interrupted
-  single-file pulls now remove them (commit 40f925c).
+  single-file pulls now remove them (commits 40f925c, fdf8c8d, b7f30cb).
 - [X] First real Docker run on Ubuntu 20.04.
 - [X] The original 37-test Docker suite passes on Ubuntu 20.04 and 26.04.
 - [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
@@ -1924,8 +1924,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =10ccee3= hostile server-name Docker test.
   - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
     read-only-check tests.
-- Unit/stub suite: =263 passed=, =50 deselected=, branch coverage =93.77%=
-  with =make check= green.  Nine safety tests live in
+- Unit/stub suite: =264 passed=, =50 deselected=, branch coverage =93.96%=
+  with =make check= green.  Ten safety tests live in
   =tests/test_safety_contract.py=.
 - Docker suite: 49 tests in =tests/integration= (14 original, 35 new).  The
   37-test suite passed on Ubuntu 20.04 and 26.04; the 12 newest tests await
