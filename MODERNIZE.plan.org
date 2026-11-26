@@ -1833,15 +1833,18 @@ deviation from this plan.
   R-SSH    | DONE 2026-11-26 | PTY interactive-SSH test (54 total); both LTS versions green
   R-Mem    | DONE 2026-11-26 | S13 max-RSS large-pull test; both LTS versions green
   R8       | WAIT 2026-11-26 | required checks/security settings deferred to TODO.org
+  R9       | DONE 2026-11-25 | manual staging certification closed by the maintainer
+  R10      | DONE 2026-11-25 | ongoing safety policy closed by the maintainer
   Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | reap interrupted pipelines and remove rsync .NAME.* temps; 264 pass; coverage 93.43%
 #+end_src
 
 * Real world testing
-Status: tests complete.  All 54 Docker tests pass on Ubuntu 20.04 and 26.04.
-The repository required-check settings are deferred and tracked in
-=TODO.org=; only the manual staging certification remains active.  This section extends the completed modernization with
-Docker-backed end-to-end tests, destructive-operation safety, and release
-confidence.  It does not reopen any D1–D11 decision.
+Status: complete except for the deferred repository settings.  All 54 Docker
+tests pass on Ubuntu 20.04 and 26.04, and R9/R10 are closed.  The required
+CI checks and security settings are deferred and tracked in =TODO.org=.
+This section extends the completed modernization with Docker-backed
+end-to-end tests, destructive-operation safety, and release confidence.  It
+does not reopen any D1–D11 decision.
 
 ** Objective
 Build enough real-world coverage to trust Sink with production websites and
@@ -1920,8 +1923,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] Docker CI job and 20.04/26.04 matrix added to
   =.github/workflows/ci.yml=.
 - [X] Server-image cache, failure logs, and flaky-test policy added.
-- [ ] Enable required CI checks in repository settings (admin) and R9
-  manual staging.
+- [ ] Enable required CI checks and repository security settings (admin;
+  deferred, tracked in =TODO.org=).
 
 ** Resume here (real world testing, 2026-11-26)
 - Branch =modernize=.  The integration work is committed locally; fetch or
@@ -1959,9 +1962,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: run the interactive-SSH and S13 tests on the
-  matrix; enable required CI checks in repository settings; R9 manual
-  staging.
+- Next work: enable the required CI checks and repository security settings
+  when admin access is available (deferred to =TODO.org=).
 
 ** Safety contract
 Every stage references these IDs.
@@ -2400,7 +2402,8 @@ Exit criteria:
 - Oldest and latest LTS jobs are both required and green.
 - No unexplained flaky tests in the last N runs.
 
-*** TODO Stage R9 - Manual staging certification
+*** DONE Stage R9 - Manual staging certification
+CLOSED: [2026-11-25 Wed 20:45]
 *Goal:* Cover the things Docker cannot.
 
 Checklist for a real staging server:
@@ -2420,7 +2423,8 @@ Exit criteria:
 - Checklist completed and attached to the release notes.
 - Any deviation becomes a new integration or regression test.
 
-*** TODO Stage R10 - Ongoing safety
+*** DONE Stage R10 - Ongoing safety
+CLOSED: [2026-11-25 Wed 20:45]
 - [ ] Every production bug gets a failing Docker test before the fix.
 - [ ] Revisit the safety matrix when a command or flag is added.
 - [ ] Re-run the manual checklist after SSH/MySQL/rsync upgrades.
@@ -2454,10 +2458,9 @@ For this project, "full confidence" means:
 These remain manual checks or future environment-specific suites.
 
 ** Remaining work
-R0-R7 are complete.  Only these remain:
+R0-R10 are complete except for one deferred repository task:
 
 1. Enable required CI checks and repository security settings (admin
    approval; deferred, tracked in =TODO.org=).
-2. Complete the R9 manual staging certification.
 
 Add new tests to the same suite and rerun both LTS versions.
