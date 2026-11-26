@@ -73,6 +73,18 @@ def _dump_argv(
 
 
 _TAG_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+_FILENAME_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _filename_component(value: str) -> str:
+    """Turn a project or server name into one safe filename component.
+
+    Names come from the config, so path separators, ``..`` segments, and
+    shell syntax must not reach a filename.  Unsafe runs become ``-`` and
+    the result is always a single component.
+    """
+    slug = _FILENAME_UNSAFE.sub("-", value).strip("-")
+    return slug or "x"
 
 
 def _validate_tag(tag: str | None) -> None:
@@ -323,7 +335,8 @@ class DB:
 
     def make_symlink(self, sqlfile: Path) -> None:
         """Point ``LATEST-<server>.sql.gz`` at the newest dump."""
-        link_name = sqlfile.parent / f"LATEST-{self.server.name}.sql.gz"
+        server = _filename_component(self.server.name)
+        link_name = sqlfile.parent / f"LATEST-{server}.sql.gz"
         with suppress(FileNotFoundError):
             # The latest file may not exist yet.
             link_name.unlink()
@@ -488,5 +501,7 @@ class DB:
         now = datetime.datetime.now(datetime.UTC).astimezone()
         now = now.strftime("%y-%m-%d_%H-%M-%S")
         tag = f"-{tag}" if tag else ""
-        name = f"{project_name}-{id}-{now}{tag}.sql.gz"
+        project = _filename_component(project_name)
+        server = _filename_component(id)
+        name = f"{project}-{server}-{now}{tag}.sql.gz"
         return Path(dirname, name)

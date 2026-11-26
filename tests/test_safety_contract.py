@@ -134,10 +134,6 @@ def test_db_failed_pull_removes_the_partial_dump(tmp_path: Path) -> None:
     assert not partial.exists()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B29: hostile project and server names escape pulls_dir",
-)
 def test_db_dump_path_stays_inside_pulls_for_hostile_names(
     tmp_path: Path,
 ) -> None:
@@ -152,10 +148,6 @@ def test_db_dump_path_stays_inside_pulls_for_hostile_names(
     assert path.resolve(strict=False).parent == pulls.resolve()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B29: a hostile server name breaks or escapes the LATEST link",
-)
 def test_latest_symlink_stays_inside_pulls_for_hostile_server(
     tmp_path: Path,
 ) -> None:
