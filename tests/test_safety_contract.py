@@ -20,10 +20,10 @@ from sink.db import DB
 from sink.shell import Result
 
 
-def _server(warn: bool = False) -> Server:
+def _server(warn: bool = False, name: str = "dev") -> Server:
     """Return a server with one database for direct DB tests."""
     return Server(
-        name="dev",
+        name=name,
         databases=(
             DatabaseConfig(
                 db="demo",
@@ -35,9 +35,9 @@ def _server(warn: bool = False) -> Server:
     )
 
 
-def _project(root: Path) -> Project:
+def _project(root: Path, name: str = "demo") -> Project:
     """Return a project rooted at *root* with a pulls directory."""
-    return Project(name="demo", root=root, pulls_dir=root / "pulls")
+    return Project(name=name, root=root, pulls_dir=root / "pulls")
 
 
 def _gzip_dump(project, name: str = "dump.sql.gz") -> str:
@@ -132,3 +132,42 @@ def test_db_failed_pull_removes_the_partial_dump(tmp_path: Path) -> None:
         db._report_pull(Result(1, "", "boom"), partial, True)
 
     assert not partial.exists()
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="B29: hostile project and server names escape pulls_dir",
+)
+def test_db_dump_path_stays_inside_pulls_for_hostile_names(
+    tmp_path: Path,
+) -> None:
+    pulls = tmp_path / "pulls"
+    pulls.mkdir()
+    project = _project(tmp_path, name="../../project-escape")
+    server = _server(name="../../server-escape")
+    db = DB(project, server)
+
+    path = db._dest(project.name, pulls, server.name, None)
+
+    assert path.resolve(strict=False).parent == pulls.resolve()
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="B29: a hostile server name breaks or escapes the LATEST link",
+)
+def test_latest_symlink_stays_inside_pulls_for_hostile_server(
+    tmp_path: Path,
+) -> None:
+    pulls = tmp_path / "pulls"
+    pulls.mkdir()
+    db = DB(_project(tmp_path), _server(name="../../escape"), real=True)
+    dump = pulls / "dump.sql.gz"
+    dump.write_text("x")
+
+    db.make_symlink(dump)
+
+    links = list(pulls.glob("LATEST-*"))
+    assert len(links) == 1
+    assert links[0].parent == pulls
+    assert links[0].is_symlink()
