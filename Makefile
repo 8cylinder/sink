@@ -39,15 +39,15 @@ test:  ## Run tests
 	uv run pytest
 
 integration:  ## Run Docker tests on the latest Ubuntu LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration --no-cov
+	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration tests/integration --no-cov
 
 integration-oldest:  ## Run Docker tests on the oldest Ubuntu LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration --no-cov
+	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration tests/integration --no-cov
 
 integration-matrix:  ## Run Docker tests on oldest and latest Ubuntu LTS
 	@for version in $(UBUNTU_VERSIONS); do \
 		echo "==> Ubuntu $$version"; \
-		SINK_TEST_UBUNTU=$$version uv run pytest -m integration --no-cov || exit $$?; \
+		SINK_TEST_UBUNTU=$$version uv run pytest -m integration tests/integration --no-cov || exit $$?; \
 	done
 
 integration-down:  ## Remove leftover integration containers

@@ -25,7 +25,7 @@ make integration-matrix   # oldest and latest
 Run one version directly:
 
 ```console
-SINK_TEST_UBUNTU=22.04 uv run pytest -m integration --no-cov
+SINK_TEST_UBUNTU=22.04 uv run pytest -m integration tests/integration --no-cov
 UBUNTU_VERSIONS="20.04 22.04 24.04 26.04" make integration-matrix
 ```
 

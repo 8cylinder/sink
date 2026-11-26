@@ -1786,7 +1786,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv run ty check
 uv run pytest
-uv run pytest -m integration --no-cov  # needs real rsync/ssh/mysql
+uv run pytest -m integration tests/integration --no-cov  # needs real rsync/ssh/mysql
 uv build
 uv tool install --editable --force .
 make check
@@ -2043,15 +2043,15 @@ UBUNTU_LATEST ?= 26.04
 UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
 
 integration:  ## Run integration tests on the latest LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration --no-cov
+	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration tests/integration --no-cov
 
 integration-oldest:  ## Run integration tests on the oldest supported LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration --no-cov
+	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration tests/integration --no-cov
 
 integration-matrix:  ## Run the oldest and latest LTS
 	@for version in $(UBUNTU_VERSIONS); do \
 		echo "==> Ubuntu $$version"; \
-		SINK_TEST_UBUNTU=$$version uv run pytest -m integration --no-cov || exit $$?; \
+		SINK_TEST_UBUNTU=$$version uv run pytest -m integration tests/integration --no-cov || exit $$?; \
 	done
 
 integration-down:  ## Remove leftover integration containers
