@@ -109,13 +109,10 @@ class Transfer:
             remotef = locations["remote"]
 
             # The downloaded file is required for the diff, so the default
-            # mode prints the real transfer instead of rsync's dry run.
-            # compare-dest must be a directory containing the local copy at
-            # the same relative path; passing the file itself makes rsync
-            # compare against a non-directory.
-            compare_to = (
-                local_file if local_file.is_dir() else local_file.parent
-            )
+            # mode prints the real transfer instead of rsync's dry run.  A
+            # single file is always downloaded; using --compare-dest there
+            # would skip identical files and leave git with no temp file.
+            compare_to = local_file if local_file.is_dir() else None
             self._rsync(
                 diffdir,
                 remotef,

@@ -133,17 +133,24 @@ def test_file_pull_directory_is_recursive(project_factory) -> None:
     assert "deploy@example.com:/var/www/demo/sub/" in rsync[0].args
 
 
-def test_diff_compare_dest_is_the_project_directory(project_factory) -> None:
+def test_diff_directory_uses_compare_dest(project_factory) -> None:
     project = project_factory()
 
-    result = project.invoke("diff", "dev", "project/index.html")
+    result = project.invoke("diff", "dev", "project")
 
     text = unwrap(combined(result))
     compare = next(
         token for token in text.split() if token.startswith("--compare-dest=")
     )
     assert compare == f"--compare-dest={project.path / 'project'}"
-    assert "index.html" not in compare
+
+
+def test_diff_single_file_does_not_use_compare_dest(project_factory) -> None:
+    project = project_factory()
+
+    result = project.invoke("diff", "dev", "project/index.html")
+
+    assert "--compare-dest=" not in unwrap(combined(result))
 
 
 def test_ssh_interactive_command_includes_tty_port_and_key(
