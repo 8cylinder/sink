@@ -334,13 +334,21 @@ class DB:
         self._report_pull(result, Path(sqlfile), local)
 
     def make_symlink(self, sqlfile: Path) -> None:
-        """Point ``LATEST-<server>.sql.gz`` at the newest dump."""
+        """Point ``LATEST-<server>.sql.gz`` at the newest dump.
+
+        Concurrent pulls finish at about the same time.  Build the link at a
+        process-unique temporary name and replace the real link atomically so
+        neither pull can observe a missing link or fail with ``FileExistsError``.
+        """
         server = _filename_component(self.server.name)
         link_name = sqlfile.parent / f"LATEST-{server}.sql.gz"
-        with suppress(FileNotFoundError):
-            # The latest file may not exist yet.
-            link_name.unlink()
-        link_name.symlink_to(f"./{sqlfile.name}")
+        temporary = link_name.with_name(f".{link_name.name}.{os.getpid()}.tmp")
+        try:
+            temporary.symlink_to(f"./{sqlfile.name}")
+            temporary.replace(link_name)
+        finally:
+            with suppress(FileNotFoundError):
+                temporary.unlink()
 
     def load_remote(self, source: str | Path) -> None:
         """Load a dump that already exists on the server."""

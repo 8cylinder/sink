@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import datetime
 import gzip
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from typing import cast
 
 import pytest
 from helpers import combined
@@ -107,4 +110,32 @@ def test_db_pull_uses_the_first_database_entry(live_project) -> None:
     assert result.exit_code == 0, combined(result)
     dumps = list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
     assert len(dumps) == 1
+    assert project.sandbox.credentials_files() == []
+
+
+def test_concurrent_tagged_pulls_keep_both_dumps_and_latest(
+    live_project,
+) -> None:
+    project = live_project()
+
+    def pull(tag: str) -> subprocess.CompletedProcess[str]:
+        result = project.run("db", "pull", "dev", "--tag", tag, "--real")
+        return cast("subprocess.CompletedProcess[str]", result)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(pull, ("a", "b")))
+
+    for result in results:
+        assert result.returncode == 0, result.stdout + result.stderr
+    dumps = sorted(
+        [
+            *(project.path / "pulls").glob("demo-dev-*-a.sql.gz"),
+            *(project.path / "pulls").glob("demo-dev-*-b.sql.gz"),
+        ]
+    )
+    assert len(dumps) == 2
+    for dump in dumps:
+        assert "widgets" in gzip.decompress(dump.read_bytes()).decode()
+    latest = (project.path / "pulls" / "LATEST-dev.sql.gz").resolve()
+    assert latest.name in {dump.name for dump in dumps}
     assert project.sandbox.credentials_files() == []

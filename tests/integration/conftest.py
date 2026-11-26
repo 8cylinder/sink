@@ -7,6 +7,7 @@ import shlex
 import shutil
 import socket
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Iterator, Mapping
@@ -238,6 +239,20 @@ class LiveProject:
             input=input,
             env=dict(env) if env is not None else None,
             catch_exceptions=True,
+        )
+
+    def run(
+        self, *args: str, timeout: float = 120
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the installed Sink in this project as a subprocess."""
+        return subprocess.run(
+            [sys.executable, "-m", "sink", *args],
+            cwd=self.path,
+            env=os.environ.copy(),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
         )
 
     def remote_path(self, name: str) -> str:
