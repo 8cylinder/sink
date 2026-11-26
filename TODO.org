@@ -3,6 +3,18 @@
 Completed items and decisions live in MODERNIZE.plan.org and git history.
 
 * Current
+** TODO Enable required CI checks and repository security settings
+   Deferred until repository admin access is available.  The workflows
+   already exist; this is GitHub enforcement and security configuration.
+   - [ ] Require =check=, =integration (Ubuntu 20.04)=, and
+         =integration (Ubuntu 26.04)= on =master=.
+   - [ ] Require branches to be up to date and disallow bypassing.
+   - [ ] Enable Dependabot alerts and security updates.
+   - [ ] Enable secret scanning with push protection.
+   - [ ] Confirm CodeQL code scanning is active
+         (=.github/workflows/codeql.yml=).
+   - [ ] Verify with a throwaway PR that failing checks block merge.
+   - [ ] Mark the R8 task and stage done in =MODERNIZE.plan.org=.
 ** TODO Harden database credential handling
    Current method: a random =0600= MySQL option file is staged over SSH
    stdin, referenced with =--defaults-extra-file=, quoted/escaped, and

@@ -156,7 +156,7 @@ make check
   no =vm= group.  License =GPL-2.0-only=.
 - Open follow-ups: first GitHub Actions run is pending a push;
   =.github/CODEOWNERS= defaults to =@8cylinder= (confirm); repository
-  security settings still need admin approval.
+  security settings are deferred and tracked in =TODO.org=.
 - Test-first rule: see Stage 3.  Every Stage 3+ fix is a =test= commit
   with a strict =xfail=, followed by a =fix= commit that removes the
   marker.
@@ -1832,13 +1832,14 @@ deviation from this plan.
   R-Intr   | DONE 2026-11-26 | 3 new interruption tests (52 total); both LTS versions green
   R-SSH    | DONE 2026-11-26 | PTY interactive-SSH test (54 total); both LTS versions green
   R-Mem    | DONE 2026-11-26 | S13 max-RSS large-pull test; both LTS versions green
+  R8       | WAIT 2026-11-26 | required checks/security settings deferred to TODO.org
   Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | reap interrupted pipelines and remove rsync .NAME.* temps; 264 pass; coverage 93.43%
 #+end_src
 
 * Real world testing
 Status: tests complete.  All 54 Docker tests pass on Ubuntu 20.04 and 26.04.
-Only the repository required-check settings and the manual staging
-certification remain.  This section extends the completed modernization with
+The repository required-check settings are deferred and tracked in
+=TODO.org=; only the manual staging certification remains active.  This section extends the completed modernization with
 Docker-backed end-to-end tests, destructive-operation safety, and release
 confidence.  It does not reopen any D1–D11 decision.
 
@@ -2370,7 +2371,7 @@ Every R7 test is automated and passes on Ubuntu 20.04 and 26.04: SIGINT
 file put/pull, db-pull SIGINT, disk pressure, SSH drop, concurrent pull,
 MySQL outage, unwritable root, and credential cleanup.
 
-*** TODO Stage R8 - CI, release gate, and residual risk
+*** WAIT Stage R8 - CI, release gate, and residual risk
 *Goal:* Make the integration suite part of the release process.
 
 Tasks:
@@ -2390,8 +2391,9 @@ Tasks:
   reruns (documented in =CONTRIBUTING.md=).
 - [X] Add dependency/security scanning if not already covered by CI
   (CodeQL workflow).
-- [ ] Enable required CI checks in the repository settings (admin
-  approval; exact check names are in =CONTRIBUTING.md=).
+- [ ] Enable required CI checks and repository security settings (admin
+  approval; deferred and tracked in =TODO.org=; exact check names are in
+  =CONTRIBUTING.md=).
 
 Exit criteria:
 - A release cannot be produced with a red integration suite.
@@ -2454,7 +2456,8 @@ These remain manual checks or future environment-specific suites.
 ** Remaining work
 R0-R7 are complete.  Only these remain:
 
-1. Enable required CI checks in repository settings (admin approval).
+1. Enable required CI checks and repository security settings (admin
+   approval; deferred, tracked in =TODO.org=).
 2. Complete the R9 manual staging certification.
 
 Add new tests to the same suite and rerun both LTS versions.
