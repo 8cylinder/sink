@@ -205,10 +205,11 @@ def test_check_url_success_and_failure(live_project) -> None:
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
 
+    # Keep the port reserved but not listening so the connection is refused
+    # instead of racing another process for the same number.
     closed = socket.socket()
     closed.bind(("127.0.0.1", 0))
     bad_port = closed.getsockname()[1]
-    closed.close()
 
     try:
         good_port = httpd.server_address[1]
@@ -226,6 +227,7 @@ def test_check_url_success_and_failure(live_project) -> None:
         assert f"[✓] URL(http://127.0.0.1:{good_port}/)" in text
         assert f"[✗] URL(http://127.0.0.1:{bad_port}/)" in text
     finally:
+        closed.close()
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=5)
