@@ -146,9 +146,8 @@ make check
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
-- Real-world testing (separate section below): the 52-test Docker suite
-  passes on Ubuntu 20.04 and 26.04; new interactive-SSH and S13 memory-budget
-  tests await one matrix run.  Five database safety bugs and the
+- Real-world testing (separate section below): all 54 Docker tests pass on
+  Ubuntu 20.04 and 26.04.  Five database safety bugs and the
   interrupted-pull temp leak are fixed.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
@@ -1830,17 +1829,17 @@ deviation from this plan.
   R-Matrix | DONE 2026-11-26 | all 49 Docker tests pass on 20.04 + 26.04; fast suite 264
   R-CI     | DONE 2026-11-26 | Docker CI job on 20.04 + 26.04; release gate documented
   R-Intr   | DONE 2026-11-26 | 3 new interruption tests (52 total); both LTS versions green
-  R-SSH    | WIP  2026-11-26 | PTY interactive-SSH test (54 total); pending matrix run
-  R-Mem    | WIP  2026-11-26 | S13 max-RSS large-pull test; pending matrix run
+  R-SSH    | DONE 2026-11-26 | PTY interactive-SSH test (54 total); both LTS versions green
+  R-Mem    | DONE 2026-11-26 | S13 max-RSS large-pull test; both LTS versions green
   Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | reap interrupted pipelines and remove rsync .NAME.* temps; 264 pass; coverage 93.43%
 #+end_src
 
 * Real world testing
-Status: in progress.  The harness and the first Ubuntu 26.04 run are
-complete; the adversarial, failure, and path-safety tests are written and
-await a Docker run on the LTS matrix.  This section extends the completed
-modernization with Docker-backed end-to-end tests, destructive-operation
-safety, and release confidence.  It does not reopen any D1–D11 decision.
+Status: tests complete.  All 54 Docker tests pass on Ubuntu 20.04 and 26.04.
+Only the repository required-check settings and the manual staging
+certification remain.  This section extends the completed modernization with
+Docker-backed end-to-end tests, destructive-operation safety, and release
+confidence.  It does not reopen any D1–D11 decision.
 
 ** Objective
 Build enough real-world coverage to trust Sink with production websites and
@@ -1870,9 +1869,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 ** Current state
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
 - =tests/test_integration.py= is the legacy opt-in host-binary check.
-- The Docker harness, Compose file, and the 52-test suite pass on Ubuntu
-  20.04 and 26.04; new interactive-SSH and S13 memory-budget tests await one
-  matrix run.
+- The Docker harness, Compose file, and all 54 tests pass on Ubuntu 20.04
+  and 26.04.
 - CI has a Docker integration job for both LTS versions.
 - The default pytest run excludes the =integration= marker.
 - Recent safety work covers pipeline stderr from every stage, quoted MySQL
@@ -1905,7 +1903,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] The SIGINT pull test found leftover rsync temp files; interrupted
   single-file pulls now remove them (commits 40f925c, fdf8c8d, b7f30cb).
 - [X] First real Docker run on Ubuntu 20.04.
-- [X] All 52 Docker tests pass on Ubuntu 20.04 and 26.04.
+- [X] All 54 Docker tests pass on Ubuntu 20.04 and 26.04.
 - [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
   preservation, diff options/compare-dest/difftool, adversarial action
   names, env-expansion safety, remote symlink safety, concurrent tagged
@@ -1916,7 +1914,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] Automate the interactive SSH check with a PTY in
   =tests/integration/test_ssh.py=.
 - [X] Add the S13 large-pull max-RSS budget test.
-- [ ] Run the interactive-SSH and S13 tests on 20.04 and 26.04.
+- [X] Run the interactive-SSH and S13 tests on 20.04 and 26.04.
 - [X] Docker CI job and 20.04/26.04 matrix added to
   =.github/workflows/ci.yml=.
 - [X] Server-image cache, failure logs, and flaky-test policy added.
@@ -1940,14 +1938,13 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =10ccee3= hostile server-name Docker test.
   - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
     read-only-check tests.
-- Unit/stub suite: =264 passed=, =53 deselected=, branch coverage =93.43%=
+- Unit/stub suite: =264 passed=, =55 deselected=, branch coverage =93.43%=
   with =make check= green.  Ten safety tests live in
   =tests/test_safety_contract.py=.
-- Docker suite: 54 tests in =tests/integration= (14 original, 40 new).
-  The 52-test suite passed on Ubuntu 20.04 and 26.04; the new interactive-
-  SSH and S13 memory-budget tests await one matrix run.  The extra
-  integration selection is the legacy host-binary check in
-  =tests/test_integration.py=, not a Docker test.
+- Docker suite: all 54 tests in =tests/integration= (14 original, 40 new)
+  pass on Ubuntu 20.04 and 26.04.  The extra integration selection is the
+  legacy host-binary check in =tests/test_integration.py=, not a Docker
+  test.
 - The 20.04/26.04 matrix is green.  Re-run it after changing the harness:
   #+begin_src bash
     make integration-matrix
@@ -2161,7 +2158,7 @@ the test is implemented and lint/type-clean; the stage stays open until the
 Docker run passes on the supported LTS images and any manual-only checks
 listed in =docs/safety.md= are completed.
 
-*** TODO Stage R0 - Safety matrix and risk register
+*** DONE Stage R0 - Safety matrix and risk register
 *Goal:* Make the safety scope explicit before adding infrastructure.
 
 Tasks:
@@ -2173,9 +2170,9 @@ Tasks:
 
 Result: =docs/safety.md= (commit ac6f0c3) has the invariant table, the
 command map, the test-coverage statement, the manual staging checklist, and
-the residual-risk owner.  S11 has an unrelated-file preservation test in
-R2; S13 now has a max-RSS large-pull test in =tests/integration=.  The stage
-stays open until that test passes on both LTS versions.
+the residual-risk owner.  S11 has an unrelated-file preservation test in R2;
+S13 has a max-RSS large-pull test in =tests/integration=.  Both pass on
+Ubuntu 20.04 and 26.04.
 
 *** DONE Stage R1 - Docker harness foundation
 *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
@@ -2238,7 +2235,7 @@ directories, modes, =--chown=, exclusions, spaces/Unicode, outside-root
 rejection, dry-run, warning declines, remote failures, unrelated-file
 preservation, and symlinked remote directories.
 
-*** TODO Stage R3 - Real diffs and remote commands
+*** DONE Stage R3 - Real diffs and remote commands
 *Goal:* Validate rsync-based diffing and remote execution.
 
 Tests:
@@ -2255,9 +2252,10 @@ Exit criteria:
 - Diff and remote-command failures are visible and non-zero.
 - No pager hangs when stdout is not a terminal.
 
-Note: the automated diff, compare-dest, difftool, action, and PTY-driven
-interactive-SSH tests are written.  The 52-test suite passed on both LTS
-versions; the new SSH test awaits one matrix run.
+*** Result
+The diff, compare-dest, difftool, action, and PTY-driven interactive-SSH
+tests all pass on Ubuntu 20.04 and 26.04.  No pager is used when stdout is
+not a terminal, and remote failures exit non-zero.
 
 *** DONE Stage R4 - Real database pull and push
 *Goal:* Prove the highest-risk data paths.
@@ -2452,12 +2450,10 @@ For this project, "full confidence" means:
 
 These remain manual checks or future environment-specific suites.
 
-** Recommended next slice
-R1, R2, R4, R5, R6, and R7 are complete.  R0 and R3 each have one new
-automated test pending a matrix run.  Next:
+** Remaining work
+R0-R7 are complete.  Only these remain:
 
-1. Run the interactive-SSH and S13 memory tests on 20.04 and 26.04.
-2. Enable required CI checks in repository settings.
-3. R9 manual staging certification.
+1. Enable required CI checks in repository settings (admin approval).
+2. Complete the R9 manual staging certification.
 
 Add new tests to the same suite and rerun both LTS versions.
