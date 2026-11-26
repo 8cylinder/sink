@@ -24,6 +24,11 @@ def _update_dump(project, value: str) -> str:
     return "update.sql.gz"
 
 
+def _reset_widgets(project) -> None:
+    """Restore the shared widgets row before a destructive assertion."""
+    project.sandbox.db_query("UPDATE widgets SET name='alpha' WHERE id=1")
+
+
 def _widget_name(project) -> str:
     """Return the current widgets row name."""
     return str(
@@ -51,6 +56,7 @@ def test_db_put_rejects_non_gzip_before_touching_the_remote(
     live_project,
 ) -> None:
     project = live_project()
+    _reset_widgets(project)
 
     result = project.invoke("db", "put", "dev", "project/index.html", "--real")
 
@@ -65,6 +71,7 @@ def test_db_put_with_restricted_user_reports_the_error(live_project) -> None:
         mysql_username="partial",
         mysql_password="partial",  # noqa: S106 - test fixture
     )
+    _reset_widgets(project)
     filename = _update_dump(project, "mutated")
 
     result = project.invoke("db", "put", "dev", filename, "--real")
@@ -77,6 +84,7 @@ def test_db_put_with_restricted_user_reports_the_error(live_project) -> None:
 
 def test_db_put_declined_warning_does_not_overwrite(live_project) -> None:
     project = live_project(warn=True)
+    _reset_widgets(project)
     filename = _update_dump(project, "mutated")
 
     result = project.invoke("db", "put", "dev", filename, "--real", input="n\n")
@@ -88,6 +96,7 @@ def test_db_put_declined_warning_does_not_overwrite(live_project) -> None:
 
 def test_db_put_confirmed_warning_overwrites(live_project) -> None:
     project = live_project(warn=True)
+    _reset_widgets(project)
     filename = _update_dump(project, "mutated")
 
     result = project.invoke("db", "put", "dev", filename, "--real", input="y\n")

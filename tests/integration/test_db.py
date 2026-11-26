@@ -13,6 +13,7 @@ pytestmark = pytest.mark.integration
 
 def test_db_pull_uses_special_password_and_cleans_up(live_project) -> None:
     project = live_project()
+    project.sandbox.db_query("UPDATE widgets SET name='alpha' WHERE id=1")
 
     result = project.invoke("db", "pull", "dev", "--real")
 
