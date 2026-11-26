@@ -1121,7 +1121,6 @@ TODO.org.
   still shows the raw =sink.yaml=, because viewing your own config is
   the point of that command.
 
-
 *** Result
 163 tests pass, 7 are strict =xfail=, and the integration test is
 deselected; branch coverage is 69.23% with =fail_under = 65= (above the
@@ -1800,26 +1799,29 @@ Append one line per completed stage: date, commit, commands run, and any
 deviation from this plan.
 
 #+begin_src text
-Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
-Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
-Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
-Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
-Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
-Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
-Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
-Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
-Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
-Deploy   | DONE 2026-11-25 | commits 1617e59, f7ebbbe | removed command/modules/coolname/tests/fixtures; 195 pass, 0 xfail; coverage 77.14%; fail_under 75; 0 ty errors, 16 warnings
-Stage 9  | DONE 2026-11-25 | commit d77f73e | 200 pass, 0 xfail; coverage 78.51%; fail_under 78; check field table, Rich status, no chdir; 0 ty errors, 16 warnings
-Stage 10 | DONE 2026-11-25 | commit a4316ef | 237 pass, 0 xfail; coverage 91.77%; fail_under 90; ANN/PTH/DTZ/RET/ARG; ty/ruff clean; import-linter 3/3
-Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
-Stage 12 | DONE 2026-11-25 | release docs + tag v0.3.0 | 237 pass; docs/man clean; clean clone sync/check/build/install; smoke
-Post-rel | DONE 2026-11-25 | commits 422c7a3, d339d65, a0d5e52 | unknown keys silent/relative; check probes always run; 238 pass; coverage 91.76%
-Check UI | DONE 2026-11-25 | commits 16bb825, 59fc02f, 9668d75, 3007243 | omit unused dirs; colored markers; key: value rows; compact errors; multi-entry DB labels; colon-free labels; 242 pass; coverage 91.90%
-Pipeline | DONE 2026-11-25 | commit e546db9 | capture stderr from every pipeline stage; 243 pass; coverage 91.95%
-Creds    | DONE 2026-11-25 | commit 734ec23 | quote option-file values; EXIT-trap cleanup; 245 pass; coverage 91.97%
-Single   | DONE 2026-11-25 | commit d145f56 | removed =single= and its transfer path; legacy =automatic= accepted but unused; 240 pass; coverage 91.88%
-Tests    | DONE 2026-11-25 | commit 1ac275e | remote db paths, URL errors, rsync dirs, secrets; 253 pass; coverage 93.68%
+  Stage 0  | DONE 2026-11-25 | tag baseline-2026-11-25 (064973c); commit 611eaf1 | 21 help, 12 dry-run, 12 xfail
+  Stage 1  | DONE 2026-11-25 | commits f508a50, 15644b1; Python 3.15.2 | wheel sink-0.3.0; 11 xfail; lean sdist
+  Stage 2  | DONE 2026-11-25 | commits 7e234d8, 1c6d58f, 7b5cccb | make ci green; 150 commits, 0 leaks; coverage 38.88%; 37 ty warnings
+  Stage 3  | DONE 2026-11-25 | commits 069df4f, eb44651, 176b556, ffd9117, 176ba54, 56209d2 | 68 pass, 30 xfail, 1 deselected; coverage 55.75%; make check green; 0 ty errors, 37 warnings
+  Stage 4  | DONE 2026-11-25 | commits ccb5876, 8d366b4, e1ff40e, 78b5dd6 | 100 pass, 23 xfail, 1 deselected; coverage 61.93%; fail_under 55; 0 shell=True; only shell.py imports subprocess; 0 ty errors, 33 warnings
+  Stage 5  | DONE 2026-11-25 | commits 87e0626, ec79862 | 132 pass, 15 xfail, 1 deselected; coverage 66.42%; fail_under 60; 0 Dict2obj; 0 ty errors, 22 warnings; import-linter 3/3
+  Stage 6  | DONE 2026-11-25 | commits 9047477, 88d7baf | 163 pass, 7 xfail, 1 deselected; coverage 69.23%; fail_under 65; sink.py removed; completions 6 tests; 0 ty errors, 24 warnings
+  Stage 7  | DONE 2026-11-25 | commits d84bb7b, ed4cbde | 184 pass, 4 xfail, 1 deselected; coverage 69.91%; fail_under 68; file ambiguity, root rejection, diff/ssh contracts; 0 ty errors, 24 warnings
+  Stage 8  | DONE 2026-11-25 | commits 2fbecd7, a15676b | 206 pass, 1 xfail, 1 deselected; coverage 71.51%; fail_under 70; gzip validation, opt-in pv/mysqlpump, lando/ddev errors; 0 ty errors, 24 warnings
+  Deploy   | DONE 2026-11-25 | commits 1617e59, f7ebbbe | removed command/modules/coolname/tests/fixtures; 195 pass, 0 xfail; coverage 77.14%; fail_under 75; 0 ty errors, 16 warnings
+  Stage 9  | DONE 2026-11-25 | commit d77f73e | 200 pass, 0 xfail; coverage 78.51%; fail_under 78; check field table, Rich status, no chdir; 0 ty errors, 16 warnings
+  Stage 10 | DONE 2026-11-25 | commit a4316ef | 237 pass, 0 xfail; coverage 91.77%; fail_under 90; ANN/PTH/DTZ/RET/ARG; ty/ruff clean; import-linter 3/3
+  Stage 11 | DEFERRED (D6) | schema v2 not in this project | -
+  Stage 12 | DONE 2026-11-25 | release docs + tag v0.3.0 | 237 pass; docs/man clean; clean clone sync/check/build/install; smoke
+  Post-rel | DONE 2026-11-25 | commits 422c7a3, d339d65, a0d5e52 | unknown keys silent/relative; check probes always run; 238 pass; coverage 91.76%
+  Check UI | DONE 2026-11-25 | commits 16bb825, 59fc02f, 9668d75, 3007243 | omit unused dirs; colored markers; key: value rows; compact errors; multi-entry DB labels; colon-free labels; 242 pass; coverage 91.90%
+  Pipeline | DONE 2026-11-25 | commit e546db9 | capture stderr from every pipeline stage; 243 pass; coverage 91.95%
+  Creds    | DONE 2026-11-25 | commit 734ec23 | quote option-file values; EXIT-trap cleanup; 245 pass; coverage 91.97%
+  Single   | DONE 2026-11-25 | commit d145f56 | removed =single= and its transfer path; legacy =automatic= accepted but unused; 240 pass; coverage 91.88%
+  Tests    | DONE 2026-11-25 | commit 1ac275e | remote db paths, URL errors, rsync dirs, secrets; 253 pass; coverage 93.68%
+  Safety   | DONE 2026-11-26 | commits aa87b47, d9846af | red tests then tag/confirm/collision/cleanup fixes; 259 pass; coverage 93.94%
+  R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
+  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257 | 17 new Docker tests (31 total); lint/type clean; Docker execution pending
 #+end_src
 
 * Real world testing
@@ -1872,9 +1874,22 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] Integration tests skip cleanly when Docker is unavailable and stay out
   of the default =make check= run.
 - [X] First real Docker run on Ubuntu 26.04: 14 Docker tests passed.
+- [X] R0 safety matrix and =docs/safety.md= (commit ac6f0c3).
+- [X] Adversarial and failure integration tests written (commits fd67182,
+  b2fc257):
+  spaces/Unicode, outside-root paths, symlinks, shell syntax in filenames,
+  tag traversal, password redaction, special-character passwords, restricted
+  and disconnected MySQL, non-gzip input, warn confirmation, unwritable
+  roots, multiple database probes, server filtering, missing pulls dir,
+  URL success/failure, and same-second dump collisions.
+- [X] Four safety bugs found and fixed while writing those tests (commit
+  d9846af): tag traversal, db put ignoring =warn=, same-second overwrite, and
+  failed dumps left on disk.
 - [ ] First real Docker run on Ubuntu 20.04.
-- [ ] CI matrix and the remaining adversarial, interruption, and release-gate
-  stages.
+- [ ] First real Docker run of the 31-test Docker suite (the new 17 tests are
+  written and lint/type-clean but were not executed in the review sandbox
+  because Docker is unavailable).
+- [ ] CI matrix and the remaining interruption and release-gate stages.
 
 ** Resume here (real world testing, 2026-11-26)
 - Branch =modernize=.  The integration work is committed locally; fetch or
@@ -1884,11 +1899,18 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =27ec4e0=/=6f4803c=/=a5e602e= known_hosts and SSH wrapper fixes.
   - =be553cb= download single files before diffing.
   - =6c8e614= scope =make integration= to =tests/integration=.
-- Unit/stub suite: =254 passed=, =15 deselected=, branch coverage =93.95%=
-  with =make check= green.
-- Docker suite: 14 tests in =tests/integration=.  Ubuntu 26.04 passes; the
-  extra 15th integration selection is the legacy host-binary check in
-  =tests/test_integration.py=, not a Docker test.
+  - =aa87b47= red safety contracts (strict xfail).
+  - =d9846af= tag, confirm, collision, and failed-dump fixes.
+  - =fd67182= adversarial and failure Docker tests.
+  - =b2fc257= restricted import and missing-root tests.
+  - =ac6f0c3= safety documentation.
+- Unit/stub suite: =259 passed=, =30 deselected=, branch coverage =93.94%=
+  with =make check= green.  The five new tests are in
+  =tests/test_safety_contract.py=.
+- Docker suite: 31 tests in =tests/integration= (14 old, 17 new).  The
+  extra 32nd integration selection is the legacy host-binary check in
+  =tests/test_integration.py=, not a Docker test.  Ubuntu 26.04 passed the
+  original 14; the new tests have not run under Docker yet.
 - Run the remaining LTS checks first:
   #+begin_src bash
     make integration-oldest
@@ -2094,22 +2116,26 @@ containers from every Ubuntu version and every interrupted run.
 
 ** Stages
 Each stage is committed separately and stops until its exit criteria are
-met.  Record completed R stages in Appendix B.
+met.  Record completed R stages in Appendix B.  A checked test item means
+the test is implemented and lint/type-clean; the stage stays open until the
+Docker run passes on the supported LTS images.
 
 *** TODO Stage R0 - Safety matrix and risk register
 *Goal:* Make the safety scope explicit before adding infrastructure.
 
 Tasks:
-- [ ] Map every command and destructive path to S1–S14.
-- [ ] Identify current test coverage and known gaps.
-- [ ] Add a short =docs/safety.md= describing dry-run, =--real=,
+- [X] Map every command and destructive path to S1–S14.
+- [X] Identify current test coverage and known gaps.
+- [X] Add a short =docs/safety.md= describing dry-run, =--real=,
   warnings, credential handling, and cleanup.
-- [ ] Record accepted residual risks and an owner.
+- [X] Record accepted residual risks and an owner.
 
-Exit criteria:
-- Every invariant has at least one planned positive test and one planned
-  failure test.
-- No destructive command is unclassified.
+Result: =docs/safety.md= (commit ac6f0c3) has the invariant table, the
+command map, the test-coverage statement, the manual staging checklist, and
+the residual-risk owner.  The stage stays open until S11 (unrelated files
+are not deleted) and S13 (large payload streaming) have explicit positive
+and failure tests; the other invariants now have at least one real-service
+test in =tests/integration= or a fast-suite counterpart.
 
 *** TODO Stage R1 - Docker harness foundation
 *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
@@ -2181,21 +2207,21 @@ Exit criteria:
 *Goal:* Prove the highest-risk data paths.
 
 Tests:
-- [ ] =db pull= succeeds and writes a valid gzip dump.
-- [ ] Pulled SQL contains expected schema/data.
-- [ ] =LATEST-<server>.sql.gz= points at the successful dump.
-- [ ] Failed =mysqldump= reports real stderr, exits non-zero, and does not
+- [X] =db pull= succeeds and writes a valid gzip dump.
+- [X] Pulled SQL contains expected schema/data.
+- [X] =LATEST-<server>.sql.gz= points at the successful dump.
+- [X] Failed =mysqldump= reports real stderr, exits non-zero, and does not
   update =LATEST=.
-- [ ] Partially written dumps are not reported as success.
-- [ ] Password with =#=, quotes, backslashes, =$=, and spaces
+- [X] Partially written dumps are not reported as success.
+- [X] Password with =#=, quotes, backslashes, =$=, and spaces
   authenticates correctly.
-- [ ] Temporary credentials file is =0600= and absent after
-  success/failure.
-- [ ] =db put= loads a gzipped dump; verify the row in MySQL.
-- [ ] Non-gzip and missing local files are rejected before touching the
+- [X] Temporary credentials file is =0600= (from =umask 077=) and absent
+  after success/failure.
+- [X] =db put= loads a gzipped dump; verify the row in MySQL.
+- [X] Non-gzip and missing local files are rejected before touching the
   remote.
-- [ ] Remote =zcat=/=mysql= failure reports stderr.
-- [ ] =warn: yes= blocks =db put= without confirmation.
+- [X] Remote =zcat=/=mysql= failure reports stderr.
+- [X] =warn: yes= blocks =db put= without confirmation.
 - [ ] Multiple database entries use the documented selection rule; the
   chosen account is visible in output.
 
@@ -2208,14 +2234,14 @@ Exit criteria:
 services.
 
 Tests:
-- [ ] =check= reports SSH, root, MySQL, and URL success.
+- [X] =check= reports SSH, root, MySQL, and URL success.
 - [ ] Bad SSH key/user fails clearly.
-- [ ] Unknown host key is refused.
-- [ ] Wrong MySQL password fails with the real server message.
-- [ ] Multiple MySQL entries are all probed.
-- [ ] Server-name filtering works.
-- [ ] Missing project/root/pulls directory is reported.
-- [ ] URL success and failure use a local test HTTP server.
+- [X] Unknown host key is refused.
+- [X] Wrong MySQL password fails with the real server message.
+- [X] Multiple MySQL entries are all probed.
+- [X] Server-name filtering works.
+- [X] Missing project/root/pulls directory is reported.
+- [X] URL success and failure use a local test HTTP server.
 - [ ] Read-only =check= makes no writes.
 
 Exit criteria:
@@ -2227,13 +2253,15 @@ Exit criteria:
 
 Tests:
 - [ ] Server names, action names, filenames, and tags containing =;=,
-  =$(...)=, backticks, quotes, newlines, spaces, and Unicode.
-- [ ] =db pull --tag= values such as =../../escape=, absolute paths, and
+  =$(...)=, backticks, quotes, newlines, spaces, and Unicode.  Filenames,
+  spaces/Unicode, and shell syntax are covered; server and action names
+  are not yet adversarial cases.
+- [X] =db pull --tag= values such as =../../escape=, absolute paths, and
   shell syntax stay inside =pulls_dir=.
-- [ ] rsync paths with spaces and shell metacharacters survive render and
+- [X] rsync paths with spaces and shell metacharacters survive render and
   execute.
-- [ ] Password values never appear in rendered commands or logs.
-- [ ] Symlinked local paths outside the project root are rejected.
+- [X] Password values never appear in rendered commands or logs.
+- [X] Symlinked local paths outside the project root are rejected.
 - [ ] Symlinked remote roots do not allow writes outside the intended
   directory.
 - [ ] Unknown config keys remain non-destructive.
@@ -2253,12 +2281,12 @@ Tests:
 - [ ] SIGINT during =db pull= does not create/update =LATEST=.
 - [ ] SSH connection drop during =mysqldump= reports failure and cleans
   credentials.
-- [ ] MySQL stopped mid-operation fails with a clear error.
-- [ ] Remote root unwritable fails without local corruption.
+- [X] MySQL stopped mid-operation fails with a clear error.
+- [X] Remote root unwritable fails without local corruption.
 - [ ] Disk-pressure/partial-output test (small tmpfs or constrained
   volume) does not report success.
 - [ ] Concurrent pulls to different tags do not corrupt =LATEST=.
-- [ ] Credential cleanup survives command failure paths.
+- [X] Credential cleanup survives command failure paths.
 
 Exit criteria:
 - S6, S7, S10, S12 hold under interruption.
