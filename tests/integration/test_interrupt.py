@@ -134,7 +134,8 @@ def _create_big_table(project, rows: int = 10_000) -> None:
     )
     project.sandbox.db_query(
         "INSERT INTO big_dump (payload) "  # noqa: S608 - test SQL
-        "SELECT REPEAT('x', 1024) "
+        # Incompressible data so the gzipped dump exceeds the file limit.
+        "SELECT REPEAT(MD5(UUID()), 32) "
         "FROM information_schema.columns a, information_schema.columns b "
         f"LIMIT {rows}"
     )
