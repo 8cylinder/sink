@@ -24,7 +24,9 @@ COMPOSE_FILE = HERE / "compose.yaml"
 DEFAULT_UBUNTU = "26.04"
 DB_NAME = "demo"
 DB_USER = "sink"
-DB_PASSWORD = "p#ass word"  # noqa: S105 - test fixture
+# Exercise every quoting layer: the MySQL option file, the YAML loader, and
+# the SQL initializer.  The SQL file represents the backslash as ``\\``.
+DB_PASSWORD = r'p#ass "word" \ $ecret'  # noqa: S105 - test fixture
 ROOT_PASSWORD = "rootsecret"  # noqa: S105 - test fixture
 HOST_BINARIES = ("ssh", "ssh-keygen", "rsync", "git", "gzip")
 
@@ -189,6 +191,30 @@ class Sandbox:
             env={"MYSQL_PWD": ROOT_PASSWORD},
         ).stdout
 
+    def wait_for_db(self) -> None:
+        """Wait until the MySQL service answers after a stop/start."""
+
+        def ready() -> bool:
+            result = _run(
+                [
+                    *self.compose,
+                    "exec",
+                    "-T",
+                    "-e",
+                    f"MYSQL_PWD={ROOT_PASSWORD}",
+                    "db",
+                    "mysqladmin",
+                    "ping",
+                    "-h",
+                    "127.0.0.1",
+                    "-uroot",
+                ],
+                env=self.env,
+            )
+            return result.returncode == 0
+
+        _wait_for(ready, description="MySQL")
+
 
 @dataclass(frozen=True)
 class LiveProject:
@@ -197,6 +223,7 @@ class LiveProject:
     path: Path
     sandbox: Sandbox
     remote_root: str
+    db_password: str = DB_PASSWORD
 
     def invoke(
         self,
@@ -579,8 +606,14 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
     def factory(
         *,
         warn: bool = False,
+        mysql_username: str = DB_USER,
         mysql_password: str = DB_PASSWORD,
+        databases: list[dict[str, object]] | None = None,
+        extra_databases: list[dict[str, object]] | None = None,
         urls: list[dict[str, object]] | None = None,
+        project_overrides: dict[str, object] | None = None,
+        server_overrides: dict[str, object] | None = None,
+        extra_servers: dict[str, dict[str, object]] | None = None,
     ) -> LiveProject:
         nonlocal counter
         counter += 1
@@ -603,39 +636,51 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
             remote_root,
         )
 
-        document = {
-            "project": {
-                "name": "demo",
-                "root": "project",
-                "pulls_dir": "pulls",
-                "exclude": [".git", ".env"],
-            },
-            "servers": {
-                "dev": {
-                    "root": remote_root,
-                    "default": True,
-                    "warn": warn,
-                    "ssh": [
-                        {
-                            "name": "deploy",
-                            "username": "deploy",
-                            "server": "127.0.0.1",
-                            "key": str(sandbox.key),
-                            "port": sandbox.port,
-                        }
-                    ],
-                    "mysql": [
-                        {
-                            "username": DB_USER,
-                            "password": mysql_password,
-                            "db": DB_NAME,
-                            "hostname": "db",
-                        }
-                    ],
-                    "urls": urls or [],
-                    "actions": {"hello": "echo hello"},
+        project_document: dict[str, object] = {
+            "name": "demo",
+            "root": "project",
+            "pulls_dir": "pulls",
+            "exclude": [".git", ".env"],
+        }
+        project_document.update(project_overrides or {})
+
+        if databases is None:
+            databases = [
+                {
+                    "username": mysql_username,
+                    "password": mysql_password,
+                    "db": DB_NAME,
+                    "hostname": "db",
                 }
-            },
+            ]
+        databases = [*databases, *(extra_databases or [])]
+
+        server_document: dict[str, object] = {
+            "root": remote_root,
+            "default": True,
+            "warn": warn,
+            "ssh": [
+                {
+                    "name": "deploy",
+                    "username": "deploy",
+                    "server": "127.0.0.1",
+                    "key": str(sandbox.key),
+                    "port": sandbox.port,
+                }
+            ],
+            "mysql": databases,
+            "urls": urls or [],
+            "actions": {"hello": "echo hello"},
+        }
+        server_document.update(server_overrides or {})
+
+        servers_document: dict[str, dict[str, object]] = {
+            "dev": server_document
+        }
+        servers_document.update(extra_servers or {})
+        document = {
+            "project": project_document,
+            "servers": servers_document,
         }
         (project_dir / "sink.yaml").write_text(
             yaml.safe_dump(document, sort_keys=False)
@@ -655,6 +700,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
             path=project_dir,
             sandbox=sandbox,
             remote_root=remote_root,
+            db_password=mysql_password,
         )
 
     return factory

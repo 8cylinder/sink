@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import gzip
 
 import pytest
@@ -55,4 +56,34 @@ def test_db_pull_with_a_bad_password_reports_the_error(
     text = combined(result)
     assert "Access denied" in text or "ERROR 1045" in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
+    assert not list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+    assert project.sandbox.credentials_files() == []
+
+
+def test_db_pull_does_not_overwrite_a_same_second_dump(
+    live_project, monkeypatch
+) -> None:
+    project = live_project()
+    frozen = datetime.datetime(2026, 11, 26, 12, 0, 0, tzinfo=datetime.UTC)
+
+    class FrozenDateTime:
+        """A clock that does not advance between pulls."""
+
+        @staticmethod
+        def now(tz=None):
+            _ = tz
+            return frozen
+
+    monkeypatch.setattr("sink.db.datetime.datetime", FrozenDateTime)
+
+    first = project.invoke("db", "pull", "dev", "--real")
+    second = project.invoke("db", "pull", "dev", "--real")
+
+    assert first.exit_code == 0, combined(first)
+    assert second.exit_code == 0, combined(second)
+    dumps = sorted((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+    assert len(dumps) == 2
+    latest = (project.path / "pulls" / "LATEST-dev.sql.gz").resolve()
+    assert latest.name in {dump.name for dump in dumps}
+    assert latest.name.endswith("-2.sql.gz")
     assert project.sandbox.credentials_files() == []
