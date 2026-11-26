@@ -134,10 +134,15 @@ def _create_big_table(project, rows: int = 10_000) -> None:
     )
     project.sandbox.db_query(
         "INSERT INTO big_dump (payload) "  # noqa: S608 - test SQL
-        # Incompressible data so the gzipped dump exceeds the file limit.
-        "SELECT REPEAT(MD5(UUID()), 32) "
+        "SELECT '' "
         "FROM information_schema.columns a, information_schema.columns b "
         f"LIMIT {rows}"
+    )
+    segments = ", ".join(
+        f"SHA2(CONCAT(id, '{index}'), 256)" for index in range(16)
+    )
+    project.sandbox.db_query(
+        f"UPDATE big_dump SET payload = CONCAT_WS('', {segments})"  # noqa: S608 - test SQL
     )
 
 
