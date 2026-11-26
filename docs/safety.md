@@ -61,7 +61,9 @@ path, never the password.
 A failed pull removes the truncated local dump, leaves `LATEST-*` untouched,
 reports the real stderr, and exits non-zero. A failed transfer reports the
 remote stderr and exits non-zero. Credential files are removed on failure and
-interruption.
+interruption. Project and server names are reduced to one filename component
+before they appear in a dump name or a `LATEST-*` link, and pull tags accept
+only letters, digits, dot, dash, and underscore.
 
 ## Test coverage
 

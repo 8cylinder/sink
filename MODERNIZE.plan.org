@@ -1819,9 +1819,9 @@ deviation from this plan.
   Creds    | DONE 2026-11-25 | commit 734ec23 | quote option-file values; EXIT-trap cleanup; 245 pass; coverage 91.97%
   Single   | DONE 2026-11-25 | commit d145f56 | removed =single= and its transfer path; legacy =automatic= accepted but unused; 240 pass; coverage 91.88%
   Tests    | DONE 2026-11-25 | commit 1ac275e | remote db paths, URL errors, rsync dirs, secrets; 253 pass; coverage 93.68%
-  Safety   | DONE 2026-11-26 | commits aa87b47, d9846af | red tests then tag/confirm/collision/cleanup fixes; 259 pass; coverage 93.94%
+  Safety   | DONE 2026-11-26 | commits aa87b47, d9846af, a92b578, 79d00ba | red tests then tag/confirm/collision/cleanup/name fixes; 261 pass; coverage 93.95%
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
-  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257 | 17 new Docker tests (31 total); lint/type clean; Docker execution pending
+  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257, 10ccee3 | 18 new Docker tests (32 total); lint/type clean; Docker execution pending
 #+end_src
 
 * Real world testing
@@ -1876,17 +1876,18 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] First real Docker run on Ubuntu 26.04: 14 Docker tests passed.
 - [X] R0 safety matrix and =docs/safety.md= (commit ac6f0c3).
 - [X] Adversarial and failure integration tests written (commits fd67182,
-  b2fc257):
+  b2fc257, 10ccee3):
   spaces/Unicode, outside-root paths, symlinks, shell syntax in filenames,
   tag traversal, password redaction, special-character passwords, restricted
   and disconnected MySQL, non-gzip input, warn confirmation, unwritable
   roots, multiple database probes, server filtering, missing pulls dir,
   URL success/failure, and same-second dump collisions.
-- [X] Four safety bugs found and fixed while writing those tests (commit
-  d9846af): tag traversal, db put ignoring =warn=, same-second overwrite, and
-  failed dumps left on disk.
+- [X] Five safety bugs found and fixed while writing those tests (commits
+  d9846af, 79d00ba): tag traversal, db put ignoring =warn=, same-second
+  overwrite, failed dumps left on disk, and hostile project/server names
+  escaping =pulls_dir=.
 - [ ] First real Docker run on Ubuntu 20.04.
-- [ ] First real Docker run of the 31-test Docker suite (the new 17 tests are
+- [ ] First real Docker run of the 32-test Docker suite (the new 18 tests are
   written and lint/type-clean but were not executed in the review sandbox
   because Docker is unavailable).
 - [ ] CI matrix and the remaining interruption and release-gate stages.
@@ -1904,11 +1905,13 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =fd67182= adversarial and failure Docker tests.
   - =b2fc257= restricted import and missing-root tests.
   - =ac6f0c3= safety documentation.
-- Unit/stub suite: =259 passed=, =30 deselected=, branch coverage =93.94%=
-  with =make check= green.  The five new tests are in
+  - =a92b578= red project/server-name contracts; =79d00ba= sanitization.
+  - =10ccee3= hostile server-name Docker test.
+- Unit/stub suite: =261 passed=, =33 deselected=, branch coverage =93.95%=
+  with =make check= green.  The seven new tests are in
   =tests/test_safety_contract.py=.
-- Docker suite: 31 tests in =tests/integration= (14 old, 17 new).  The
-  extra 32nd integration selection is the legacy host-binary check in
+- Docker suite: 32 tests in =tests/integration= (14 old, 18 new).  The
+  extra 33rd integration selection is the legacy host-binary check in
   =tests/test_integration.py=, not a Docker test.  Ubuntu 26.04 passed the
   original 14; the new tests have not run under Docker yet.
 - Run the remaining LTS checks first:
@@ -2254,8 +2257,8 @@ Exit criteria:
 Tests:
 - [ ] Server names, action names, filenames, and tags containing =;=,
   =$(...)=, backticks, quotes, newlines, spaces, and Unicode.  Filenames,
-  spaces/Unicode, and shell syntax are covered; server and action names
-  are not yet adversarial cases.
+  spaces/Unicode, shell syntax, tags, and project/server filename
+  sanitization are covered; action names are not yet adversarial cases.
 - [X] =db pull --tag= values such as =../../escape=, absolute paths, and
   shell syntax stay inside =pulls_dir=.
 - [X] rsync paths with spaces and shell metacharacters survive render and
