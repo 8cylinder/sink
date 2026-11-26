@@ -141,11 +141,16 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 254 passed, 0 strict =xfail=, 15 deselected
+- Current test baseline: 261 passed, 0 strict =xfail=, 38 deselected
   =integration= tests, branch coverage 93.95%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
+- Real-world testing (separate section below): the Docker harness and the
+  original 14 tests passed on Ubuntu 26.04; 23 adversarial, failure,
+  cleanup, and action tests are now written (37 Docker tests total) and
+  five database safety bugs are fixed.  The new Docker tests have not run
+  yet; see the real-world resume below.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
 - CI still needs the first push; no package has been published.
@@ -1821,7 +1826,7 @@ deviation from this plan.
   Tests    | DONE 2026-11-25 | commit 1ac275e | remote db paths, URL errors, rsync dirs, secrets; 253 pass; coverage 93.68%
   Safety   | DONE 2026-11-26 | commits aa87b47, d9846af, a92b578, 79d00ba | red tests then tag/confirm/collision/cleanup/name fixes; 261 pass; coverage 93.95%
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
-  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257, 10ccee3 | 18 new Docker tests (32 total); lint/type clean; Docker execution pending
+  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257, 10ccee3, c3c0e9f | 23 new Docker tests (37 total); lint/type clean; Docker execution pending
 #+end_src
 
 * Real world testing
@@ -1858,15 +1863,19 @@ cleanup.  The remaining risks are tracked in Stage R8.
 
 ** Current state
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
-- =tests/test_integration.py= is opt-in but only checks that real binaries
-  exist.
-- There is no Docker harness, Compose file, or CI workflow.
+- =tests/test_integration.py= is the legacy opt-in host-binary check.
+- The Docker harness, Compose file, and the original 14 tests exist and
+  passed on Ubuntu 26.04.  Another 23 adversarial, failure, cleanup, and
+  action tests are written; the 37-test Docker suite has not run since
+  they were added.
+- CI exists but has no Docker integration job yet.
 - The default pytest run excludes the =integration= marker.
-- Recent safety work already covers pipeline stderr from every stage,
-  quoted MySQL option-file values, remote =EXIT=-trap cleanup, and removal
-  of the obsolete =single= command.
-- Baseline for this section: 254 tests, 93.95% branch coverage, =make check=
-  green.
+- Recent safety work covers pipeline stderr from every stage, quoted MySQL
+  option-file values, remote =EXIT=-trap cleanup, tag and name traversal,
+  same-second dump collisions, failed-dump cleanup, and =warn=
+  confirmation.
+- Fast-suite baseline for this section: 261 tests, 93.95% branch coverage,
+  =make check= green; 38 deselected (37 Docker + 1 legacy host check).
 
 ** Implementation status
 - [X] Docker Compose harness with Ubuntu LTS server and MySQL 8.0
@@ -1877,8 +1886,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
   of the default =make check= run.
 - [X] First real Docker run on Ubuntu 26.04: 14 Docker tests passed.
 - [X] R0 safety matrix and =docs/safety.md= (commit ac6f0c3).
-- [X] Adversarial and failure integration tests written (commits fd67182,
-  b2fc257, 10ccee3):
+- [X] Adversarial, failure, cleanup, and action integration tests written
+  (commits fd67182, b2fc257, 10ccee3, c3c0e9f):
   spaces/Unicode, outside-root paths, symlinks, shell syntax in filenames,
   tag traversal, password redaction, special-character passwords, restricted
   and disconnected MySQL, non-gzip input, warn confirmation, unwritable
@@ -1889,7 +1898,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   overwrite, failed dumps left on disk, and hostile project/server names
   escaping =pulls_dir=.
 - [ ] First real Docker run on Ubuntu 20.04.
-- [ ] First real Docker run of the 32-test Docker suite (the new 18 tests are
+- [ ] First real Docker run of the 37-test Docker suite (the new 23 tests are
   written and lint/type-clean but were not executed in the review sandbox
   because Docker is unavailable).
 - [ ] CI matrix and the remaining interruption and release-gate stages.
@@ -1909,11 +1918,13 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =ac6f0c3= safety documentation.
   - =a92b578= red project/server-name contracts; =79d00ba= sanitization.
   - =10ccee3= hostile server-name Docker test.
-- Unit/stub suite: =261 passed=, =33 deselected=, branch coverage =93.95%=
+  - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
+    read-only-check tests.
+- Unit/stub suite: =261 passed=, =38 deselected=, branch coverage =93.95%=
   with =make check= green.  The seven new tests are in
   =tests/test_safety_contract.py=.
-- Docker suite: 32 tests in =tests/integration= (14 old, 18 new).  The
-  extra 33rd integration selection is the legacy host-binary check in
+- Docker suite: 37 tests in =tests/integration= (14 old, 23 new).  The
+  extra 38th integration selection is the legacy host-binary check in
   =tests/test_integration.py=, not a Docker test.  Ubuntu 26.04 passed the
   original 14; the new tests have not run under Docker yet.
 - Run the remaining LTS checks first:
@@ -1929,9 +1940,10 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: R6 adversarial/path-safety tests, R4 partial/failed
-  database paths, R7 interruption/failure injection, R8 CI matrix, R9 manual
-  staging certification.
+- Next work, in risk order: run the 37-test Docker suite on 20.04 and
+  26.04; finish R6 (action-name adversarial cases, symlinked remote roots,
+  environment-expansion shell safety); R7 signals, disk pressure, and
+  concurrent pulls; R8 CI matrix; R9 manual staging certification.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2147,19 +2159,19 @@ test in =tests/integration= or a fast-suite counterpart.
 test passes.
 
 Tasks:
-- [ ] Add =tests/integration/compose.yaml=.
-- [ ] Add the =server= image with =ARG UBUNTU_VERSION= and =sshd_config=.
-- [ ] Add the MySQL service and init SQL.
-- [ ] Add the session fixture: build, start, health-wait, key generation,
+- [X] Add =tests/integration/compose.yaml=.
+- [X] Add the =server= image with =ARG UBUNTU_VERSION= and =sshd_config=.
+- [X] Add the MySQL service and init SQL.
+- [X] Add the session fixture: build, start, health-wait, key generation,
   =known_hosts=, teardown.
-- [ ] Add the temporary-project fixture.
-- [ ] Add =make integration=, =integration-oldest=, and
+- [X] Add the temporary-project fixture.
+- [X] Add =make integration=, =integration-oldest=, and
   =integration-matrix=; document prerequisites.
-- [ ] Generate a per-version Compose project name and image tag.
-- [ ] Add the =sink.integration=true= label and verify
+- [X] Generate a per-version Compose project name and image tag.
+- [X] Add the =sink.integration=true= label and verify
   =make integration-down= removes leftovers.
-- [ ] Verify tests skip cleanly when Docker is absent.
-- [ ] Add one smoke test that records the Ubuntu and tool versions and
+- [X] Verify tests skip cleanly when Docker is absent.
+- [X] Add one smoke test that records the Ubuntu and tool versions and
   performs an SSH connection plus =sink check=.
 
 Exit criteria:
@@ -2176,15 +2188,15 @@ Exit criteria:
 
 Tests:
 - [ ] =file put= a single file; verify remote content and mode.
-- [ ] =file pull= a file modified on the server.
-- [ ] =file put= / =file pull= a directory tree.
-- [ ] Project and server exclusions are honored.
-- [ ] Filenames containing spaces and Unicode work.
-- [ ] Paths outside =project.root= are rejected.
-- [ ] Dry-run performs no remote mutation.
-- [ ] =warn: yes= asks before overwriting; "no" aborts without changing
+- [X] =file pull= a file modified on the server.
+- [X] =file put= / =file pull= a directory tree.
+- [X] Project and server exclusions are honored.
+- [X] Filenames containing spaces and Unicode work.
+- [X] Paths outside =project.root= are rejected.
+- [X] Dry-run performs no remote mutation.
+- [X] =warn: yes= asks before overwriting; "no" aborts without changing
   the remote.
-- [ ] Remote rsync failure reports stderr and exits non-zero.
+- [X] Remote rsync failure reports stderr and exits non-zero.
 - [ ] =--chown=/group/user behavior only runs when configured.
 
 Exit criteria:
@@ -2195,12 +2207,12 @@ Exit criteria:
 *Goal:* Validate rsync-based diffing and remote execution.
 
 Tests:
-- [ ] =diff= identical files.
+- [X] =diff= identical files.
 - [ ] =diff= changed files, including whitespace/word/letter options.
-- [ ] Missing remote file fails cleanly.
+- [X] Missing remote file fails cleanly.
 - [ ] Directory diff uses the correct =--compare-dest=.
 - [ ] =--difftool= success and failure.
-- [ ] =action= runs a real remote command and propagates its exit status.
+- [X] =action= runs a real remote command and propagates its exit status.
 - [ ] Interactive =ssh= is verified manually; lower-level SSH execution is
   covered through =action=/=check=.
 
@@ -2227,7 +2239,7 @@ Tests:
   remote.
 - [X] Remote =zcat=/=mysql= failure reports stderr.
 - [X] =warn: yes= blocks =db put= without confirmation.
-- [ ] Multiple database entries use the documented selection rule; the
+- [X] Multiple database entries use the documented selection rule; the
   chosen account is visible in output.
 
 Exit criteria:
@@ -2240,14 +2252,14 @@ services.
 
 Tests:
 - [X] =check= reports SSH, root, MySQL, and URL success.
-- [ ] Bad SSH key/user fails clearly.
+- [X] Bad SSH key/user fails clearly.
 - [X] Unknown host key is refused.
 - [X] Wrong MySQL password fails with the real server message.
 - [X] Multiple MySQL entries are all probed.
 - [X] Server-name filtering works.
 - [X] Missing project/root/pulls directory is reported.
 - [X] URL success and failure use a local test HTTP server.
-- [ ] Read-only =check= makes no writes.
+- [X] Read-only =check= makes no writes.
 
 Exit criteria:
 - S2, S5, S7, S8 are covered.
@@ -2269,7 +2281,7 @@ Tests:
 - [X] Symlinked local paths outside the project root are rejected.
 - [ ] Symlinked remote roots do not allow writes outside the intended
   directory.
-- [ ] Unknown config keys remain non-destructive.
+- [X] Unknown config keys remain non-destructive (fast-suite loader tests).
 - [ ] Environment-variable expansion is not re-evaluated as shell syntax.
 
 Exit criteria:
