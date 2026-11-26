@@ -141,14 +141,15 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 264 passed, 0 strict =xfail=, 50 deselected
+- Current test baseline: 264 passed, 0 strict =xfail=, 52 deselected
   =integration= tests, branch coverage 93.43%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
-- Real-world testing (separate section below): all 49 Docker tests pass on
-  Ubuntu 20.04 and 26.04.  Five database safety bugs and the interrupted-pull
-  temp leak are fixed.
+- Real-world testing (separate section below): the 49-test Docker suite
+  passes on Ubuntu 20.04 and 26.04; two new database interruption tests
+  await the next matrix run.  Five database safety bugs and the
+  interrupted-pull temp leak are fixed.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
 - CI still needs the first push; no package has been published.
@@ -1827,6 +1828,8 @@ deviation from this plan.
   R-Run    | DONE 2026-11-26 | 37 Docker tests pass on Ubuntu 20.04 and 26.04
   R-Tests2 | DONE 2026-11-26 | 12 new R2/R3/R6/R7 tests (49 total); pass on 20.04 + 26.04
   R-Matrix | DONE 2026-11-26 | all 49 Docker tests pass on 20.04 + 26.04; fast suite 264
+  R-CI     | DONE 2026-11-26 | Docker CI job on 20.04 + 26.04; release gate documented
+  R-Intr   | WIP  2026-11-26 | 2 new db interruption tests (51 total); pending matrix run
   Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | reap interrupted pipelines and remove rsync .NAME.* temps; 264 pass; coverage 93.43%
 #+end_src
 
@@ -1865,8 +1868,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 ** Current state
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
 - =tests/test_integration.py= is the legacy opt-in host-binary check.
-- The Docker harness, Compose file, and all 49 tests pass on Ubuntu 20.04
-  and 26.04.
+- The Docker harness, Compose file, and the 49-test suite pass on Ubuntu
+  20.04 and 26.04; two new database interruption tests await the next run.
 - CI exists but has no Docker integration job yet.
 - The default pytest run excludes the =integration= marker.
 - Recent safety work covers pipeline stderr from every stage, quoted MySQL
@@ -1874,7 +1877,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   same-second dump collisions, failed-dump cleanup, and =warn=
   confirmation.
 - Fast-suite baseline for this section: 264 tests, 93.43% branch coverage,
-  =make check= green; 50 deselected (49 Docker + 1 legacy host check).
+  =make check= green; 52 deselected (51 Docker + 1 legacy host check).
 
 ** Implementation status
 - [X] Docker Compose harness with Ubuntu LTS server and MySQL 8.0
@@ -1903,9 +1906,14 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
   preservation, diff options/compare-dest/difftool, adversarial action
   names, env-expansion safety, remote symlink safety, concurrent tagged
-  pulls, and SIGINT during large file put/pull.
-- [X] Run the 12 new tests on the 20.04/26.04 matrix.
-- [ ] CI matrix and the remaining interruption and release-gate stages.
+  pulls, SIGINT during large file put/pull, db-pull SIGINT, and local file
+  size limits.
+- [X] Run the 12 R2/R3/R6 tests on the 20.04/26.04 matrix.
+- [ ] Run the 2 new database interruption tests on the matrix.
+- [X] Docker CI job and 20.04/26.04 matrix added to
+  =.github/workflows/ci.yml=.
+- [ ] Remaining R8 items (Docker layer cache, failure logs, flaky tracking)
+  and R9 manual staging.
 
 ** Resume here (real world testing, 2026-11-26)
 - Branch =modernize=.  The integration work is committed locally; fetch or
@@ -1924,13 +1932,14 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =10ccee3= hostile server-name Docker test.
   - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
     read-only-check tests.
-- Unit/stub suite: =264 passed=, =50 deselected=, branch coverage =93.43%=
+- Unit/stub suite: =264 passed=, =52 deselected=, branch coverage =93.43%=
   with =make check= green.  Ten safety tests live in
   =tests/test_safety_contract.py=.
-- Docker suite: all 49 tests in =tests/integration= (14 original, 35 new)
-  pass on Ubuntu 20.04 and 26.04.  The extra integration selection is the
-  legacy host-binary check in =tests/test_integration.py=, not a Docker
-  test.
+- Docker suite: 51 tests in =tests/integration= (14 original, 37 new).  The
+  49-test suite passed on Ubuntu 20.04 and 26.04; the 2 new database
+  interruption tests await the next run.  The extra integration selection
+  is the legacy host-binary check in =tests/test_integration.py=, not a
+  Docker test.
 - The 20.04/26.04 matrix is green.  Re-run both after changing the
   harness:
   #+begin_src bash
@@ -1944,9 +1953,10 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: run the new tests on the matrix; run the
-  remaining R7 interruption checks (db pull SIGINT, SSH drop, disk
-  pressure) from =docs/safety.md=; then R8 CI matrix and R9 manual staging.
+- Next work, in risk order: run the 2 new DB interruption tests on the
+  matrix; complete the SSH-drop manual check; add the S13 memory check;
+  finish the remaining R8 tasks (Docker layer cache, failure logs, flaky
+  tracking) and R9 manual staging.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2337,14 +2347,13 @@ name traversal bugs have permanent regression tests.
 Tests:
 - [X] SIGINT/SIGTERM during a large file put/pull leaves no partial
   success claim and cleans temp files.
-- [ ] SIGINT during =db pull= does not create/update =LATEST=
-  (manual: =docs/safety.md=).
+- [X] SIGINT during =db pull= does not create/update =LATEST=.
 - [ ] SSH connection drop during =mysqldump= reports failure and cleans
   credentials (manual: =docs/safety.md=).
 - [X] MySQL stopped mid-operation fails with a clear error.
 - [X] Remote root unwritable fails without local corruption.
-- [ ] Disk-pressure/partial-output test (small tmpfs or constrained
-  volume) does not report success (manual: =docs/safety.md=).
+- [X] Disk-pressure/partial-output test (local file-size limit) does not
+  report success.
 - [X] Concurrent pulls to different tags do not corrupt =LATEST=.
 - [X] Credential cleanup survives command failure paths.
 
@@ -2353,28 +2362,31 @@ Exit criteria:
 - Any test that cannot be made deterministic is documented as a manual
   check rather than silently skipped.
 
-Note: the automated SIGINT file put/pull, concurrent pull, MySQL-outage,
-unwritable-root, and credential-cleanup tests pass on both LTS versions.
-The db-pull SIGINT, SSH-drop, and disk-pressure checks remain manual in
-=docs/safety.md=.
+Note: the SIGINT file put/pull, db-pull SIGINT, disk-pressure, concurrent
+pull, MySQL-outage, unwritable-root, and credential-cleanup tests are
+automated.  The SSH-drop check remains manual in =docs/safety.md=; the two
+newest DB interruption tests still need a matrix run.
 
 *** TODO Stage R8 - CI, release gate, and residual risk
 *Goal:* Make the integration suite part of the release process.
 
 Tasks:
-- [ ] Add a Docker-capable CI job for the integration suite.
-- [ ] Add a CI matrix with =ubuntu: ["20.04", "26.04"]= as separate jobs,
+- [X] Add a Docker-capable CI job for the integration suite.
+- [X] Add a CI matrix with =ubuntu: ["20.04", "26.04"]= as separate jobs,
   setting =SINK_TEST_UBUNTU= for each.
-- [ ] Allow an optional full matrix with 22.04 and 24.04.
-- [ ] Run on pull requests and/or nightly; document the policy.
-- [ ] Require both the oldest and latest LTS jobs before tagging a release.
+- [X] Allow an optional full matrix with 22.04 and 24.04 via
+  =UBUNTU_VERSIONS=.
+- [X] Run on pull requests and document the release policy.
+- [X] Require both the oldest and latest LTS jobs before tagging a release
+  (CI =needs= and =CONTRIBUTING.md=).
 - [ ] Cache Docker layers per Ubuntu version and pin image digests where
   practical.
 - [ ] Publish a short failure report with container logs and the recorded
   tool versions on CI failure.
 - [ ] Track flaky tests explicitly; do not hide them with automatic
   reruns.
-- [ ] Add dependency/security scanning if not already covered by CI.
+- [X] Add dependency/security scanning if not already covered by CI
+  (CodeQL workflow).
 
 Exit criteria:
 - A release cannot be produced with a red integration suite.
@@ -2436,12 +2448,12 @@ These remain manual checks or future environment-specific suites.
 
 ** Recommended next slice
 R1, R2, R4, R5, and R6 are complete.  R0 is open only for S13; R3 is open
-only for the manual interactive-SSH check; R7 has three manual interruption
-checks.  Next:
+only for the manual interactive-SSH check; R7 has two new automated tests
+pending a matrix run plus the manual SSH-drop check.  Next:
 
-1. Run the R7 db-pull SIGINT, SSH-drop, and disk-pressure checks and the
-   interactive =sink ssh= check from =docs/safety.md=.
-2. Add the S13 large-payload memory check.
-3. R8 CI matrix, then R9 manual staging certification.
+1. Run the 2 new DB interruption tests on the matrix.
+2. Complete the SSH-drop and interactive-=ssh= manual checks.
+3. Add the S13 large-payload memory check.
+4. Finish R8 caching/failure-log/flaky tracking, then R9 manual staging.
 
 Add new tests to the same suite and rerun both LTS versions.

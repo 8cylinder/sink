@@ -88,11 +88,14 @@ fault-injection harness exists. Run them against staging:
   temporary files. The put/pull cases are automated in
   `tests/integration/test_interrupt.py`; repeat on staging.
 - Start `db pull` against a large table and send SIGINT. Confirm `LATEST-*`
-  was not created or changed and no success line is printed.
+  was not created or changed and no success line is printed. This is
+  automated in `tests/integration/test_interrupt.py`; repeat on staging.
 - Drop SSH during `mysqldump` (stop the server or sever the network). Confirm
-  a non-zero exit and that no `/tmp/sink-mysql-*.cnf` remains.
+  a non-zero exit and that no `/tmp/sink-mysql-*.cnf` remains. This remains
+  a manual check.
 - Repeat a `db pull` with a small quota or `ulimit -f`. Confirm a non-zero
-  exit, no success line, and that `LATEST-*` is unchanged.
+  exit, no success line, and that `LATEST-*` is unchanged. The local
+  file-size limit case is automated in `tests/integration/test_interrupt.py`.
 - Pull a large database on a memory-limited host and confirm memory use stays
   bounded (streaming, not buffering the whole dump).
 
