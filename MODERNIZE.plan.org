@@ -141,14 +141,15 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 261 passed, 0 strict =xfail=, 38 deselected
-  =integration= tests, branch coverage 93.95%, =fail_under = 90=; =ty=
+- Current test baseline: 262 passed, 0 strict =xfail=, 47 deselected
+  =integration= tests, branch coverage 93.96%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
-- Real-world testing (separate section below): all 37 Docker tests pass on
-  Ubuntu 20.04 and 26.04, and five database safety bugs are fixed.  See the
-  real-world resume below for the remaining R2/R3/R6/R7 tests and CI work.
+- Real-world testing (separate section below): the 37-test Docker suite
+  passed on Ubuntu 20.04 and 26.04; 9 additional R2/R3/R6/R7 tests are
+  written (46 total) and await the next matrix run.  Five database safety
+  bugs are fixed.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
 - CI still needs the first push; no package has been published.
@@ -1825,6 +1826,7 @@ deviation from this plan.
   Safety   | DONE 2026-11-26 | commits aa87b47, d9846af, a92b578, 79d00ba | red tests then tag/confirm/collision/cleanup/name fixes; 261 pass; coverage 93.95%
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
   R-Run    | DONE 2026-11-26 | 37 Docker tests pass on Ubuntu 20.04 and 26.04
+  R-Tests2 | WIP  2026-11-26 | 9 new R2/R3/R6/R7 tests (46 total); pending matrix run
 #+end_src
 
 * Real world testing
@@ -1894,7 +1896,11 @@ cleanup.  The remaining risks are tracked in Stage R8.
   overwrite, failed dumps left on disk, and hostile project/server names
   escaping =pulls_dir=.
 - [X] First real Docker run on Ubuntu 20.04.
-- [X] All 37 Docker tests pass on Ubuntu 20.04 and 26.04.
+- [X] The 37-test Docker suite passes on Ubuntu 20.04 and 26.04.
+- [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
+  preservation, diff options/compare-dest/difftool, adversarial action
+  names, env-expansion safety, and concurrent tagged pulls.
+- [ ] Run the 9 new tests on the 20.04/26.04 matrix.
 - [ ] CI matrix and the remaining interruption and release-gate stages.
 
 ** Resume here (real world testing, 2026-11-26)
@@ -1914,13 +1920,13 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =10ccee3= hostile server-name Docker test.
   - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
     read-only-check tests.
-- Unit/stub suite: =261 passed=, =38 deselected=, branch coverage =93.95%=
-  with =make check= green.  The seven new tests are in
+- Unit/stub suite: =262 passed=, =47 deselected=, branch coverage =93.96%=
+  with =make check= green.  Eight safety tests live in
   =tests/test_safety_contract.py=.
-- Docker suite: all 37 tests in =tests/integration= pass on Ubuntu 20.04
-  and 26.04 (14 original, 23 new).  The extra 38th integration selection
-  is the legacy host-binary check in =tests/test_integration.py=, not a
-  Docker test.
+- Docker suite: 46 tests in =tests/integration= (14 original, 32 new).  The
+  37-test suite passed on Ubuntu 20.04 and 26.04; the 9 newest tests await
+  the next matrix run.  The extra integration selection is the legacy
+  host-binary check in =tests/test_integration.py=, not a Docker test.
 - The 20.04/26.04 matrix is green.  Re-run both after changing the
   harness:
   #+begin_src bash
@@ -1934,10 +1940,9 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: finish R6 (action-name adversarial cases,
-  symlinked remote roots, environment-expansion shell safety); R7 signals,
-  disk pressure, and concurrent pulls; R2/R3 remaining checks; R8 CI
-  matrix; R9 manual staging certification.
+- Next work, in risk order: run the new tests on the matrix; finish R6
+  (symlinked remote roots); run the R7 interruption checks (documented in
+  =docs/safety.md=); then R8 CI matrix and R9 manual staging.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2147,10 +2152,11 @@ Tasks:
 
 Result: =docs/safety.md= (commit ac6f0c3) has the invariant table, the
 command map, the test-coverage statement, the manual staging checklist, and
-the residual-risk owner.  The stage stays open until S11 (unrelated files
-are not deleted) and S13 (large payload streaming) have explicit positive
-and failure tests; the other invariants now have at least one real-service
-test in =tests/integration= or a fast-suite counterpart.
+the residual-risk owner.  S11 now has an unrelated-file preservation test in
+R2; S13 (large payload streaming) remains a manual check in
+=docs/safety.md=, so the stage stays open for that invariant.  The other
+invariants have at least one real-service test in =tests/integration= or a
+fast-suite counterpart.
 
 *** DONE Stage R1 - Docker harness foundation
 *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
@@ -2191,7 +2197,7 @@ green.
 *Goal:* Prove file and directory transfers are correct and safe.
 
 Tests:
-- [ ] =file put= a single file; verify remote content and mode.
+- [X] =file put= a single file; verify remote content and mode.
 - [X] =file pull= a file modified on the server.
 - [X] =file put= / =file pull= a directory tree.
 - [X] Project and server exclusions are honored.
@@ -2201,7 +2207,7 @@ Tests:
 - [X] =warn: yes= asks before overwriting; "no" aborts without changing
   the remote.
 - [X] Remote rsync failure reports stderr and exits non-zero.
-- [ ] =--chown=/group/user behavior only runs when configured.
+- [X] =--chown=/group/user behavior only runs when configured.
 
 Exit criteria:
 - S1, S3, S4, S11, S12 have real-server evidence.
@@ -2212,10 +2218,10 @@ Exit criteria:
 
 Tests:
 - [X] =diff= identical files.
-- [ ] =diff= changed files, including whitespace/word/letter options.
+- [X] =diff= changed files, including whitespace/word/letter options.
 - [X] Missing remote file fails cleanly.
-- [ ] Directory diff uses the correct =--compare-dest=.
-- [ ] =--difftool= success and failure.
+- [X] Directory diff uses the correct =--compare-dest=.
+- [X] =--difftool= success and failure.
 - [X] =action= runs a real remote command and propagates its exit status.
 - [ ] Interactive =ssh= is verified manually; lower-level SSH execution is
   covered through =action=/=check=.
@@ -2284,10 +2290,10 @@ unchanged.
 *Goal:* Attack Sink with hostile but valid configuration and names.
 
 Tests:
-- [ ] Server names, action names, filenames, and tags containing =;=,
+- [X] Server names, action names, filenames, and tags containing =;=,
   =$(...)=, backticks, quotes, newlines, spaces, and Unicode.  Filenames,
-  spaces/Unicode, shell syntax, tags, and project/server filename
-  sanitization are covered; action names are not yet adversarial cases.
+  spaces/Unicode, shell syntax, tags, project/server filename sanitization,
+  and action names are covered.
 - [X] =db pull --tag= values such as =../../escape=, absolute paths, and
   shell syntax stay inside =pulls_dir=.
 - [X] rsync paths with spaces and shell metacharacters survive render and
@@ -2297,7 +2303,7 @@ Tests:
 - [ ] Symlinked remote roots do not allow writes outside the intended
   directory.
 - [X] Unknown config keys remain non-destructive (fast-suite loader tests).
-- [ ] Environment-variable expansion is not re-evaluated as shell syntax.
+- [X] Environment-variable expansion is not re-evaluated as shell syntax.
 
 Exit criteria:
 - S3, S5, S9, S14 have adversarial evidence.
@@ -2309,15 +2315,16 @@ Exit criteria:
 
 Tests:
 - [ ] SIGINT/SIGTERM during a large file put/pull leaves no partial
-  success claim and cleans temp files.
-- [ ] SIGINT during =db pull= does not create/update =LATEST=.
+  success claim and cleans temp files (manual: =docs/safety.md=).
+- [ ] SIGINT during =db pull= does not create/update =LATEST=
+  (manual: =docs/safety.md=).
 - [ ] SSH connection drop during =mysqldump= reports failure and cleans
-  credentials.
+  credentials (manual: =docs/safety.md=).
 - [X] MySQL stopped mid-operation fails with a clear error.
 - [X] Remote root unwritable fails without local corruption.
 - [ ] Disk-pressure/partial-output test (small tmpfs or constrained
-  volume) does not report success.
-- [ ] Concurrent pulls to different tags do not corrupt =LATEST=.
+  volume) does not report success (manual: =docs/safety.md=).
+- [X] Concurrent pulls to different tags do not corrupt =LATEST=.
 - [X] Credential cleanup survives command failure paths.
 
 Exit criteria:
@@ -2402,16 +2409,12 @@ For this project, "full confidence" means:
 These remain manual checks or future environment-specific suites.
 
 ** Recommended next slice
-R1, R4, and R5 are complete; R0 is complete except S11/S13 coverage.  The
-next work, in risk order:
+R1, R4, and R5 are complete; R0 is open only for S13.  The new R2/R3/R6/R7
+tests are written and await a matrix run.  Next:
 
-1. R6 action-name adversarial cases, symlinked remote roots, and
-   environment-expansion shell safety.
-2. R7 SIGINT/SIGTERM, SSH drop during a dump, disk pressure, and concurrent
-   pulls.
-3. R2 remote file mode, =--chown=, and unrelated-file preservation (S11).
-4. R3 diff option matrix, directory =--compare-dest=, and =--difftool=.
-5. R8 CI matrix, then R9 manual staging certification.
+1. Run the 46-test Docker suite on 20.04 and 26.04.
+2. R6 symlinked remote roots.
+3. R7 interruption checks from =docs/safety.md=.
+4. R8 CI matrix, then R9 manual staging certification.
 
-The 20.04/26.04 Docker matrix is green, so new tests should be added to the
-same suite and rerun on both LTS versions.
+Add new tests to the same suite and rerun both LTS versions.

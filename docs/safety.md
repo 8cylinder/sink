@@ -78,6 +78,22 @@ The Docker suite does not cover production `sshd`/PAM/sudo/SELinux policy,
 cloud IAM authentication, network interruption at arbitrary points, or
 Lando/DDEV. Those remain manual staging checks.
 
+## Interruption checks
+
+These are timing-dependent, so they stay manual until a deterministic
+fault-injection harness exists. Run them against staging:
+
+- Start a large `file put` and send SIGINT to the process group. Confirm a
+  non-zero exit, no success line, and no leftover rsync temporary files.
+- Start `db pull` against a large table and send SIGINT. Confirm `LATEST-*`
+  was not created or changed and no success line is printed.
+- Drop SSH during `mysqldump` (stop the server or sever the network). Confirm
+  a non-zero exit and that no `/tmp/sink-mysql-*.cnf` remains.
+- Repeat a `db pull` with a small quota or `ulimit -f`. Confirm a non-zero
+  exit, no success line, and that `LATEST-*` is unchanged.
+- Pull a large database on a memory-limited host and confirm memory use stays
+  bounded (streaming, not buffering the whole dump).
+
 ## Manual staging checklist
 
 Run against a real staging server before a release:
