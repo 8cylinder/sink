@@ -60,6 +60,21 @@ def test_db_put_rejects_non_gzip_before_touching_the_remote(
     assert "alpha" in _widget_name(project)
 
 
+def test_db_put_with_restricted_user_reports_the_error(live_project) -> None:
+    project = live_project(
+        mysql_username="partial",
+        mysql_password="partial",  # noqa: S106 - test fixture
+    )
+    filename = _update_dump(project, "mutated")
+
+    result = project.invoke("db", "put", "dev", filename, "--real")
+
+    assert result.exit_code != 0, combined(result)
+    assert "denied" in combined(result).lower()
+    assert "alpha" in _widget_name(project)
+    assert project.sandbox.credentials_files() == []
+
+
 def test_db_put_declined_warning_does_not_overwrite(live_project) -> None:
     project = live_project(warn=True)
     filename = _update_dump(project, "mutated")
@@ -170,6 +185,19 @@ class _OkHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         """Keep the test output quiet."""
         _ = format, args
+
+
+def test_check_reports_a_missing_remote_root(live_project) -> None:
+    project = live_project(
+        server_overrides={"root": "/var/www/sink-missing-root"}
+    )
+
+    result = project.invoke("check", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    text = combined(result)
+    assert "root dir does not exist" in text
+    assert "[✗]" in text
 
 
 def test_check_url_success_and_failure(live_project) -> None:
