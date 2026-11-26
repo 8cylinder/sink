@@ -33,9 +33,10 @@ def test_check_reports_a_bad_mysql_password(live_project) -> None:
 
 def test_check_rejects_an_unknown_host_key(live_project, monkeypatch) -> None:
     project = live_project()
-    empty_home = project.path / "empty-home"
-    empty_home.mkdir()
-    monkeypatch.setenv("HOME", str(empty_home))
+    empty_known_hosts = project.path / "empty-known-hosts"
+    empty_known_hosts.write_text("")
+    empty_known_hosts.chmod(0o600)
+    monkeypatch.setenv("SINK_TEST_KNOWN_HOSTS", str(empty_known_hosts))
 
     result = project.invoke("check", "dev")
 

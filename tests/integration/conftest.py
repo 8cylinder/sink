@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -107,6 +108,7 @@ class Sandbox:
     port: int
     key: Path
     home: Path
+    bin_dir: Path
 
     def compose_run(
         self,
@@ -500,8 +502,30 @@ def sandbox(
         known_hosts.write_text("\n".join(known_lines) + "\n")
         known_hosts.chmod(0o600)
 
+        # OpenSSH resolves ~/.ssh/known_hosts from the passwd home directory,
+        # not from $HOME.  An ssh wrapper keeps the test away from the real
+        # user's known_hosts while preserving strict host-key checking.
+        bin_dir = work / "bin"
+        bin_dir.mkdir()
+        real_ssh = shutil.which("ssh")
+        if real_ssh is None:
+            raise RuntimeError("ssh disappeared after the skip check")
+        wrapper = bin_dir / "ssh"
+        wrapper.write_text(
+            "#!/bin/sh\n"
+            f'known_hosts="${{SINK_TEST_KNOWN_HOSTS:-{known_hosts}}}"\n'
+            f"exec {shlex.quote(real_ssh)} "
+            '-o "UserKnownHostsFile=$known_hosts" '
+            '-o GlobalKnownHostsFile=/dev/null "$@"\n'
+        )
+        wrapper.chmod(0o755)
+
         strict_env = os.environ.copy()
         strict_env["HOME"] = str(home)
+        strict_env["SINK_TEST_KNOWN_HOSTS"] = str(known_hosts)
+        strict_env["PATH"] = (
+            f"{bin_dir}{os.pathsep}{strict_env.get('PATH', '')}"
+        )
         strict = subprocess.run(
             [
                 "ssh",
@@ -541,6 +565,7 @@ def sandbox(
             port=port,
             key=key,
             home=home,
+            bin_dir=bin_dir,
         )
     finally:
         down()
@@ -617,6 +642,14 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
         )
         monkeypatch.chdir(project_dir)
         monkeypatch.setenv("HOME", str(sandbox.home))
+        monkeypatch.setenv(
+            "SINK_TEST_KNOWN_HOSTS",
+            str(sandbox.home / ".ssh" / "known_hosts"),
+        )
+        monkeypatch.setenv(
+            "PATH",
+            f"{sandbox.bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        )
         monkeypatch.setenv("SINK_TEST_UBUNTU", sandbox.ubuntu)
         return LiveProject(
             path=project_dir,
