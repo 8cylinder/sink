@@ -10,6 +10,7 @@ and runs exactly that command with `--real`.
 cli
 configuration
 development
+safety
 ```
 
 ## Quick start
