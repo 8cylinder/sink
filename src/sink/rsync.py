@@ -4,6 +4,7 @@ import shlex
 import sys
 import tempfile
 from collections.abc import Sequence
+from contextlib import suppress
 from pathlib import Path
 
 import click
@@ -78,7 +79,21 @@ class Transfer:
         if local.is_dir():
             remote = f"{remote}/"
             self.multiple = True
-        self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
+        try:
+            self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
+        except KeyboardInterrupt:
+            # rsync creates .NAME.XXXXXX beside a single-file destination and
+            # does not always remove it when SIGINT reaches the process group.
+            if not self.multiple:
+                self._remove_pull_temp(local)
+            raise
+
+    @staticmethod
+    def _remove_pull_temp(local: Path) -> None:
+        """Remove rsync temp files left beside an interrupted file pull."""
+        for candidate in local.parent.glob(f".{local.name}.*"):
+            with suppress(OSError):
+                candidate.unlink()
 
     @staticmethod
     def _flags(

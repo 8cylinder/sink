@@ -17,6 +17,7 @@ from helpers import combined, commands_named
 
 from sink.config.models import DatabaseConfig, Project, Server
 from sink.db import DB
+from sink.rsync import Transfer
 from sink.shell import Result
 
 
@@ -181,3 +182,20 @@ def test_environment_expansion_is_not_shell_syntax(
     assert rsync
     assert any(f"$(touch {marker})" in arg for arg in rsync[0].args)
     assert not marker.exists()
+
+
+def test_interrupted_pull_removes_only_rsync_temp_files(
+    tmp_path: Path,
+) -> None:
+    local = tmp_path / "remote.bin"
+    local.write_text("complete")
+    temporary = tmp_path / ".remote.bin.14r3Y9"
+    temporary.write_text("partial")
+    unrelated = tmp_path / ".other.bin.14r3Y9"
+    unrelated.write_text("keep")
+
+    Transfer._remove_pull_temp(local)
+
+    assert local.exists()
+    assert unrelated.exists()
+    assert not temporary.exists()
