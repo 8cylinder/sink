@@ -146,11 +146,9 @@ make check
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
-- Real-world testing (separate section below): the Docker harness and the
-  original 14 tests passed on Ubuntu 26.04; 23 adversarial, failure,
-  cleanup, and action tests are now written (37 Docker tests total) and
-  five database safety bugs are fixed.  The new Docker tests have not run
-  yet; see the real-world resume below.
+- Real-world testing (separate section below): all 37 Docker tests pass on
+  Ubuntu 20.04 and 26.04, and five database safety bugs are fixed.  See the
+  real-world resume below for the remaining R2/R3/R6/R7 tests and CI work.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
 - CI still needs the first push; no package has been published.
@@ -1826,7 +1824,7 @@ deviation from this plan.
   Tests    | DONE 2026-11-25 | commit 1ac275e | remote db paths, URL errors, rsync dirs, secrets; 253 pass; coverage 93.68%
   Safety   | DONE 2026-11-26 | commits aa87b47, d9846af, a92b578, 79d00ba | red tests then tag/confirm/collision/cleanup/name fixes; 261 pass; coverage 93.95%
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
-  R-Tests  | WIP  2026-11-26 | commits fd67182, b2fc257, 10ccee3, c3c0e9f | 23 new Docker tests (37 total); lint/type clean; Docker execution pending
+  R-Run    | DONE 2026-11-26 | 37 Docker tests pass on Ubuntu 20.04 and 26.04
 #+end_src
 
 * Real world testing
@@ -1864,10 +1862,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 ** Current state
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
 - =tests/test_integration.py= is the legacy opt-in host-binary check.
-- The Docker harness, Compose file, and the original 14 tests exist and
-  passed on Ubuntu 26.04.  Another 23 adversarial, failure, cleanup, and
-  action tests are written; the 37-test Docker suite has not run since
-  they were added.
+- The Docker harness, Compose file, and all 37 tests pass on Ubuntu 20.04
+  and 26.04.
 - CI exists but has no Docker integration job yet.
 - The default pytest run excludes the =integration= marker.
 - Recent safety work covers pipeline stderr from every stage, quoted MySQL
@@ -1897,10 +1893,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
   d9846af, 79d00ba): tag traversal, db put ignoring =warn=, same-second
   overwrite, failed dumps left on disk, and hostile project/server names
   escaping =pulls_dir=.
-- [ ] First real Docker run on Ubuntu 20.04.
-- [ ] First real Docker run of the 37-test Docker suite (the new 23 tests are
-  written and lint/type-clean but were not executed in the review sandbox
-  because Docker is unavailable).
+- [X] First real Docker run on Ubuntu 20.04.
+- [X] All 37 Docker tests pass on Ubuntu 20.04 and 26.04.
 - [ ] CI matrix and the remaining interruption and release-gate stages.
 
 ** Resume here (real world testing, 2026-11-26)
@@ -1923,13 +1917,13 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - Unit/stub suite: =261 passed=, =38 deselected=, branch coverage =93.95%=
   with =make check= green.  The seven new tests are in
   =tests/test_safety_contract.py=.
-- Docker suite: 37 tests in =tests/integration= (14 old, 23 new).  The
-  extra 38th integration selection is the legacy host-binary check in
-  =tests/test_integration.py=, not a Docker test.  Ubuntu 26.04 passed the
-  original 14; the new tests have not run under Docker yet.
-- Run the remaining LTS checks first:
+- Docker suite: all 37 tests in =tests/integration= pass on Ubuntu 20.04
+  and 26.04 (14 original, 23 new).  The extra 38th integration selection
+  is the legacy host-binary check in =tests/test_integration.py=, not a
+  Docker test.
+- The 20.04/26.04 matrix is green.  Re-run both after changing the
+  harness:
   #+begin_src bash
-    make integration-oldest
     make integration-matrix
   #+end_src
 - Preserve these harness details when editing tests:
@@ -1940,10 +1934,10 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: run the 37-test Docker suite on 20.04 and
-  26.04; finish R6 (action-name adversarial cases, symlinked remote roots,
-  environment-expansion shell safety); R7 signals, disk pressure, and
-  concurrent pulls; R8 CI matrix; R9 manual staging certification.
+- Next work, in risk order: finish R6 (action-name adversarial cases,
+  symlinked remote roots, environment-expansion shell safety); R7 signals,
+  disk pressure, and concurrent pulls; R2/R3 remaining checks; R8 CI
+  matrix; R9 manual staging certification.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2158,7 +2152,7 @@ are not deleted) and S13 (large payload streaming) have explicit positive
 and failure tests; the other invariants now have at least one real-service
 test in =tests/integration= or a fast-suite counterpart.
 
-*** TODO Stage R1 - Docker harness foundation
+*** DONE Stage R1 - Docker harness foundation
 *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
 test passes.
 
@@ -2186,6 +2180,12 @@ Exit criteria:
 - The smoke test fails if SSH or MySQL is unreachable.
 - The smoke output identifies the Ubuntu, OpenSSH, rsync, and client
   versions under test.
+
+*** Result
+The Compose stack, fixtures, Make targets, and smoke/version tests are in
+place.  All 37 Docker tests pass on Ubuntu 20.04 and 26.04; `make
+integration`, `make integration-oldest`, and `make integration-matrix` are
+green.
 
 *** TODO Stage R2 - Real file transfers
 *Goal:* Prove file and directory transfers are correct and safe.
@@ -2224,7 +2224,7 @@ Exit criteria:
 - Diff and remote-command failures are visible and non-zero.
 - No pager hangs when stdout is not a terminal.
 
-*** TODO Stage R4 - Real database pull and push
+*** DONE Stage R4 - Real database pull and push
 *Goal:* Prove the highest-risk data paths.
 
 Tests:
@@ -2250,7 +2250,12 @@ Exit criteria:
 - S5, S6, S7, S10, S12, S14 have real-server evidence.
 - A wrong-password test proves the quoting fix and error reporting.
 
-*** TODO Stage R5 - Real check, SSH policy, and failure paths
+*** Result
+All database tests pass on Ubuntu 20.04 and 26.04, including the
+special-character password, restricted users, failed dumps, cleanup,
+`LATEST` handling, first-entry selection, and same-second collisions.
+
+*** DONE Stage R5 - Real check, SSH policy, and failure paths
 *Goal:* Verify diagnostics and authentication behavior against real
 services.
 
@@ -2268,6 +2273,12 @@ Tests:
 Exit criteria:
 - S2, S5, S7, S8 are covered.
 - No probe hangs on authentication or host-key prompts.
+
+*** Result
+All check tests pass on Ubuntu 20.04 and 26.04, including multiple database
+probes, server filtering, bad SSH users, host-key rejection, missing
+directories, URL success/failure, and proof that the remote root is
+unchanged.
 
 *** TODO Stage R6 - Adversarial inputs and path safety
 *Goal:* Attack Sink with hostile but valid configuration and names.
@@ -2390,16 +2401,17 @@ For this project, "full confidence" means:
 
 These remain manual checks or future environment-specific suites.
 
-** Recommended first slice
-Implement Stages R0–R1, then the highest-risk half of Stage R4:
+** Recommended next slice
+R1, R4, and R5 are complete; R0 is complete except S11/S13 coverage.  The
+next work, in risk order:
 
-1. Safety matrix.
-2. Compose harness with SSH and MySQL.
-3. Ubuntu 20.04 and 26.04 smoke tests with recorded tool versions.
-4. Successful =db pull= with a =#= password on both LTS versions.
-5. Failed =db pull= with wrong credentials and credential cleanup.
-6. Successful =db put= with row verification.
-7. File put/pull smoke test.
+1. R6 action-name adversarial cases, symlinked remote roots, and
+   environment-expansion shell safety.
+2. R7 SIGINT/SIGTERM, SSH drop during a dump, disk pressure, and concurrent
+   pulls.
+3. R2 remote file mode, =--chown=, and unrelated-file preservation (S11).
+4. R3 diff option matrix, directory =--compare-dest=, and =--difftool=.
+5. R8 CI matrix, then R9 manual staging certification.
 
-That gives the most safety value quickly, before expanding into diffing,
-adversarial inputs, and interruption tests.
+The 20.04/26.04 Docker matrix is green, so new tests should be added to the
+same suite and rerun on both LTS versions.
