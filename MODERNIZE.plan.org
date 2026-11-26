@@ -1864,8 +1864,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 ** Current state
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
 - =tests/test_integration.py= is the legacy opt-in host-binary check.
-- The Docker harness, Compose file, and all 37 tests pass on Ubuntu 20.04
-  and 26.04.
+- The Docker harness, Compose file, and the original 37 tests pass on
+  Ubuntu 20.04 and 26.04; 12 new R2/R3/R6/R7 tests await the next run.
 - CI exists but has no Docker integration job yet.
 - The default pytest run excludes the =integration= marker.
 - Recent safety work covers pipeline stderr from every stage, quoted MySQL
@@ -1873,7 +1873,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   same-second dump collisions, failed-dump cleanup, and =warn=
   confirmation.
 - Fast-suite baseline for this section: 261 tests, 93.95% branch coverage,
-  =make check= green; 38 deselected (37 Docker + 1 legacy host check).
+  =make check= green; 50 deselected (49 Docker + 1 legacy host check).
 
 ** Implementation status
 - [X] Docker Compose harness with Ubuntu LTS server and MySQL 8.0
@@ -1896,7 +1896,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   overwrite, failed dumps left on disk, and hostile project/server names
   escaping =pulls_dir=.
 - [X] First real Docker run on Ubuntu 20.04.
-- [X] The 37-test Docker suite passes on Ubuntu 20.04 and 26.04.
+- [X] The original 37-test Docker suite passes on Ubuntu 20.04 and 26.04.
 - [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
   preservation, diff options/compare-dest/difftool, adversarial action
   names, env-expansion safety, remote symlink safety, concurrent tagged
@@ -2190,9 +2190,9 @@ Exit criteria:
 
 *** Result
 The Compose stack, fixtures, Make targets, and smoke/version tests are in
-place.  All 37 Docker tests pass on Ubuntu 20.04 and 26.04; `make
-integration`, `make integration-oldest`, and `make integration-matrix` are
-green.
+place.  The original 37 Docker tests pass on Ubuntu 20.04 and 26.04;
+`make integration`, `make integration-oldest`, and `make integration-matrix`
+are green.  The suite is now 49 tests; the 12 new tests await the next run.
 
 *** TODO Stage R2 - Real file transfers
 *Goal:* Prove file and directory transfers are correct and safe.
