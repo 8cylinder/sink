@@ -141,14 +141,14 @@ make check
 - Python 3.15.2 via uv; =.python-version= = 3.15.  The review sandbox
   needed =UV_PYTHON_INSTALL_DIR=/tmp/uv-python= because the default uv
   cache was read-only; a normal machine does not.
-- Current test baseline: 262 passed, 0 strict =xfail=, 47 deselected
+- Current test baseline: 262 passed, 0 strict =xfail=, 50 deselected
   =integration= tests, branch coverage 93.96%, =fail_under = 90=; =ty=
   is clean with no warning downgrades.  Release tag =v0.3.0=; post-release
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
 - Real-world testing (separate section below): the 37-test Docker suite
-  passed on Ubuntu 20.04 and 26.04; 9 additional R2/R3/R6/R7 tests are
-  written (46 total) and await the next matrix run.  Five database safety
+  passed on Ubuntu 20.04 and 26.04; 12 additional R2/R3/R6/R7 tests are
+  written (49 total) and await the next matrix run.  Five database safety
   bugs are fixed.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
@@ -1826,7 +1826,7 @@ deviation from this plan.
   Safety   | DONE 2026-11-26 | commits aa87b47, d9846af, a92b578, 79d00ba | red tests then tag/confirm/collision/cleanup/name fixes; 261 pass; coverage 93.95%
   R-Docs   | DONE 2026-11-26 | commit ac6f0c3 | docs/safety.md; R0 command map and residual risks
   R-Run    | DONE 2026-11-26 | 37 Docker tests pass on Ubuntu 20.04 and 26.04
-  R-Tests2 | WIP  2026-11-26 | 9 new R2/R3/R6/R7 tests (46 total); pending matrix run
+  R-Tests2 | WIP  2026-11-26 | 12 new R2/R3/R6/R7 tests (49 total); pending matrix run
 #+end_src
 
 * Real world testing
@@ -1899,8 +1899,9 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] The 37-test Docker suite passes on Ubuntu 20.04 and 26.04.
 - [X] R2/R3/R6/R7 test gaps written: file mode, =--chown=, unrelated-file
   preservation, diff options/compare-dest/difftool, adversarial action
-  names, env-expansion safety, and concurrent tagged pulls.
-- [ ] Run the 9 new tests on the 20.04/26.04 matrix.
+  names, env-expansion safety, remote symlink safety, concurrent tagged
+  pulls, and SIGINT during large file put/pull.
+- [ ] Run the 12 new tests on the 20.04/26.04 matrix.
 - [ ] CI matrix and the remaining interruption and release-gate stages.
 
 ** Resume here (real world testing, 2026-11-26)
@@ -1920,11 +1921,11 @@ cleanup.  The remaining risks are tracked in Stage R8.
   - =10ccee3= hostile server-name Docker test.
   - =c3c0e9f= directory pull, action, first-database, bad-SSH, and
     read-only-check tests.
-- Unit/stub suite: =262 passed=, =47 deselected=, branch coverage =93.96%=
+- Unit/stub suite: =262 passed=, =50 deselected=, branch coverage =93.96%=
   with =make check= green.  Eight safety tests live in
   =tests/test_safety_contract.py=.
-- Docker suite: 46 tests in =tests/integration= (14 original, 32 new).  The
-  37-test suite passed on Ubuntu 20.04 and 26.04; the 9 newest tests await
+- Docker suite: 49 tests in =tests/integration= (14 original, 35 new).  The
+  37-test suite passed on Ubuntu 20.04 and 26.04; the 12 newest tests await
   the next matrix run.  The extra integration selection is the legacy
   host-binary check in =tests/test_integration.py=, not a Docker test.
 - The 20.04/26.04 matrix is green.  Re-run both after changing the
@@ -1940,9 +1941,9 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: run the new tests on the matrix; finish R6
-  (symlinked remote roots); run the R7 interruption checks (documented in
-  =docs/safety.md=); then R8 CI matrix and R9 manual staging.
+- Next work, in risk order: run the new tests on the matrix; run the
+  remaining R7 interruption checks (db pull SIGINT, SSH drop, disk
+  pressure) from =docs/safety.md=; then R8 CI matrix and R9 manual staging.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2300,7 +2301,7 @@ Tests:
   execute.
 - [X] Password values never appear in rendered commands or logs.
 - [X] Symlinked local paths outside the project root are rejected.
-- [ ] Symlinked remote roots do not allow writes outside the intended
+- [X] Symlinked remote directories do not allow writes outside the intended
   directory.
 - [X] Unknown config keys remain non-destructive (fast-suite loader tests).
 - [X] Environment-variable expansion is not re-evaluated as shell syntax.
@@ -2314,8 +2315,8 @@ Exit criteria:
 *Goal:* Prove Sink fails safely when the world goes wrong.
 
 Tests:
-- [ ] SIGINT/SIGTERM during a large file put/pull leaves no partial
-  success claim and cleans temp files (manual: =docs/safety.md=).
+- [X] SIGINT/SIGTERM during a large file put/pull leaves no partial
+  success claim and cleans temp files.
 - [ ] SIGINT during =db pull= does not create/update =LATEST=
   (manual: =docs/safety.md=).
 - [ ] SSH connection drop during =mysqldump= reports failure and cleans
@@ -2412,9 +2413,9 @@ These remain manual checks or future environment-specific suites.
 R1, R4, and R5 are complete; R0 is open only for S13.  The new R2/R3/R6/R7
 tests are written and await a matrix run.  Next:
 
-1. Run the 46-test Docker suite on 20.04 and 26.04.
-2. R6 symlinked remote roots.
-3. R7 interruption checks from =docs/safety.md=.
-4. R8 CI matrix, then R9 manual staging certification.
+1. Run the 49-test Docker suite on 20.04 and 26.04.
+2. R7 db-pull SIGINT, SSH-drop, and disk-pressure checks from
+   =docs/safety.md=.
+3. R8 CI matrix, then R9 manual staging certification.
 
 Add new tests to the same suite and rerun both LTS versions.
