@@ -257,3 +257,57 @@ def test_ssh_drop_during_db_pull_reports_error_and_cleans(
     assert "[Success" not in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
     assert project.sandbox.credentials_files() == []
+
+
+_MEMORY_WRAPPER = """
+import os
+import sys
+
+pid = os.fork()
+if pid == 0:
+    os.execvp(sys.argv[1], sys.argv[1:])
+_, status, usage = os.wait4(pid, 0)
+print(f"SINK_MAXRSS {usage.ru_maxrss}", file=sys.stderr)
+sys.exit(os.waitstatus_to_exitcode(status))
+"""
+
+
+def test_large_db_pull_stays_within_memory_budget(live_project) -> None:
+    project = live_project()
+    _create_big_table(project, rows=100_000)
+    try:
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                _MEMORY_WRAPPER,
+                sys.executable,
+                "-u",
+                "-m",
+                "sink",
+                "db",
+                "pull",
+                "dev",
+                "--real",
+            ],
+            cwd=project.path,
+            env=os.environ.copy(),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=180,
+        )
+    finally:
+        _drop_big_table(project)
+
+    assert process.returncode == 0, process.stdout + process.stderr
+    assert "[Success" in process.stdout
+    max_rss = next(
+        int(line.split()[1])
+        for line in process.stderr.splitlines()
+        if line.startswith("SINK_MAXRSS ")
+    )
+    if sys.platform == "darwin":
+        max_rss //= 1024
+    assert max_rss < 80 * 1024
+    assert (project.path / "pulls" / "LATEST-dev.sql.gz").is_symlink()
