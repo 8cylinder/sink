@@ -1861,7 +1861,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - Recent safety work already covers pipeline stderr from every stage,
   quoted MySQL option-file values, remote =EXIT=-trap cleanup, and removal
   of the obsolete =single= command.
-- Baseline for this section: 253 tests, 93.68% branch coverage, =make check=
+- Baseline for this section: 254 tests, 93.95% branch coverage, =make check=
   green.
 
 ** Implementation status
@@ -1871,10 +1871,40 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] =make integration=, =integration-oldest=, and =integration-matrix=.
 - [X] Integration tests skip cleanly when Docker is unavailable and stay out
   of the default =make check= run.
-- [X] First real Docker run on Ubuntu 26.04: 15 passed.
+- [X] First real Docker run on Ubuntu 26.04: 14 Docker tests passed.
 - [ ] First real Docker run on Ubuntu 20.04.
 - [ ] CI matrix and the remaining adversarial, interruption, and release-gate
   stages.
+
+** Resume here (real world testing, 2026-11-26)
+- Branch =modernize=.  The integration work is committed locally; fetch or
+  pull these commits on the next machine:
+  - =508269f= Docker harness and first real-world tests.
+  - =8056121= unlock the =deploy= account in the test image.
+  - =27ec4e0=/=6f4803c=/=a5e602e= known_hosts and SSH wrapper fixes.
+  - =be553cb= download single files before diffing.
+  - =6c8e614= scope =make integration= to =tests/integration=.
+- Unit/stub suite: =254 passed=, =15 deselected=, branch coverage =93.95%=
+  with =make check= green.
+- Docker suite: 14 tests in =tests/integration=.  Ubuntu 26.04 passes; the
+  extra 15th integration selection is the legacy host-binary check in
+  =tests/test_integration.py=, not a Docker test.
+- Run the remaining LTS checks first:
+  #+begin_src bash
+    make integration-oldest
+    make integration-matrix
+  #+end_src
+- Preserve these harness details when editing tests:
+  - the =deploy= account is unlocked in the image because sshd rejects locked
+    accounts even for key authentication;
+  - OpenSSH ignores =$HOME= for =~/.ssh/known_hosts=, so the fixture uses a
+    temporary =ssh= wrapper with =UserKnownHostsFile= and
+    =GlobalKnownHostsFile=/dev/null=;
+  - single-file diffs must download the remote file; =--compare-dest= skips
+    identical files and leaves =git diff= with no file.
+- Next work, in risk order: R6 adversarial/path-safety tests, R4 partial/failed
+  database paths, R7 interruption/failure injection, R8 CI matrix, R9 manual
+  staging certification.
 
 ** Safety contract
 Every stage references these IDs.
