@@ -34,7 +34,9 @@ temporary `known_hosts`, and temporary projects, then removes the stack. Use
 `make integration-down` to clean up containers left by an interrupted run.
 
 CI runs the integration suite on Ubuntu 20.04 and 26.04 for pull requests;
-both matrix jobs must be green before a release.
+both matrix jobs must be green before a release. Set `SINK_TEST_KEEP=1` to
+leave a failed stack running so `docker logs` can inspect it; clean up with
+`make integration-down`.
 
 Build documentation:
 

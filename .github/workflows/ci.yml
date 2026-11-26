@@ -55,7 +55,15 @@ jobs:
       - name: Run integration tests
         env:
           SINK_TEST_UBUNTU: ${{ matrix.ubuntu }}
+          SINK_TEST_KEEP: "1"
         run: make integration
-      - name: Show leftover containers
+      - name: Container logs on failure
         if: failure()
-        run: docker ps -a --filter label=sink.integration=true
+        run: |
+          for id in $(docker ps -aq --filter label=sink.integration=true); do
+            echo "=== $id ==="
+            docker logs "$id" 2>&1 | tail -n 200 || true
+          done
+      - name: Remove integration containers
+        if: always()
+        run: make integration-down

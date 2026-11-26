@@ -610,7 +610,10 @@ def sandbox(
             bin_dir=bin_dir,
         )
     finally:
-        down()
+        # CI sets SINK_TEST_KEEP=1 so a failed run can dump container logs
+        # before the cleanup step removes the stack.
+        if os.environ.get("SINK_TEST_KEEP") != "1":
+            down()
 
 
 @pytest.fixture

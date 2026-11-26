@@ -2381,8 +2381,8 @@ Tasks:
   (CI =needs= and =CONTRIBUTING.md=).
 - [ ] Cache Docker layers per Ubuntu version and pin image digests where
   practical.
-- [ ] Publish a short failure report with container logs and the recorded
-  tool versions on CI failure.
+- [X] Publish a short failure report with container logs and the recorded
+  tool versions on CI failure (SINK_TEST_KEEP + logs step; version test).
 - [ ] Track flaky tests explicitly; do not hide them with automatic
   reruns.
 - [X] Add dependency/security scanning if not already covered by CI
