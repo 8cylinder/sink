@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from helpers import combined
 
@@ -125,3 +127,30 @@ def test_transfers_leave_unrelated_files_alone(live_project) -> None:
     assert pull.exit_code == 0, combined(pull)
     assert local_unrelated.read_text() == "local\n"
     assert project.remote_read("unrelated.txt") == "keep\n"
+
+
+def test_remote_symlinked_directory_is_replaced_not_followed(
+    live_project,
+) -> None:
+    project = live_project()
+    outside = f"/var/www/sink-outside-{uuid.uuid4().hex[:12]}"
+    project.sandbox.exec(
+        "server", "install", "-d", "-o", "deploy", "-g", "deploy", outside
+    )
+    project.sandbox.exec(
+        "server",
+        "ln",
+        "-s",
+        outside,
+        project.remote_path("sub"),
+        user="deploy",
+    )
+
+    result = project.invoke("file", "put", "dev", "project", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    leaked = project.sandbox.exec(
+        "server", "ls", "-A", outside, user="deploy"
+    ).stdout.strip()
+    assert leaked == ""
+    assert project.remote_read("sub/file.txt") == "local sub\n"
