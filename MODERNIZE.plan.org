@@ -1991,9 +1991,11 @@ tests/integration/
   test_files.py
   test_diff.py
   test_db.py
-  test_check_action.py
+  test_check.py
+  test_action.py
   test_adversarial.py
   test_failures.py
+  test_versions.py
 #+end_src
 
 *** Services
@@ -2017,11 +2019,12 @@ tests/integration/
   The server version is intentionally separate from the OS matrix.
 - Internal-only network; no host port.
 - Health check with =mysqladmin ping=.
-- Init SQL creates a test database and users:
+- Init SQL creates a test database, a readable table, a protected table,
+  and users:
   - a normal user;
   - a user whose password contains =#=, quotes, backslashes, =$=, and
     spaces;
-  - a restricted user for failure tests.
+  - a partial-access user and a no-privilege user for failure tests.
 
 *** Ubuntu version matrix
 The OS matrix isolates differences in OpenSSH, rsync, sudo, the shell, and the
@@ -2098,7 +2101,8 @@ Each integration test gets:
 - a generated =sink.yaml= pointing at =127.0.0.1:<mapped-port>= and the
   =db= service;
 - a unique remote root under =/var/www/<test-id>=;
-- a unique database or table namespace;
+- the shared =demo= database, with destructive tests resetting the rows
+  they read;
 - real SSH/rsync/mysql binaries on =PATH=;
 - the temporary =HOME= containing =known_hosts=.
 
