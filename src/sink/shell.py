@@ -13,6 +13,7 @@ import shlex
 import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
@@ -330,7 +331,20 @@ def _execute_pipeline(
         # Only the final process writes to the caller's stdout.  Every
         # stage writes stderr to the same destination, which is read after
         # all of them exit.
-        output_text, error_text = previous.communicate(input=input)
+        try:
+            output_text, error_text = previous.communicate(input=input)
+        except BaseException:
+            # A signal or write error can interrupt communicate().  Reap the
+            # stages before propagating so cleanup can safely remove files
+            # they may still be writing.
+            for process in processes:
+                if process.poll() is None:
+                    with suppress(ProcessLookupError):
+                        process.terminate()
+            for process in processes:
+                with suppress(subprocess.TimeoutExpired):
+                    process.wait(timeout=5)
+            raise
         for process in processes[:-1]:
             process.wait()
         if error_capture is not None:
