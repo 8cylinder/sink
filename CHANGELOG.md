@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `db pull --tag` accepts only one filename component. Values such as
+  `../../../escape` are rejected instead of writing outside `pulls_dir`.
+- `db put` honors `warn: yes` and asks before overwriting a database on the
+  remote, Lando, and DDEV paths. Declining leaves the database unchanged.
+- `db pull` appends `-2`, `-3`, and so on instead of overwriting a dump
+  created in the same second.
+- A failed `db pull` removes the truncated local dump, leaves `LATEST-*`
+  unchanged, and exits non-zero.
+- Project and server names are reduced to a single filename component before
+  they become dump names or `LATEST-*` links, so a name containing `../`
+  cannot escape `pulls_dir`.
+
+### Tests
+
+- Added fast safety contracts and real-service Docker coverage for hostile
+  filenames and tags, outside-root paths, special-character passwords,
+  restricted and disconnected databases, warning confirmation, unwritable
+  remote roots, missing directories, URL probes, and credential cleanup.
+
 ## 0.3.0 - 2026-11-25
 
 ### Removed
