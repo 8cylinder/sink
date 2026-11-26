@@ -110,6 +110,7 @@ Run against a real staging server before a release:
 8. Run `check` and confirm every probe is green.
 9. Confirm no `/tmp/sink-mysql-*.cnf` file remains.
 10. Confirm no unexpected deletions or ownership changes.
+11. Open `sink ssh` interactively and confirm it starts in the server root.
 
 Record any deviation as a new integration or regression test.
 
