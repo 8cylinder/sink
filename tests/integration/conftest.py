@@ -614,6 +614,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
         urls: list[dict[str, object]] | None = None,
         project_overrides: dict[str, object] | None = None,
         server_overrides: dict[str, object] | None = None,
+        ssh_overrides: dict[str, object] | None = None,
         extra_servers: dict[str, dict[str, object]] | None = None,
     ) -> LiveProject:
         nonlocal counter
@@ -656,19 +657,19 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
             ]
         databases = [*databases, *(extra_databases or [])]
 
+        ssh_entry: dict[str, object] = {
+            "name": "deploy",
+            "username": "deploy",
+            "server": "127.0.0.1",
+            "key": str(sandbox.key),
+            "port": sandbox.port,
+        }
+        ssh_entry.update(ssh_overrides or {})
         server_document: dict[str, object] = {
             "root": remote_root,
             "default": True,
             "warn": warn,
-            "ssh": [
-                {
-                    "name": "deploy",
-                    "username": "deploy",
-                    "server": "127.0.0.1",
-                    "key": str(sandbox.key),
-                    "port": sandbox.port,
-                }
-            ],
+            "ssh": [ssh_entry],
             "mysql": databases,
             "urls": urls or [],
             "actions": {"hello": "echo hello"},

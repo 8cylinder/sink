@@ -62,3 +62,16 @@ def test_warn_declined_does_not_overwrite(live_project) -> None:
 
     assert result.exit_code == 0, combined(result)
     assert not project.remote_exists("index.html")
+
+
+def test_directory_pull_updates_local_files(live_project) -> None:
+    project = live_project()
+    put = project.invoke("file", "put", "dev", "project", "--real")
+    assert put.exit_code == 0, combined(put)
+
+    project.remote_write("sub/file.txt", "remote sub\n")
+    result = project.invoke("file", "pull", "dev", "project", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    local = project.path / "project" / "sub" / "file.txt"
+    assert local.read_text() == "remote sub\n"

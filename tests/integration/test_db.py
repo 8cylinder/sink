@@ -87,3 +87,23 @@ def test_db_pull_does_not_overwrite_a_same_second_dump(
     assert latest.name in {dump.name for dump in dumps}
     assert latest.name.endswith("-2.sql.gz")
     assert project.sandbox.credentials_files() == []
+
+
+def test_db_pull_uses_the_first_database_entry(live_project) -> None:
+    project = live_project(
+        extra_databases=[
+            {
+                "username": "nopriv",
+                "password": "wrong",
+                "db": "demo",
+                "hostname": "db",
+            }
+        ]
+    )
+
+    result = project.invoke("db", "pull", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    dumps = list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+    assert len(dumps) == 1
+    assert project.sandbox.credentials_files() == []
