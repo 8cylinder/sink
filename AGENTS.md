@@ -11,6 +11,7 @@
 - `pyproject.toml` is the only manifest. Hatchling builds `src/sink`; there is no `setup.py` and no Poetry.
 - `uv.lock` is tracked and must stay committed. `.python-version` is 3.15.
 - Lint/type/coverage gates live in `pyproject.toml`; `make check` runs Ruff, ty, import-linter, and the 90% branch coverage suite. Do not add ad-hoc tool config.
+- Docker tests: `make integration` (latest LTS), `make integration-oldest`, `make integration-matrix`. `make ci-full` runs `ci` plus the matrix. Docker tests live in `tests/integration` and use real SSH/rsync/MySQL.
 
 ## Critical gotchas
 

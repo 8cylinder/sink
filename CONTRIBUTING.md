@@ -48,13 +48,22 @@ and container logs in the issue tracker. Do not hide it with automatic reruns.
 Before tagging a release, run:
 
 ```console
-make check
-make secrets
-make integration-matrix
+make ci-full
 ```
 
-CI runs the same integration suite on Ubuntu 20.04 and 26.04 as separate
-jobs. Both matrix jobs must be green before a release.
+That runs formatting, Ruff, ty, import-linter, the fast suite, the secret
+scan, and the Docker matrix. CI runs the same integration suite on Ubuntu
+20.04 and 26.04 as separate jobs. Both matrix jobs must be green before a
+release.
+
+Repository admins must enable these as required status checks on `master`:
+
+- `check`
+- `integration (Ubuntu 20.04)`
+- `integration (Ubuntu 26.04)`
+
+Also enable Dependabot alerts, secret scanning with push protection, and
+CodeQL code scanning in the repository settings.
 
 ## Documentation
 

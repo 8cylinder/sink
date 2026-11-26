@@ -9,7 +9,8 @@ make test
 ```
 
 `make check` runs formatting, linting, type checking, import contracts, and
-the full branch-coverage suite. The coverage floor is 90%.
+the full branch-coverage suite. The coverage floor is 90%. `make ci-full`
+adds the secret scan and the Docker integration matrix.
 
 Docker-backed integration tests exercise real SSH, rsync, and MySQL against
 Ubuntu LTS containers. They are excluded from `make check` and require Docker

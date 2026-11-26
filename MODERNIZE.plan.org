@@ -1793,6 +1793,7 @@ uv build
 uv tool install --editable --force .
 make check
 make ci
+make ci-full
 make secrets
 make hooks
 #+end_src
@@ -2390,7 +2391,7 @@ Tasks:
 - [X] Add dependency/security scanning if not already covered by CI
   (CodeQL workflow).
 - [ ] Enable required CI checks in the repository settings (admin
-  approval).
+  approval; exact check names are in =CONTRIBUTING.md=).
 
 Exit criteria:
 - A release cannot be produced with a red integration suite.

@@ -7,7 +7,7 @@ UBUNTU_LATEST ?= 26.04
 UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
 SINK_TEST_UBUNTU ?= $(UBUNTU_LATEST)
 
-.PHONY: help sync hooks fmt fmt-check lint lint-check type arch test integration integration-oldest integration-matrix integration-down secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
+.PHONY: help sync hooks fmt fmt-check lint lint-check type arch test integration integration-oldest integration-matrix integration-down secrets docs docs-serve man install-man check ci ci-full build install uninstall upgrade clean
 
 help:  ## Show this help
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -79,6 +79,10 @@ ci:  ## Install locked dependencies and run all checks
 	uv sync --locked --all-groups
 	$(MAKE) check
 	$(MAKE) secrets
+
+ci-full:  ## Run CI checks plus the Docker integration matrix
+	$(MAKE) ci
+	$(MAKE) integration-matrix
 
 build:  ## Build the wheel and sdist
 	uv build
