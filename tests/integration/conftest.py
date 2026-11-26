@@ -331,7 +331,10 @@ def sandbox(
         _run([*compose, "down", "-v", "--remove-orphans"], env=env)
 
     try:
-        up = _run([*compose, "up", "-d", "--build"], env=env)
+        build = (
+            [] if os.environ.get("SINK_TEST_SKIP_BUILD") == "1" else ["--build"]
+        )
+        up = _run([*compose, "up", "-d", *build], env=env)
         if up.returncode:
             raise RuntimeError(
                 f"docker compose up failed ({up.returncode}):\n"

@@ -30,6 +30,9 @@ Behavior changes follow the test-first workflow in `MODERNIZE.plan.org`: add a
 strict xfail/regression test, prove it fails for the intended reason, then fix
 it and remove the marker.
 
+If an integration test flakes, record the Ubuntu version, failing assertion,
+and container logs in the issue tracker. Do not hide it with automatic reruns.
+
 ## Code standards
 
 - Python 3.15, PEP 604/585 annotations, `pathlib.Path`, and aware datetimes.

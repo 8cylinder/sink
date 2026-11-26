@@ -52,11 +52,24 @@ jobs:
         run: |
           docker compose version
           docker info --format '{{.ServerVersion}}'
+      - name: Restore server image
+        id: image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/sink-test-server-${{ matrix.ubuntu }}.tar
+          key: sink-test-server-${{ matrix.ubuntu }}-${{ hashFiles('tests/integration/server/**') }}
+      - name: Load server image
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/sink-test-server-${{ matrix.ubuntu }}.tar
       - name: Run integration tests
         env:
           SINK_TEST_UBUNTU: ${{ matrix.ubuntu }}
           SINK_TEST_KEEP: "1"
+          SINK_TEST_SKIP_BUILD: ${{ steps.image-cache.outputs.cache-hit == 'true' && '1' || '0' }}
         run: make integration
+      - name: Save server image
+        if: always() && steps.image-cache.outputs.cache-hit != 'true'
+        run: docker save sink-test-server:${{ matrix.ubuntu }} -o /tmp/sink-test-server-${{ matrix.ubuntu }}.tar || true
       - name: Container logs on failure
         if: failure()
         run: |
