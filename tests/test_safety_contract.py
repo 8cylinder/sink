@@ -199,3 +199,23 @@ def test_interrupted_pull_removes_only_rsync_temp_files(
     assert local.exists()
     assert unrelated.exists()
     assert not temporary.exists()
+
+
+def test_interrupted_pull_removes_the_temp_before_reraising(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transfer = Transfer(_project(tmp_path), Server(name="dev", root=tmp_path))
+    local = tmp_path / "remote.bin"
+    temporary = tmp_path / ".remote.bin.abc123"
+    temporary.write_text("partial")
+
+    def interrupted(*args, **kwargs) -> None:
+        _ = args, kwargs
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(transfer, "_rsync", interrupted)
+
+    with pytest.raises(KeyboardInterrupt):
+        transfer.pull(local, None)
+
+    assert not temporary.exists()
