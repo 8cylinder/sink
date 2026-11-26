@@ -47,10 +47,6 @@ def _gzip_dump(project, name: str = "dump.sql.gz") -> str:
     return name
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B25: a db pull tag may escape pulls_dir",
-)
 def test_db_pull_rejects_a_path_traversal_tag(project_factory) -> None:
     project = project_factory()
 
@@ -60,10 +56,6 @@ def test_db_pull_rejects_a_path_traversal_tag(project_factory) -> None:
     assert "tag" in combined(result).lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B26: db put does not honor warn before overwriting",
-)
 def test_db_put_requires_confirmation_when_warn(project_factory) -> None:
     project = project_factory(warn=True)
     filename = _gzip_dump(project)
@@ -98,10 +90,6 @@ def test_db_put_proceeds_when_warn_is_confirmed(project_factory) -> None:
     assert commands_named(project.stub_log, "ssh")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B27: dumps created within one second overwrite each other",
-)
 def test_db_pull_does_not_overwrite_a_same_second_dump(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -133,10 +121,6 @@ def test_db_pull_does_not_overwrite_a_same_second_dump(
     assert len(list(pulls.glob("*.sql.gz"))) == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="B28: a failed pull leaves a partial dump on disk",
-)
 def test_db_failed_pull_removes_the_partial_dump(tmp_path: Path) -> None:
     pulls = tmp_path / "pulls"
     pulls.mkdir()

@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import re
 import shlex
 import shutil
 import sys
@@ -69,6 +70,38 @@ def _dump_argv(
             ]
         )
     return argv
+
+
+_TAG_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def _validate_tag(tag: str | None) -> None:
+    """Reject a tag that could escape the pulls directory.
+
+    A tag becomes part of a local filename.  Allowing path separators or
+    ``..`` lets a value such as ``../../../escape`` write outside
+    ``pulls_dir``, even though the tag never reaches a shell.
+    """
+    if tag is None:
+        return
+    if tag in {".", ".."} or _TAG_PATTERN.fullmatch(tag) is None:
+        raise CommandError(
+            f"Invalid tag {tag!r}: use only letters, digits, dot, dash, "
+            "or underscore"
+        )
+
+
+def _unique_path(path: Path) -> Path:
+    """Return a dump path that does not overwrite an existing file."""
+    if not path.exists():
+        return path
+    suffix = "".join(path.suffixes)
+    base = path.name[: -len(suffix)] if suffix else path.name
+    for index in range(2, 1000):
+        candidate = path.with_name(f"{base}-{index}{suffix}")
+        if not candidate.exists():
+            return candidate
+    raise CommandError(f"Could not find a free dump name for {path}")
 
 
 def _validate_gzip(path: Path) -> None:
@@ -146,11 +179,13 @@ class DB:
 
         if s.server_type == "lando":
             # lando adds the gz extension itself so we remove here
-            sqlfile = Path(str(sqlfile)[:-3])
+            sqlfile = _unique_path(Path(str(sqlfile)[:-3]))
             self._pull_lando(sqlfile)
         elif s.server_type == "ddev":
+            sqlfile = _unique_path(sqlfile)
             self._pull_ddev(sqlfile)
         else:
+            sqlfile = _unique_path(sqlfile)
             self._pull(sqlfile, local=True)
 
     def _pull_lando(self, sqlfile: Path) -> None:
@@ -246,6 +281,12 @@ class DB:
                 message="sql download complete",
             )
         elif result.returncode:
+            if local:
+                # A failed dump is truncated.  Keep it out of the pulls
+                # directory so it cannot be mistaken for a usable backup.
+                for candidate in (sqlfile, Path(f"{sqlfile}.gz")):
+                    with suppress(OSError):
+                        candidate.unlink()
             if ui.quiet < 2:
                 ui.err_console.print(str(sqlfile.absolute()), style="yellow")
             ui.error(
@@ -326,6 +367,8 @@ class DB:
         """Build and run a local or remote import pipeline."""
         s = self.server
         db = self._database()
+        if not self._confirm_overwrite():
+            return
         if not s.ssh:
             raise CommandError(f"Server has no ssh settings ({s.name})")
         ssh = s.ssh[0]
@@ -416,16 +459,20 @@ class DB:
             message="sql upload complete",
         )
 
+    def _confirm_overwrite(self) -> bool:
+        """Ask before overwriting a database on a warned server."""
+        if not (self.real and self.server.warn):
+            return True
+        msg = (
+            f" WARNING: You are about to overwrite the {self.server.name} "
+            "database, continue?"
+        )
+        return click.confirm(msg)
+
     def run_put_cmd(self, cmd: Command) -> None:
         """Confirm, run, and report an import command."""
-        s = self.server
-        if self.real and s.warn:
-            msg = (
-                f" WARNING: You are about to overwrite the {s.name} "
-                "database, continue?"
-            )
-            if not click.confirm(msg):
-                return
+        if not self._confirm_overwrite():
+            return
         result = run(cmd, real=self.real, capture=True)
         self._report_put(result)
 
@@ -437,6 +484,7 @@ class DB:
         tag: str | None,
     ) -> Path:
         """Build the timestamped dump filename."""
+        _validate_tag(tag)
         now = datetime.datetime.now(datetime.UTC).astimezone()
         now = now.strftime("%y-%m-%d_%H-%M-%S")
         tag = f"-{tag}" if tag else ""
