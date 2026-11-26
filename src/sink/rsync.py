@@ -81,9 +81,10 @@ class Transfer:
             self.multiple = True
         try:
             self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
-        except KeyboardInterrupt:
+        except BaseException:
             # rsync creates .NAME.XXXXXX beside a single-file destination and
-            # does not always remove it when SIGINT reaches the process group.
+            # does not always remove it when the transfer is interrupted or
+            # fails.  Clean it before propagating the failure.
             if not self.multiple:
                 self._remove_pull_temp(local)
             raise
