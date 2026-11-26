@@ -13,7 +13,7 @@ the full branch-coverage suite. The coverage floor is 90%.
 
 Docker-backed integration tests exercise real SSH, rsync, and MySQL against
 Ubuntu LTS containers. They are excluded from `make check` and require Docker
-Compose, `ssh`, `ssh-keygen`, `ssh-keyscan`, `rsync`, `git`, and `gzip` on the
+Compose, `ssh`, `ssh-keygen`, `rsync`, `git`, and `gzip` on the
 host:
 
 ```console

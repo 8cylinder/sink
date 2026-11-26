@@ -25,7 +25,7 @@ DB_NAME = "demo"
 DB_USER = "sink"
 DB_PASSWORD = "p#ass word"  # noqa: S105 - test fixture
 ROOT_PASSWORD = "rootsecret"  # noqa: S105 - test fixture
-HOST_BINARIES = ("ssh", "ssh-keygen", "ssh-keyscan", "rsync", "git", "gzip")
+HOST_BINARIES = ("ssh", "ssh-keygen", "rsync", "git", "gzip")
 
 
 def _skip_reason() -> str | None:
@@ -464,18 +464,40 @@ def sandbox(
                 f"--- diagnostics ---\n{inspect.stdout}{inspect.stderr}"
             ) from error
 
-        scan = subprocess.run(
-            ["ssh-keyscan", "-p", str(port), "127.0.0.1"],
-            text=True,
-            capture_output=True,
-            check=True,
+        host_keys = _run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "server",
+                "sh",
+                "-c",
+                "cat /etc/ssh/ssh_host_*_key.pub",
+            ],
+            env=env,
         )
+        if host_keys.returncode:
+            raise RuntimeError(
+                "could not read the server host keys:\n"
+                f"{host_keys.stdout}{host_keys.stderr}"
+            )
+        known_lines = [
+            f"[127.0.0.1]:{port} {line}"
+            for line in host_keys.stdout.splitlines()
+            if line.strip()
+        ]
+        if not any("ssh-ed25519" in line for line in known_lines):
+            raise RuntimeError(
+                "the server did not publish an ED25519 host key:\n"
+                + "\n".join(known_lines)
+            )
+
         home = work / "home"
         ssh_dir = home / ".ssh"
         ssh_dir.mkdir(parents=True)
         ssh_dir.chmod(0o700)
         known_hosts = ssh_dir / "known_hosts"
-        known_hosts.write_text(scan.stdout)
+        known_hosts.write_text("\n".join(known_lines) + "\n")
         known_hosts.chmod(0o600)
 
         yield Sandbox(
