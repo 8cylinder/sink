@@ -500,6 +500,39 @@ def sandbox(
         known_hosts.write_text("\n".join(known_lines) + "\n")
         known_hosts.chmod(0o600)
 
+        strict_env = os.environ.copy()
+        strict_env["HOME"] = str(home)
+        strict = subprocess.run(
+            [
+                "ssh",
+                "-vvv",
+                "-i",
+                str(key),
+                "-p",
+                str(port),
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "IdentitiesOnly=yes",
+                "-o",
+                "StrictHostKeyChecking=yes",
+                "-o",
+                "ConnectTimeout=3",
+                "deploy@127.0.0.1",
+                "true",
+            ],
+            env=strict_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if strict.returncode:
+            raise RuntimeError(
+                "strict known_hosts verification failed:\n"
+                f"{strict.stderr[-4000:]}\n"
+                f"--- known_hosts ---\n{known_hosts.read_text()}"
+            )
+
         yield Sandbox(
             compose=compose,
             env=env,

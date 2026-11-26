@@ -49,6 +49,9 @@
   against Ubuntu LTS containers. `make integration`, `make integration-oldest`,
   and `make integration-matrix` cover the oldest and latest supported LTS
   releases; the default `make check` suite remains Docker-free.
+- `diff` always downloads a single remote file before comparison.  Using
+  `--compare-dest` there skipped identical files and left `git diff` with no
+  temporary file.
 - `file` accepts `[SERVER] [FILENAME]`; a lone non-server token is treated
   as a filename on the default server. Paths outside `project.root` are
   rejected instead of becoming remote absolute paths.
