@@ -31,3 +31,19 @@ def test_action_reports_a_failing_remote_command(live_project) -> None:
 
     assert result.exit_code != 0, combined(result)
     assert "boom" in combined(result)
+
+
+def test_action_name_with_shell_syntax_is_not_executed(live_project) -> None:
+    name = "pwn;$(touch sink-pwned) `id`"
+    project = live_project(server_overrides={"actions": {name: "echo safe"}})
+
+    result = project.invoke("action", "dev", name, "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert "safe" in combined(result)
+    remote_home = project.sandbox.exec(
+        "server", "test", "-e", "/home/deploy/sink-pwned", check=False
+    )
+    assert remote_home.returncode != 0
+    assert not project.remote_exists("sink-pwned")
+    assert not (project.path / "sink-pwned").exists()

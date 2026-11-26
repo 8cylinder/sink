@@ -75,3 +75,53 @@ def test_directory_pull_updates_local_files(live_project) -> None:
     assert result.exit_code == 0, combined(result)
     local = project.path / "project" / "sub" / "file.txt"
     assert local.read_text() == "remote sub\n"
+
+
+def test_file_put_preserves_the_source_mode(live_project) -> None:
+    project = live_project()
+    local = project.path / "project" / "index.html"
+    local.chmod(0o600)
+
+    result = project.invoke(
+        "file", "put", "dev", "project/index.html", "--real"
+    )
+
+    assert result.exit_code == 0, combined(result)
+    mode = project.sandbox.exec(
+        "server", "stat", "-c", "%a", project.remote_path("index.html")
+    ).stdout.strip()
+    assert mode == "600"
+
+
+def test_chown_flags_only_appear_when_configured(live_project) -> None:
+    plain = live_project()
+    result = plain.invoke("file", "put", "dev", "project/index.html")
+    text = combined(result)
+    assert "--chown" not in text
+    assert "--owner" not in text
+    assert "--group" not in text
+
+    configured = live_project(
+        server_overrides={"user": "deploy", "group": "deploy"}
+    )
+    result = configured.invoke("file", "put", "dev", "project/index.html")
+    text = combined(result)
+    assert "--chown=deploy:deploy" in text
+    assert "--owner" in text
+    assert "--group" in text
+
+
+def test_transfers_leave_unrelated_files_alone(live_project) -> None:
+    project = live_project()
+    project.remote_write("unrelated.txt", "keep\n")
+    local_unrelated = project.path / "project" / "unrelated-local.txt"
+    local_unrelated.write_text("local\n")
+
+    put = project.invoke("file", "put", "dev", "project/index.html", "--real")
+    assert put.exit_code == 0, combined(put)
+    assert project.remote_read("unrelated.txt") == "keep\n"
+
+    pull = project.invoke("file", "pull", "dev", "project/index.html", "--real")
+    assert pull.exit_code == 0, combined(pull)
+    assert local_unrelated.read_text() == "local\n"
+    assert project.remote_read("unrelated.txt") == "keep\n"

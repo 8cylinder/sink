@@ -163,3 +163,21 @@ def test_latest_symlink_stays_inside_pulls_for_hostile_server(
     assert len(links) == 1
     assert links[0].parent == pulls
     assert links[0].is_symlink()
+
+
+def test_environment_expansion_is_not_shell_syntax(
+    project_factory, monkeypatch, tmp_path: Path
+) -> None:
+    marker = tmp_path / "sink-pwned"
+    monkeypatch.setenv("SINK_TEST_HOSTILE", f"$(touch {marker})")
+    project = project_factory(
+        project_overrides={"exclude": ["${SINK_TEST_HOSTILE}"]}
+    )
+
+    result = project.invoke("file", "put", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    rsync = commands_named(project.stub_log, "rsync")
+    assert rsync
+    assert any(f"$(touch {marker})" in arg for arg in rsync[0].args)
+    assert not marker.exists()
