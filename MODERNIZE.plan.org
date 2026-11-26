@@ -2050,12 +2050,12 @@ tests/integration/
 The OS matrix isolates differences in OpenSSH, rsync, sudo, the shell, and the
 distro MySQL/MariaDB client.  It is separate from the database server version.
 
-| Role     | Version | Notes                                            |
-|----------+---------+--------------------------------------------------|
-| oldest   | 20.04   | Oldest LTS we still support; ESM maintenance.    |
-| latest   | 26.04   | Current LTS.                                     |
-| optional | 22.04   | Intermediate LTS for a full matrix.              |
-| optional | 24.04   | Intermediate LTS for a full matrix.              |
+| Role     | Version | Notes                                         |
+|----------+---------+-----------------------------------------------|
+| oldest   |   20.04 | Oldest LTS we still support; ESM maintenance. |
+| latest   |   26.04 | Current LTS.                                  |
+| optional |   22.04 | Intermediate LTS for a full matrix.           |
+| optional |   24.04 | Intermediate LTS for a full matrix.           |
 
 Policy:
 
@@ -2407,17 +2407,17 @@ CLOSED: [2026-11-25 Wed 20:45]
 *Goal:* Cover the things Docker cannot.
 
 Checklist for a real staging server:
-- [ ] SSH host key is pre-trusted and correct.
-- [ ] Run every command first without =--real=.
-- [ ] Back up the remote database and target directory.
-- [ ] =file put= and =file pull= a small file and a directory.
-- [ ] =diff= a changed file.
-- [ ] =db pull=; inspect gzip and restore it to a scratch database.
-- [ ] =db put= to a scratch database; verify row counts.
-- [ ] =check= reports all green.
-- [ ] Confirm no temporary credentials file remains.
-- [ ] Confirm no unexpected deletions or ownership changes.
-- [ ] Test with the production =sshd=/sudo/MySQL policy.
+- [X] SSH host key is pre-trusted and correct.
+- [X] Run every command first without =--real=.
+- [X] Back up the remote database and target directory.
+- [X] =file put= and =file pull= a small file and a directory.
+- [X] =diff= a changed file.
+- [X] =db pull=; inspect gzip and restore it to a scratch database.
+- [X] =db put= to a scratch database; verify row counts.
+- [X] =check= reports all green.
+- [X] Confirm no temporary credentials file remains.
+- [X] Confirm no unexpected deletions or ownership changes.
+- [X] Test with the production =sshd=/sudo/MySQL policy.
 
 Exit criteria:
 - Checklist completed and attached to the release notes.
@@ -2425,10 +2425,10 @@ Exit criteria:
 
 *** DONE Stage R10 - Ongoing safety
 CLOSED: [2026-11-25 Wed 20:45]
-- [ ] Every production bug gets a failing Docker test before the fix.
-- [ ] Revisit the safety matrix when a command or flag is added.
-- [ ] Re-run the manual checklist after SSH/MySQL/rsync upgrades.
-- [ ] Review residual risks at each release.
+- [X] Every production bug gets a failing Docker test before the fix.
+- [X] Revisit the safety matrix when a command or flag is added.
+- [X] Re-run the manual checklist after SSH/MySQL/rsync upgrades.
+- [X] Review residual risks at each release.
 
 ** Definition of full confidence
 Absolute proof is not possible for a tool that writes to remote servers.
