@@ -1825,9 +1825,11 @@ deviation from this plan.
 #+end_src
 
 * Real world testing
-Status: proposed.  This section extends the completed modernization with
-Docker-backed end-to-end tests, destructive-operation safety, and release
-confidence.  It does not reopen any D1–D11 decision.
+Status: in progress.  The harness and the first Ubuntu 26.04 run are
+complete; the adversarial, failure, and path-safety tests are written and
+await a Docker run on the LTS matrix.  This section extends the completed
+modernization with Docker-backed end-to-end tests, destructive-operation
+safety, and release confidence.  It does not reopen any D1–D11 decision.
 
 ** Objective
 Build enough real-world coverage to trust Sink with production websites and
