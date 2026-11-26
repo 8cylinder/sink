@@ -96,3 +96,20 @@ def test_database_password_is_never_rendered(live_project) -> None:
     text = combined(result)
     assert project.db_password not in text
     assert "defaults-extra-file=" in text
+
+
+def test_hostile_server_name_keeps_dumps_inside_pulls(live_project) -> None:
+    name = "../../escape"
+    project = live_project(server_name=name)
+
+    result = project.invoke("db", "pull", name, "--real")
+
+    assert result.exit_code == 0, combined(result)
+    pulls = project.path / "pulls"
+    dumps = list(pulls.glob("*.sql.gz"))
+    assert dumps
+    assert all(dump.resolve().parent == pulls.resolve() for dump in dumps)
+    latest = list(pulls.glob("LATEST-*.sql.gz"))
+    assert latest
+    assert latest[0].is_symlink()
+    assert latest[0].resolve().parent == pulls.resolve()

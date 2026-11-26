@@ -606,6 +606,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
     def factory(
         *,
         warn: bool = False,
+        server_name: str = "dev",
         mysql_username: str = DB_USER,
         mysql_password: str = DB_PASSWORD,
         databases: list[dict[str, object]] | None = None,
@@ -675,7 +676,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
         server_document.update(server_overrides or {})
 
         servers_document: dict[str, dict[str, object]] = {
-            "dev": server_document
+            server_name: server_document
         }
         servers_document.update(extra_servers or {})
         document = {
