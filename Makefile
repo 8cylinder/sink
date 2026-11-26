@@ -5,6 +5,7 @@ SHELL := bash
 UBUNTU_OLDEST ?= 20.04
 UBUNTU_LATEST ?= 26.04
 UBUNTU_VERSIONS ?= $(UBUNTU_OLDEST) $(UBUNTU_LATEST)
+SINK_TEST_UBUNTU ?= $(UBUNTU_LATEST)
 
 .PHONY: help sync hooks fmt fmt-check lint lint-check type arch test integration integration-oldest integration-matrix integration-down secrets docs docs-serve man install-man check ci build install uninstall upgrade clean
 
@@ -38,8 +39,8 @@ arch:  ## Check import boundaries
 test:  ## Run tests
 	uv run pytest
 
-integration:  ## Run Docker tests on the latest Ubuntu LTS
-	SINK_TEST_UBUNTU=$(UBUNTU_LATEST) uv run pytest -m integration tests/integration --no-cov
+integration:  ## Run Docker tests on the selected Ubuntu LTS
+	SINK_TEST_UBUNTU=$(SINK_TEST_UBUNTU) uv run pytest -m integration tests/integration --no-cov
 
 integration-oldest:  ## Run Docker tests on the oldest Ubuntu LTS
 	SINK_TEST_UBUNTU=$(UBUNTU_OLDEST) uv run pytest -m integration tests/integration --no-cov

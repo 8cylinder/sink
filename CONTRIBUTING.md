@@ -40,6 +40,19 @@ it and remove the marker.
 - Keep the command-transparency contract: one command object renders and
   executes the same argv/pipeline.
 
+## Release gate
+
+Before tagging a release, run:
+
+```console
+make check
+make secrets
+make integration-matrix
+```
+
+CI runs the same integration suite on Ubuntu 20.04 and 26.04 as separate
+jobs. Both matrix jobs must be green before a release.
+
 ## Documentation
 
 Update `README.md`, `docs/`, and `CHANGELOG.md` for user-visible changes.
