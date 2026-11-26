@@ -17,7 +17,7 @@ pytestmark = pytest.mark.integration
 def test_required_binaries_are_installed() -> None:
     missing = [
         name
-        for name in ("bash", "rsync", "ssh", "mysql", "mysqldump", "git")
+        for name in ("bash", "rsync", "ssh", "git", "gzip")
         if shutil.which(name) is None
     ]
     if missing:
