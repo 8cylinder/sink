@@ -193,3 +193,61 @@ def test_disk_pressure_during_db_pull_does_not_claim_success(
     assert "[Success" not in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
     assert project.sandbox.credentials_files() == []
+
+
+def _wait_for_child(parent: int, name: str, timeout: float = 10) -> int:
+    """Return the pid of a named direct child of *parent*."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        listing = subprocess.run(
+            ["ps", "-o", "pid=,comm=", "--ppid", str(parent)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        for line in listing.stdout.splitlines():
+            fields = line.split(None, 1)
+            if len(fields) == 2 and fields[1].strip() == name:
+                return int(fields[0])
+        time.sleep(0.1)
+    raise AssertionError(f"no {name!r} child of {parent}")
+
+
+def test_ssh_drop_during_db_pull_reports_error_and_cleans(
+    live_project,
+) -> None:
+    project = live_project()
+    _create_big_table(project)
+    log = project.path / "ssh-drop.log"
+    try:
+        with log.open("w") as output:
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-u",
+                    "-m",
+                    "sink",
+                    "db",
+                    "pull",
+                    "dev",
+                    "--real",
+                ],
+                cwd=project.path,
+                env=os.environ.copy(),
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+            )
+            _wait_for_text(log, "mysqldump")
+            ssh_pid = _wait_for_child(process.pid, "ssh")
+            os.kill(ssh_pid, signal.SIGKILL)
+            process.wait(timeout=30)
+        text = log.read_text(errors="replace")
+    finally:
+        _drop_big_table(project)
+
+    assert process.returncode != 0
+    assert "[Success" not in text
+    assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
+    assert project.sandbox.credentials_files() == []
