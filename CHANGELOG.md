@@ -23,8 +23,9 @@
   restricted and disconnected databases, warning confirmation, unwritable
   remote roots, missing directories, URL probes, and credential cleanup.
 - Added interruption coverage for SIGINT file put/pull and database pulls,
-  SSH drops, disk pressure, and concurrent pulls, plus diff option/difftool
-  coverage and a Docker CI matrix on Ubuntu 20.04 and 26.04.
+  SSH drops, disk pressure, concurrent pulls, a large-pull memory budget,
+  a PTY-driven interactive-SSH check, diff option/difftool coverage, and a
+  Docker CI matrix on Ubuntu 20.04 and 26.04.
 
 ## 0.3.0 - 2026-11-25
 

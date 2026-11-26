@@ -147,8 +147,8 @@ make check
   changes: unknown-key policy =422c7a3=, check execution =d339d65=,
   relative key locations =a0d5e52=, compact errors =3007243=.
 - Real-world testing (separate section below): the 52-test Docker suite
-  passes on Ubuntu 20.04 and 26.04; a new PTY-driven interactive-SSH test
-  awaits one matrix run.  Five database safety bugs and the
+  passes on Ubuntu 20.04 and 26.04; new interactive-SSH and S13 memory-budget
+  tests await one matrix run.  Five database safety bugs and the
   interrupted-pull temp leak are fixed.
 - Documentation: =make docs=, =make man=, =make install-man=.  The
   sandbox has no =groff=/=man=; templates were generated and inspected.
@@ -1830,7 +1830,8 @@ deviation from this plan.
   R-Matrix | DONE 2026-11-26 | all 49 Docker tests pass on 20.04 + 26.04; fast suite 264
   R-CI     | DONE 2026-11-26 | Docker CI job on 20.04 + 26.04; release gate documented
   R-Intr   | DONE 2026-11-26 | 3 new interruption tests (52 total); both LTS versions green
-  R-SSH    | WIP  2026-11-26 | PTY interactive-SSH test (53 total); pending matrix run
+  R-SSH    | WIP  2026-11-26 | PTY interactive-SSH test (54 total); pending matrix run
+  R-Mem    | WIP  2026-11-26 | S13 max-RSS large-pull test; pending matrix run
   Interrupt| DONE 2026-11-26 | commits 40f925c, fdf8c8d, b7f30cb | reap interrupted pipelines and remove rsync .NAME.* temps; 264 pass; coverage 93.43%
 #+end_src
 
@@ -1870,7 +1871,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - =make check= runs the fast suite with stub =ssh=, =rsync=, =mysql=, etc.
 - =tests/test_integration.py= is the legacy opt-in host-binary check.
 - The Docker harness, Compose file, and the 52-test suite pass on Ubuntu
-  20.04 and 26.04; the new interactive-SSH test awaits one matrix run.
+  20.04 and 26.04; new interactive-SSH and S13 memory-budget tests await one
+  matrix run.
 - CI has a Docker integration job for both LTS versions.
 - The default pytest run excludes the =integration= marker.
 - Recent safety work covers pipeline stderr from every stage, quoted MySQL
@@ -1878,7 +1880,7 @@ cleanup.  The remaining risks are tracked in Stage R8.
   same-second dump collisions, failed-dump cleanup, and =warn=
   confirmation.
 - Fast-suite baseline for this section: 264 tests, 93.43% branch coverage,
-  =make check= green; 54 deselected (53 Docker + 1 legacy host check).
+  =make check= green; 55 deselected (54 Docker + 1 legacy host check).
 
 ** Implementation status
 - [X] Docker Compose harness with Ubuntu LTS server and MySQL 8.0
@@ -1913,7 +1915,8 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - [X] Run the 3 new interruption tests on 20.04 and 26.04.
 - [X] Automate the interactive SSH check with a PTY in
   =tests/integration/test_ssh.py=.
-- [ ] Run the interactive-SSH test on 20.04 and 26.04.
+- [X] Add the S13 large-pull max-RSS budget test.
+- [ ] Run the interactive-SSH and S13 tests on 20.04 and 26.04.
 - [X] Docker CI job and 20.04/26.04 matrix added to
   =.github/workflows/ci.yml=.
 - [X] Server-image cache, failure logs, and flaky-test policy added.
@@ -1940,11 +1943,11 @@ cleanup.  The remaining risks are tracked in Stage R8.
 - Unit/stub suite: =264 passed=, =53 deselected=, branch coverage =93.43%=
   with =make check= green.  Ten safety tests live in
   =tests/test_safety_contract.py=.
-- Docker suite: 53 tests in =tests/integration= (14 original, 39 new).
+- Docker suite: 54 tests in =tests/integration= (14 original, 40 new).
   The 52-test suite passed on Ubuntu 20.04 and 26.04; the new interactive-
-  SSH test awaits one matrix run.  The extra integration selection is the
-  legacy host-binary check in =tests/test_integration.py=, not a Docker
-  test.
+  SSH and S13 memory-budget tests await one matrix run.  The extra
+  integration selection is the legacy host-binary check in
+  =tests/test_integration.py=, not a Docker test.
 - The 20.04/26.04 matrix is green.  Re-run it after changing the harness:
   #+begin_src bash
     make integration-matrix
@@ -1957,9 +1960,9 @@ cleanup.  The remaining risks are tracked in Stage R8.
     =GlobalKnownHostsFile=/dev/null=;
   - single-file diffs must download the remote file; =--compare-dest= skips
     identical files and leaves =git diff= with no file.
-- Next work, in risk order: run the interactive-SSH test on the matrix;
-  add the S13 memory check; enable required CI checks in repository
-  settings; R9 manual staging.
+- Next work, in risk order: run the interactive-SSH and S13 tests on the
+  matrix; enable required CI checks in repository settings; R9 manual
+  staging.
 
 ** Safety contract
 Every stage references these IDs.
@@ -2170,11 +2173,9 @@ Tasks:
 
 Result: =docs/safety.md= (commit ac6f0c3) has the invariant table, the
 command map, the test-coverage statement, the manual staging checklist, and
-the residual-risk owner.  S11 now has an unrelated-file preservation test in
-R2; S13 (large payload streaming) remains a manual check in
-=docs/safety.md=, so the stage stays open for that invariant.  The other
-invariants have at least one real-service test in =tests/integration= or a
-fast-suite counterpart.
+the residual-risk owner.  S11 has an unrelated-file preservation test in
+R2; S13 now has a max-RSS large-pull test in =tests/integration=.  The stage
+stays open until that test passes on both LTS versions.
 
 *** DONE Stage R1 - Docker harness foundation
 *Goal:* One command starts a real SSH/rsync/MySQL sandbox and one smoke
@@ -2452,11 +2453,11 @@ For this project, "full confidence" means:
 These remain manual checks or future environment-specific suites.
 
 ** Recommended next slice
-R1, R2, R4, R5, R6, and R7 are complete.  R0 is open only for S13; R3 has a
-new automated SSH test pending one matrix run.  Next:
+R1, R2, R4, R5, R6, and R7 are complete.  R0 and R3 each have one new
+automated test pending a matrix run.  Next:
 
-1. Run the interactive-SSH test on 20.04 and 26.04.
-2. Add the S13 large-payload memory check.
-3. Enable required CI checks in repository settings, then R9 manual staging.
+1. Run the interactive-SSH and S13 memory tests on 20.04 and 26.04.
+2. Enable required CI checks in repository settings.
+3. R9 manual staging certification.
 
 Add new tests to the same suite and rerun both LTS versions.

@@ -97,7 +97,8 @@ fault-injection harness exists. Run them against staging:
   exit, no success line, and that `LATEST-*` is unchanged. The local
   file-size limit case is automated in `tests/integration/test_interrupt.py`.
 - Pull a large database on a memory-limited host and confirm memory use stays
-  bounded (streaming, not buffering the whole dump).
+  bounded (streaming, not buffering the whole dump). This is automated as a
+  max-RSS budget in `tests/integration/test_interrupt.py`; repeat on staging.
 
 ## Manual staging checklist
 
