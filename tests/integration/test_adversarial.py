@@ -46,6 +46,43 @@ def test_paths_outside_the_project_root_are_rejected(live_project) -> None:
     assert not project.remote_exists("link.txt")
 
 
+def test_extra_flags_delete_is_refused(live_project) -> None:
+    project = live_project()
+    project.remote_write("keep.txt", "keep\n")
+
+    result = project.invoke(
+        "file",
+        "put",
+        "dev",
+        "project/index.html",
+        "--real",
+        "--extra-flags=--delete",
+    )
+
+    assert result.exit_code != 0, combined(result)
+    assert "--allow-dangerous-rsync" in combined(result)
+    assert project.remote_read("keep.txt") == "keep\n"
+
+
+def test_extra_flags_rsync_path_is_refused(live_project) -> None:
+    project = live_project()
+
+    result = project.invoke(
+        "file",
+        "put",
+        "dev",
+        "project/index.html",
+        "--real",
+        "--extra-flags=--rsync-path='touch /home/deploy/sink-pwned'",
+    )
+
+    assert result.exit_code != 0, combined(result)
+    marker = project.sandbox.exec(
+        "server", "test", "-e", "/home/deploy/sink-pwned", check=False
+    )
+    assert marker.returncode != 0
+
+
 def test_shell_syntax_in_a_filename_never_runs(live_project) -> None:
     project = live_project()
     name = "pwn-$(touch sink-pwned).txt"

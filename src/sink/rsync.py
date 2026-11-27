@@ -53,6 +53,114 @@ SAFE_EXCLUDES = (
 # must not make a normal repository fail the secret pre-scan.
 _SAFE_EXCLUDE_DIRS = frozenset({".sink", "pulls", ".ssh", ".aws"})
 _PRUNE_DIRS = _SAFE_EXCLUDE_DIRS | {".git"}
+
+SAFE_RSYNC_FLAGS = frozenset(
+    {
+        "--bwlimit",
+        "--partial",
+        "--progress",
+        "--info",
+        "--stats",
+        "--human-readable",
+        "--exclude",
+        "--include",
+        "--max-size",
+        "--min-size",
+        "--timeout",
+        "--contimeout",
+        "--block-size",
+        "--checksum-choice",
+        "--compress-level",
+        "--skip-compress",
+        "--whole-file",
+        "--no-whole-file",
+        "--numeric-ids",
+        "--modify-window",
+        "--ignore-times",
+        "--size-only",
+        "--update",
+        "--existing",
+        "--ignore-existing",
+        "--prune-empty-dirs",
+        "--dry-run",
+        "--itemize-changes",
+        "--links",
+        "--safe-links",
+        "--compress",
+        "--checksum",
+        "--recursive",
+        "--quiet",
+        "--verbose",
+        "--delay-updates",
+        "--sparse",
+        "--no-inc-recursive",
+        "-P",
+    }
+)
+SAFE_RSYNC_VALUE_FLAGS = frozenset(
+    {
+        "--bwlimit",
+        "--exclude",
+        "--include",
+        "--max-size",
+        "--min-size",
+        "--timeout",
+        "--contimeout",
+        "--block-size",
+        "--checksum-choice",
+        "--compress-level",
+        "--skip-compress",
+        "--modify-window",
+        "--info",
+    }
+)
+DANGEROUS_RSYNC_FLAGS = frozenset(
+    {
+        "--delete",
+        "--delete-before",
+        "--delete-during",
+        "--delete-delay",
+        "--delete-after",
+        "--delete-excluded",
+        "--delete-missing-args",
+        "--remove-source-files",
+        "--rsync-path",
+        "--files-from",
+        "--from0",
+        "--log-file",
+        "--log-file-format",
+        "--write-batch",
+        "--only-write-batch",
+        "--read-batch",
+        "--rsh",
+        "-e",
+        "--copy-links",
+        "--copy-unsafe-links",
+        "--copy-dirlinks",
+        "--chmod",
+        "--chown",
+        "--usermap",
+        "--groupmap",
+        "--devices",
+        "--specials",
+        "--hard-links",
+        "--temp-dir",
+        "-T",
+        "--partial-dir",
+        "--backup",
+        "--backup-dir",
+        "--suffix",
+        "--password-file",
+        "--fake-super",
+        "--super",
+        "--address",
+        "--port",
+        "--inplace",
+        "--append",
+        "--append-verify",
+        "--force",
+    }
+)
 _SAFE_EXCLUDE_FILE_PATTERNS = tuple(
     pattern for pattern in SAFE_EXCLUDES if not pattern.endswith("/")
 )
@@ -72,6 +180,7 @@ class Transfer:
         silent: bool = False,
         quiet: bool = False,
         allow_secret_files: bool = False,
+        allow_dangerous_rsync: bool = False,
     ) -> None:
         """Transfer files to and from a server with rsync
 
@@ -80,6 +189,7 @@ class Transfer:
         quiet: adds --quiet to rsync
         allow_secret_files: permits secret-looking files in a directory
         transfer after printing their paths
+        allow_dangerous_rsync: permits destructive extra rsync flags
         """
         self.verbose = bool(verbose)
         self.real = real
@@ -88,6 +198,7 @@ class Transfer:
         self.quiet = quiet
         self.silent = silent
         self.allow_secret_files = bool(allow_secret_files)
+        self.allow_dangerous_rsync = bool(allow_dangerous_rsync)
         self.multiple = False
 
     def _excluded(self) -> tuple[str, ...]:
@@ -294,7 +405,7 @@ class Transfer:
         remote = locations["remote"]
         if dest_override:
             remote = dest_override
-        self._rsync(local, remote, Action.PUT, self._flags(extra_flags))
+        self._rsync(local, remote, Action.PUT, extra_flags)
 
     def pull(
         self, filename: str | Path, extra_flags: str | Sequence[str] | None
@@ -313,7 +424,7 @@ class Transfer:
             with suppress(OSError):
                 before = set(local.parent.iterdir())
         try:
-            self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
+            self._rsync(local, remote, Action.PULL, extra_flags)
         except BaseException:
             # rsync creates .NAME.XXXXXX beside a single-file destination and
             # does not always remove it when the transfer is interrupted or
@@ -332,16 +443,58 @@ class Transfer:
             with suppress(OSError):
                 candidate.unlink()
 
-    @staticmethod
     def _flags(
+        self,
         extra_flags: str | Sequence[str] | None,
     ) -> tuple[str, ...]:
-        """Normalize extra rsync flags."""
+        """Validate and return extra rsync flags."""
         if not extra_flags:
             return ()
-        if isinstance(extra_flags, str):
-            return tuple(shlex.split(extra_flags))
-        return tuple(extra_flags)
+        tokens = (
+            list(shlex.split(extra_flags))
+            if isinstance(extra_flags, str)
+            else list(extra_flags)
+        )
+        validated: list[str] = []
+        dangerous: list[str] = []
+        for token in tokens:
+            if not token.startswith("-"):
+                previous = validated[-1] if validated else ""
+                previous_name = previous.split("=", 1)[0]
+                if (
+                    previous_name in SAFE_RSYNC_VALUE_FLAGS
+                    and "=" not in previous
+                ):
+                    validated.append(token)
+                    continue
+                raise TransferError(
+                    f"Extra rsync operand is not allowed: {token}"
+                )
+            name = token.split("=", 1)[0]
+            if name in SAFE_RSYNC_FLAGS:
+                validated.append(token)
+            elif name in DANGEROUS_RSYNC_FLAGS:
+                dangerous.append(token)
+                validated.append(token)
+            else:
+                raise TransferError(
+                    f"Rsync flag {name} is not in the safe allowlist"
+                )
+        if dangerous and not self.allow_dangerous_rsync:
+            raise TransferError(
+                "Refusing dangerous rsync flags: "
+                + " ".join(dangerous)
+                + ". Pass --allow-dangerous-rsync to override."
+            )
+        if dangerous:
+            ui.warn("Allowing dangerous rsync flags: " + " ".join(dangerous))
+        if any(
+            token.split("=", 1)[0] in {"--exclude", "--include"}
+            for token in validated
+        ):
+            ui.warn("extra rsync filter flags can hide files")
+        ui.notice("extra rsync flags: " + " ".join(validated))
+        return tuple(validated)
 
     def diff(
         self,

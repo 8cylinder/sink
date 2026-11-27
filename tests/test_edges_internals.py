@@ -214,8 +214,15 @@ def test_rsync_internal_edges(tmp_path: Path) -> None:
     project_value = project(tmp_path)
     transfer = Transfer(project_value, server())
     assert transfer._flags("") == ()
-    assert transfer._flags("--delete --compress") == ("--delete", "--compress")
-    assert transfer._flags(["--delete"]) == ("--delete",)
+    assert transfer._flags("--bwlimit=1 --compress") == (
+        "--bwlimit=1",
+        "--compress",
+    )
+    assert transfer._flags(["--bwlimit=1"]) == ("--bwlimit=1",)
+    with pytest.raises(TransferError):
+        transfer._flags("--delete")
+    allowed = Transfer(project_value, server(), allow_dangerous_rsync=True)
+    assert allowed._flags("--delete") == ("--delete",)
 
     with pytest.raises(TransferError):
         Transfer(project_value, server(root=None))._locations(tmp_path)

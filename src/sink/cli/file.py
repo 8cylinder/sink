@@ -38,7 +38,15 @@ def _resolve_target(
 @click.argument("filename", type=click.Path(), required=False)
 @click.option("--real", "-r", is_flag=True)
 @click.option("--silent", is_flag=True, help="Deprecated alias for -qq.")
-@click.option("--extra-flags", help="extra flags to pass to rsync.")
+@click.option(
+    "--extra-flags",
+    help="Safe extra flags to pass to rsync; dangerous flags require the override.",
+)
+@click.option(
+    "--allow-dangerous-rsync",
+    is_flag=True,
+    help="Allow destructive extra rsync flags.",
+)
 @click.option(
     "--allow-secret-files",
     is_flag=True,
@@ -53,6 +61,7 @@ def files(
     real: bool,
     silent: bool,
     extra_flags: str | None,
+    allow_dangerous_rsync: bool,
     allow_secret_files: bool,
 ) -> None:
     """Send files to and fro.
@@ -82,6 +91,7 @@ def files(
         real=real,
         silent=silent,
         allow_secret_files=allow_secret_files,
+        allow_dangerous_rsync=allow_dangerous_rsync,
     )
     extra_flags = extra_flags if extra_flags else ""
 

@@ -77,6 +77,16 @@ the root are transferred, and a symlink loop is reported as unresolvable.
 Pulls cannot pre-scan the remote, so they rely on `--safe-links` to ignore
 escaping remote links.
 
+## Rsync flags
+
+`--extra-flags` accepts a safe allowlist: bandwidth, partial/progress, info,
+stats, exclude/include filters, size and time limits, checksum/compression
+tuning, and similar transfer options. Destructive or executing options such
+as `--delete*`, `--remove-source-files`, `--rsync-path`, `--files-from`,
+`--log-file`, `--rsh`, and `--copy-links` are refused unless
+`--allow-dangerous-rsync` is passed. Extra operands are always refused. The
+effective command is printed, and filter flags warn that they can hide files.
+
 ## Configuration trust
 
 `sink.yaml` is executable code and credential material. It can select the

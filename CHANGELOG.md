@@ -43,6 +43,10 @@
   complete `--defaults-file` instead of `--defaults-extra-file`, so ambient
   `~/.my.cnf` and `/etc/my.cnf` cannot change the connection.
   `skip_secure_auth` is deprecated and emits a warning.
+- `file --extra-flags` now accepts only a safe rsync allowlist. Destructive
+  options such as `--delete*`, `--remove-source-files`, `--rsync-path`,
+  `--files-from`, `--log-file`, `--rsh`, and `--copy-links` require
+  `--allow-dangerous-rsync`; operands and unknown flags are refused.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

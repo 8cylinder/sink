@@ -106,6 +106,14 @@ links are preserved. Pulls ignore remote links that escape the destination.
 A failed single-file pull removes only rsync temp files created during that
 transfer; pre-existing backups and editor swap files are preserved.
 
+`--extra-flags` accepts only a safe rsync allowlist (`--bwlimit`,
+`--partial`, `--progress`, `--info`, `--exclude`/`--include`, size and time
+limits, and similar options). Destructive or executing options such as
+`--delete*`, `--remove-source-files`, `--rsync-path`, `--files-from`,
+`--log-file`, `--rsh`, and `--copy-links` require the explicit
+`--allow-dangerous-rsync` override. Extra operands are refused, the effective
+command is printed, and filter flags produce a warning.
+
 Every non-interactive SSH path uses `StrictHostKeyChecking=yes` and
 `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
 Interactive `sink ssh` also enforces strict host keys. Set

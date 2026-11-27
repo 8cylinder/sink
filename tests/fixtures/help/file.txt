@@ -12,7 +12,9 @@ Usage: sink file [OPTIONS] {put|pull} [SERVER] [FILENAME]
 
 Options:
   -r, --real
-  --silent              Deprecated alias for -qq.
-  --extra-flags TEXT    extra flags to pass to rsync.
-  --allow-secret-files  Allow secret-looking files in a directory put.
-  -h, --help            Show this message and exit.
+  --silent                 Deprecated alias for -qq.
+  --extra-flags TEXT       Safe extra flags to pass to rsync; dangerous flags
+                           require the override.
+  --allow-dangerous-rsync  Allow destructive extra rsync flags.
+  --allow-secret-files     Allow secret-looking files in a directory put.
+  -h, --help               Show this message and exit.
