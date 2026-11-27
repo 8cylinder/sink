@@ -79,6 +79,7 @@ servers:
         username: deploy
         server: example.com
         key: ~/.ssh/id_ed25519
+        known_hosts: ~/.ssh/known_hosts_sink
     mysql:
       - username: example
         password: ${DATABASE_PASSWORD}
@@ -98,6 +99,13 @@ working tree. `.git/` and `.sink/` are always excluded. Automatic
 Rsync runs with `--safe-links`. A directory put also refuses absolute
 symlinks or links whose targets leave `project.root`; safe relative in-tree
 links are preserved. Pulls ignore remote links that escape the destination.
+
+Every non-interactive SSH path uses `StrictHostKeyChecking=yes` and
+`BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
+Interactive `sink ssh` also enforces strict host keys. Set
+`ssh.known_hosts` to a dedicated file seeded out of band if you do not want
+to rely on the default `~/.ssh/known_hosts`. A changed host key stops the
+command; verify the new fingerprint before updating the file.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Extra keys are allowed and ignored by normal commands; `sink check`

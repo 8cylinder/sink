@@ -1,4 +1,4 @@
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
-+ ssh -C -T -p 2222 -i <CONFIG_DIR>/id_rsa -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; mysqlpump --defaults-extra-file=/tmp/<CREDS_FILE> --watch-progress demo' | gzip -c > <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
++ ssh -C -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; mysqlpump --defaults-extra-file=/tmp/<CREDS_FILE> --watch-progress demo' | gzip -c > <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
 [Success (DRY RUN)] dev: sql download complete
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

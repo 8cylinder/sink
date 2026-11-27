@@ -40,6 +40,10 @@
   `--trust-config` is passed. Other commands warn but do not block.
   Configured `rsync_binary`, `difftool`, and action commands are announced
   before use.
+- Every non-interactive SSH path now enforces `StrictHostKeyChecking=yes` and
+  `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
+  Interactive `sink ssh` also enforces strict host keys. Added optional
+  `ssh.known_hosts` for a dedicated known-hosts file.
 - `sink check` now exits non-zero when any probe fails, including under
   `-qq`. Use `--allow-failures` for the old exit-0 behavior. `--json` emits a
   machine-readable probe summary.

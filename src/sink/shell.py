@@ -433,9 +433,14 @@ def _ssh_base(
         key = getattr(ssh, "key", None)
     if key:
         argv.extend(["-i", str(key)])
+        argv.extend(["-o", "IdentitiesOnly=yes"])
+    known_hosts = getattr(ssh, "known_hosts", None)
+    if known_hosts:
+        argv.extend(["-o", f"UserKnownHostsFile={known_hosts}"])
+        argv.extend(["-o", "GlobalKnownHostsFile=/dev/null"])
+    argv.extend(["-o", "StrictHostKeyChecking=yes"])
     if batch:
         argv.extend(["-o", "BatchMode=yes"])
-        argv.extend(["-o", "StrictHostKeyChecking=yes"])
     if timeout:
         argv.extend(["-o", f"ConnectTimeout={timeout}"])
     host = getattr(ssh, "server", None)
@@ -508,6 +513,10 @@ def scp_argv(
         "scp",
         "-o",
         f"ConnectTimeout={timeout}",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
     ]
     port = getattr(ssh, "port", None)
     if port:
@@ -515,6 +524,11 @@ def scp_argv(
     key = getattr(ssh, "key", None)
     if key:
         argv.extend(["-i", str(key)])
+        argv.extend(["-o", "IdentitiesOnly=yes"])
+    known_hosts = getattr(ssh, "known_hosts", None)
+    if known_hosts:
+        argv.extend(["-o", f"UserKnownHostsFile={known_hosts}"])
+        argv.extend(["-o", "GlobalKnownHostsFile=/dev/null"])
     argv.extend([source, destination])
     return tuple(argv)
 

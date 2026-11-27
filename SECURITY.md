@@ -31,6 +31,11 @@ temporary directory, or `/`. Use `--config-file PATH` for an explicit path.
 user, world-writable, or outside the detected repository unless
 `--trust-config` is passed. Other commands warn but do not block.
 
+All non-interactive SSH paths enforce `StrictHostKeyChecking=yes` and
+`BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
+Interactive `sink ssh` also enforces strict host keys. Set
+`ssh.known_hosts` to a dedicated file seeded out of band.
+
 ## Secret handling
 
 Sink never renders database passwords into commands. Local clients use a

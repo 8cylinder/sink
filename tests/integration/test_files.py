@@ -10,6 +10,28 @@ from helpers import combined
 pytestmark = pytest.mark.integration
 
 
+def test_rsync_rejects_an_unknown_host_key(
+    live_project, tmp_path, monkeypatch
+) -> None:
+    empty = tmp_path / "empty-known-hosts"
+    empty.write_text("")
+    empty.chmod(0o600)
+    project = live_project(ssh_overrides={"known_hosts": str(empty)})
+    monkeypatch.setenv("SINK_TEST_KNOWN_HOSTS", str(empty))
+
+    result = project.invoke(
+        "file", "put", "dev", "project/index.html", "--real"
+    )
+
+    assert result.exit_code != 0, combined(result)
+    text = combined(result)
+    assert (
+        "Host key verification failed" in text
+        or "REMOTE HOST IDENTIFICATION HAS CHANGED" in text
+    )
+    assert not project.remote_exists("index.html")
+
+
 def test_file_put_and_pull(live_project) -> None:
     project = live_project()
 

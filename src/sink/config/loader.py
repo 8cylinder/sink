@@ -73,6 +73,7 @@ SSH_KEYS = {
     "password",
     "server",
     "key",
+    "known_hosts",
     "port",
     "note",
 }
@@ -359,6 +360,13 @@ def _ssh_configs(
         key = _string(raw.get("key"), path, f"{item_where}.key")
         if key:
             key = _resolve_key(key, path, project, warnings, item_where)
+        known_hosts = _string(
+            raw.get("known_hosts"), path, f"{item_where}.known_hosts"
+        )
+        if known_hosts:
+            known_hosts = str(
+                _resolve_path(known_hosts, path, f"{item_where}.known_hosts")
+            )
         configs.append(
             SSHConfig(
                 name=_string(raw.get("name"), path, f"{item_where}.name"),
@@ -370,6 +378,7 @@ def _ssh_configs(
                 ),
                 server=_string(raw.get("server"), path, f"{item_where}.server"),
                 key=key,
+                known_hosts=known_hosts,
                 port=_optional_int(raw.get("port"), path, f"{item_where}.port"),
                 note=_string(raw.get("note"), path, f"{item_where}.note"),
             )

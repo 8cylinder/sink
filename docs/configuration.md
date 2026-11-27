@@ -47,6 +47,7 @@ servers:
         username: deploy
         server: example.com
         key: ~/.ssh/id_ed25519
+        known_hosts: ~/.ssh/known_hosts_sink
         port: 22
     mysql:
       - username: example
@@ -54,6 +55,12 @@ servers:
         db: example
         hostname: localhost
 ```
+
+`ssh.known_hosts` is optional. Sink enforces `StrictHostKeyChecking=yes` and
+`BatchMode=yes` on every non-interactive SSH path, and adds
+`IdentitiesOnly=yes` when a key is configured. Interactive `sink ssh` also
+enforces strict host keys. Seed a dedicated known-hosts file out of band
+before the first connection; a changed key stops the command.
 
 Extra keys are allowed. Sink ignores them during normal commands so a
 `sink.yaml` can hold unrelated project data; `sink check` lists them as

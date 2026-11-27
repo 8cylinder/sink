@@ -8,11 +8,11 @@ Local dirs
 dev
 [✓] root: /var/www/demo
 [✓] warn: False
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com exit
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com exit
 [✓] ssh login good (deploy).
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'
 [✓] root dir exists.
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; mysql --defaults-extra-file=/tmp/<CREDS_FILE> demo --execute=exit;'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; mysql --defaults-extra-file=/tmp/<CREDS_FILE> demo --execute=exit;'
 [✓] DB(demo) as dbuser: mysql username, password and db are good.
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'

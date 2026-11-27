@@ -92,6 +92,17 @@ user, world-writable, or outside the detected repository unless
 A configured non-default `rsync_binary` or `difftool` is announced before it
 is used, and configured actions print the command before execution.
 
+## SSH host keys
+
+Every non-interactive SSH path (rsync, scp, check, actions, and credential
+staging) uses `StrictHostKeyChecking=yes` and `BatchMode=yes`. When a key is
+configured, Sink also passes `IdentitiesOnly=yes`. Interactive `sink ssh`
+enforces strict host keys but keeps the session interactive. Set
+`ssh.known_hosts` to a dedicated file seeded out of band; Sink then passes
+`UserKnownHostsFile` and disables `GlobalKnownHostsFile`. An unknown or
+changed host key stops the command—verify the fingerprint before updating
+the file.
+
 ## Credentials
 
 `sink info` prints a redacted view of the config by default: passwords,

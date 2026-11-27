@@ -489,15 +489,27 @@ class Transfer:
 
         argv = [rsyncb]
 
-        # rsync accepts one remote-shell command.  Keep port and identity in
-        # the same --rsh value; passing a separate -e would silently win.
-        rsh = ["ssh"]
+        # rsync accepts one remote-shell command.  Keep port, identity, and
+        # host-key policy in the same --rsh value; passing a separate -e
+        # would silently win.
+        rsh = [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+        ]
         if ssh.port:
             rsh.extend(["-p", str(ssh.port)])
         if ssh.key:
             rsh.extend(["-i", ssh.key])
-        if len(rsh) > 1:
-            argv.extend(["--rsh", " ".join(rsh)])
+            rsh.extend(["-o", "IdentitiesOnly=yes"])
+        if ssh.known_hosts:
+            rsh.extend(["-o", f"UserKnownHostsFile={ssh.known_hosts}"])
+            rsh.extend(["-o", "GlobalKnownHostsFile=/dev/null"])
+        argv.extend(["--rsh", " ".join(rsh)])
 
         if action == Action.PUT and (server.group or server.user):
             # To have rsync change owner or group, sudo will probably
