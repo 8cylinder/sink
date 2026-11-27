@@ -168,6 +168,9 @@ def test_sigint_during_db_pull_does_not_create_latest(live_project) -> None:
     assert code != 0
     assert "[Success" not in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
+    pulls = project.path / "pulls"
+    assert not list(pulls.glob("*.sql.gz"))
+    assert not list(pulls.glob("*.part*"))
     assert project.sandbox.credentials_files() == []
 
 
@@ -198,6 +201,9 @@ def test_disk_pressure_during_db_pull_does_not_claim_success(
     assert process.returncode != 0
     assert "[Success" not in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
+    pulls = project.path / "pulls"
+    assert not list(pulls.glob("*.sql.gz"))
+    assert not list(pulls.glob("*.part*"))
     assert project.sandbox.credentials_files() == []
 
 
@@ -256,6 +262,9 @@ def test_ssh_drop_during_db_pull_reports_error_and_cleans(
     assert process.returncode != 0
     assert "[Success" not in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
+    pulls = project.path / "pulls"
+    assert not list(pulls.glob("*.sql.gz"))
+    assert not list(pulls.glob("*.part*"))
     assert project.sandbox.credentials_files() == []
 
 
@@ -311,3 +320,4 @@ def test_large_db_pull_stays_within_memory_budget(live_project) -> None:
         max_rss //= 1024
     assert max_rss < 80 * 1024
     assert (project.path / "pulls" / "LATEST-dev.sql.gz").is_symlink()
+    assert not list((project.path / "pulls").glob("*.part*"))

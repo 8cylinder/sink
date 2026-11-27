@@ -178,9 +178,11 @@ suppresses the view entirely.
 
 Local database pulls create dumps with mode `0600` and require the pulls
 directory to be `0700`. `db pull` creates a missing `pulls_dir` with `0700`
-and refuses a group- or world-accessible directory. Local MySQL clients use
-a `0600` defaults file in a private temporary directory; Sink does not export
-`MYSQL_PWD`.
+and refuses a group- or world-accessible directory. Dumps are written to a
+`.part` file and renamed only after a successful transfer; a failed,
+interrupted, or startup-failed pull leaves no final dump or `.part` and does
+not update `LATEST-*`. Local MySQL clients use a `0600` defaults file in a
+private temporary directory; Sink does not export `MYSQL_PWD`.
 
 ## Completions
 

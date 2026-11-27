@@ -110,10 +110,13 @@ def test_db_pull_does_not_overwrite_a_same_second_dump(
 
     monkeypatch.setattr("sink.db.datetime.datetime", FrozenDateTime)
 
-    def fake_pull(sqlfile, local: bool = True) -> None:
-        """Stand in for the remote pipeline and write the destination."""
-        _ = local
-        Path(sqlfile).write_text("dump")
+    def fake_pull(
+        sqlfile, local: bool = True, final: Path | None = None
+    ) -> None:
+        """Stand in for the remote pipeline and commit the destination."""
+        _ = sqlfile, local
+        assert final is not None
+        final.write_text("dump")
 
     monkeypatch.setattr(db, "_pull", fake_pull)
 

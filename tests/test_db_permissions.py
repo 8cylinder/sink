@@ -99,6 +99,7 @@ def test_db_pull_writes_a_private_dump(project_factory) -> None:
     pulls = project.path / "pulls"
     dumps = list(pulls.glob("*.sql.gz"))
     assert dumps
+    assert not list(pulls.glob("*.part*"))
     assert pulls.stat().st_mode & 0o777 == 0o700
     assert dumps[0].stat().st_mode & 0o777 == 0o600
 

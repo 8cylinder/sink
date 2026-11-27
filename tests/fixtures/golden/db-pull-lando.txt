@@ -1,2 +1,2 @@
-+ lando db-export <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql
++ lando db-export <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.part
 [Success (DRY RUN)] dev: sql download complete

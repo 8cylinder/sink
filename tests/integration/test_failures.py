@@ -49,6 +49,7 @@ def test_restricted_database_user_leaves_no_dump(live_project) -> None:
     assert result.exit_code != 0, combined(result)
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
     assert not list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+    assert not list((project.path / "pulls").glob("*.part*"))
     assert project.sandbox.credentials_files() == []
 
 
@@ -134,6 +135,7 @@ def test_mysql_outage_reports_error_and_cleans_credentials(
         assert result.exit_code != 0, combined(result)
         assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
         assert not list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+        assert not list((project.path / "pulls").glob("*.part*"))
         assert project.sandbox.credentials_files() == []
     finally:
         project.sandbox.compose_run("start", "db")

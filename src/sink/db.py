@@ -6,6 +6,8 @@ import re
 import shlex
 import shutil
 import sys
+import time
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 
@@ -196,33 +198,103 @@ class DB:
             )
         return pulls
 
+    @staticmethod
+    def _part_path(final: Path) -> Path:
+        """Return the temporary path used while a dump is written."""
+        return final.with_name(f"{final.name}.part")
+
+    @staticmethod
+    def _part_candidates(part: Path) -> tuple[Path, Path]:
+        """Return the part path and a tool-added gzip variant."""
+        return part, Path(f"{part}.gz")
+
+    def _cleanup_part(self, part: Path) -> None:
+        """Remove a partial dump and any tool-added gzip variant."""
+        for candidate in self._part_candidates(part):
+            with suppress(OSError):
+                candidate.unlink()
+
+    def _actual_part(self, part: Path) -> Path | None:
+        """Return the file the dump tool actually wrote, if any."""
+        for candidate in self._part_candidates(part):
+            if candidate.exists():
+                return candidate
+        return None
+
+    @staticmethod
+    def _final_path(final: Path, actual: Path) -> Path:
+        """Preserve the tool's gzip suffix in the committed filename."""
+        if actual.suffix == ".gz" and final.suffix != ".gz":
+            return Path(f"{final}.gz")
+        return final
+
+    def _cleanup_stale_parts(self, pulls: Path) -> None:
+        """Remove partial dumps older than one day."""
+        cutoff = time.time() - 24 * 60 * 60
+        for pattern in ("*.part", "*.part.gz"):
+            for path in pulls.glob(pattern):
+                try:
+                    if path.stat().st_mtime < cutoff:
+                        path.unlink()
+                except OSError:
+                    continue
+
+    def _run_part_pull(
+        self,
+        part: Path,
+        final: Path,
+        action: Callable[[Path, Path], None],
+    ) -> None:
+        """Run one part-file pull and always clean up on failure."""
+        self._cleanup_part(part)
+        try:
+            action(part, final)
+        except FileExistsError as error:
+            self._cleanup_part(part)
+            raise CommandError(
+                f"Could not create partial dump {part}: {error}"
+            ) from error
+        except OSError as error:
+            self._cleanup_part(part)
+            raise CommandError(
+                f"Could not start the dump pipeline: {error}"
+            ) from error
+        except BaseException:
+            self._cleanup_part(part)
+            raise
+
     def pull(self, tag: str | None = None) -> None:
         """Pull a dump into the pulls directory."""
         p = self.project
         s = self.server
         self._database()
         pulls = self._ensure_pulls_dir()
+        self._cleanup_stale_parts(pulls)
         sqlfile = self._dest(p.name, pulls, s.name, tag=tag)
 
         if s.server_type == "lando":
             # lando adds the gz extension itself so we remove here
-            sqlfile = _unique_path(Path(str(sqlfile)[:-3]))
-            self._pull_lando(sqlfile)
+            final = _unique_path(Path(str(sqlfile)[:-3]))
+            self._run_part_pull(self._part_path(final), final, self._pull_lando)
         elif s.server_type == "ddev":
-            sqlfile = _unique_path(sqlfile)
-            self._pull_ddev(sqlfile)
+            final = _unique_path(sqlfile)
+            self._run_part_pull(self._part_path(final), final, self._pull_ddev)
         else:
-            sqlfile = _unique_path(sqlfile)
-            self._pull(sqlfile, local=True)
+            final = _unique_path(sqlfile)
+            self._run_part_pull(
+                self._part_path(final),
+                final,
+                lambda part, target: self._pull(part, local=True, final=target),
+            )
 
-    def _pull_lando(self, sqlfile: Path) -> None:
+    def _pull_lando(self, sqlfile: Path, final: Path) -> None:
         """Pull through Lando, keeping stderr for real failures."""
         # Lando writes update messages to stderr even on success; the
         # return code decides whether they are errors.
         command = Pipeline((Argv(("lando", "db-export", str(sqlfile))),))
-        self.run_pull_cmd(command, sqlfile, True)
+        self.run_pull_cmd(command, sqlfile, True, final)
 
-    def _pull_ddev(self, sqlfile: Path) -> None:
+    def _pull_ddev(self, sqlfile: Path, final: Path) -> None:
         """Pull through DDEV, keeping stderr for real failures."""
         # DDEV writes informational output to stderr even on success.
         command = Pipeline(
@@ -237,9 +309,14 @@ class DB:
                 ),
             ),
         )
-        self.run_pull_cmd(command, sqlfile, True)
+        self.run_pull_cmd(command, sqlfile, True, final)
 
-    def _pull(self, sqlfile: str | Path, local: bool = True) -> None:
+    def _pull(
+        self,
+        sqlfile: str | Path,
+        local: bool = True,
+        final: Path | None = None,
+    ) -> None:
         """Build and run a local or remote dump pipeline."""
         p = self.project
         s = self.server
@@ -270,9 +347,10 @@ class DB:
                     ),
                     stdout_path=Path(sqlfile),
                     stdout_mode=0o600,
+                    stdout_exclusive=True,
                 )
                 result = run(command, real=self.real, capture=True)
-            self._report_pull(result, Path(sqlfile), local)
+            self._report_pull(result, Path(sqlfile), local, final)
             return
 
         with remote_mysql_credentials(
@@ -297,6 +375,7 @@ class DB:
                     ),
                     stdout_path=Path(sqlfile),
                     stdout_mode=0o600,
+                    stdout_exclusive=True,
                 )
             else:
                 destination = shlex.quote(str(sqlfile))
@@ -306,10 +385,16 @@ class DB:
                 )
                 command = remote_command(ssh, fragment, compress=True)
             result = run(command, real=self.real, capture=True)
-            self._report_pull(result, Path(sqlfile), local)
+            self._report_pull(result, Path(sqlfile), local, final)
 
-    def _report_pull(self, result: Result, sqlfile: Path, local: bool) -> None:
-        """Report the result of a pull."""
+    def _report_pull(
+        self,
+        result: Result,
+        sqlfile: Path,
+        local: bool,
+        final: Path | None = None,
+    ) -> None:
+        """Report the result of a pull and commit a successful dump."""
         if not self.real:
             ui.display_success(
                 self.real,
@@ -318,49 +403,58 @@ class DB:
             )
         elif result.returncode:
             if local:
-                # A failed dump is truncated.  Keep it out of the pulls
-                # directory so it cannot be mistaken for a usable backup.
-                for candidate in (sqlfile, Path(f"{sqlfile}.gz")):
-                    with suppress(OSError):
-                        candidate.unlink()
+                self._cleanup_part(sqlfile)
+            display = final or sqlfile
             if ui.quiet < 2:
-                ui.err_console.print(str(sqlfile.absolute()), style="yellow")
+                ui.err_console.print(str(display.absolute()), style="yellow")
             ui.error(
                 f"\n{result.stderr or 'Command failed'}",
                 secrets=self.secrets,
             )
-        elif local and (sqlfile.exists() or Path(f"{sqlfile}.gz").exists()):
-            actual = sqlfile if sqlfile.exists() else Path(f"{sqlfile}.gz")
+        elif local:
+            actual = self._actual_part(sqlfile)
+            if actual is None:
+                ui.error("Command failed")
+                return
+            if final is not None:
+                target = self._final_path(final, actual)
+                actual.replace(target)
+            else:
+                target = actual
             # Lando/DDEV and tools that create the file themselves may use a
             # wider mode.  The private pulls directory is the primary control;
             # this is defense in depth for the dump itself.
             with suppress(OSError):
-                actual.chmod(0o600)
-            filename = str(actual.absolute())
+                target.chmod(0o600)
+            filename = str(target.absolute())
             if ui.quiet < 2:
                 ui.console.print(filename, style="green")
+            self.make_symlink(target)
             if not self.filename_only:
                 ui.display_success(
                     self.real,
                     server=self.server.name,
                     message="sql download complete",
                 )
-            self.make_symlink(actual)
-        elif not local and result.ok:
+        elif result.ok:
             ui.display_success(
                 self.real,
                 server=self.server.name,
                 message="sql download complete",
             )
-        elif local:
+        else:
             ui.error("Command failed")
 
     def run_pull_cmd(
-        self, cmd: Command, sqlfile: str | Path, local: bool
+        self,
+        cmd: Command,
+        sqlfile: str | Path,
+        local: bool,
+        final: Path | None = None,
     ) -> None:
         """Run a pull command and report its result."""
         result = run(cmd, real=self.real, capture=True)
-        self._report_pull(result, Path(sqlfile), local)
+        self._report_pull(result, Path(sqlfile), local, final)
 
     def make_symlink(self, sqlfile: Path) -> None:
         """Point ``LATEST-<server>.sql.gz`` at the newest dump.

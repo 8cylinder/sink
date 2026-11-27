@@ -31,6 +31,10 @@
   missing `pulls_dir` with `0700` and refuses a group- or world-accessible
   directory. Local MySQL clients use a private `0600` defaults file instead
   of `MYSQL_PWD`, which is no longer exported to any pipeline stage.
+- Database pulls write to a `.part` file and rename it only after a
+  successful transfer. Failed, interrupted, and startup-failed pulls remove
+  the partial file and leave `LATEST-*` untouched; stale parts older than a
+  day are cleaned up before the next pull.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

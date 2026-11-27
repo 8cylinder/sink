@@ -166,6 +166,7 @@ class Pipeline:
     stages: tuple[Command, ...]
     stdout_path: Path | None = None
     stdout_mode: int | None = None
+    stdout_exclusive: bool = False
     stderr_path: Path | None = None
     stderr_devnull: bool = False
 
@@ -281,9 +282,11 @@ def _execute_pipeline(
             if pipeline.stdout_mode is None:
                 output_file = pipeline.stdout_path.open("w")
             else:
+                flags = os.O_WRONLY | os.O_CREAT
+                flags |= os.O_EXCL if pipeline.stdout_exclusive else os.O_TRUNC
                 fd = os.open(
                     pipeline.stdout_path,
-                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                    flags,
                     pipeline.stdout_mode,
                 )
                 os.fchmod(fd, pipeline.stdout_mode)

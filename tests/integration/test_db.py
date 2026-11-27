@@ -39,6 +39,7 @@ def test_db_pull_writes_a_private_dump(live_project) -> None:
     pulls = project.path / "pulls"
     dumps = list(pulls.glob("demo-dev-*.sql.gz"))
     assert dumps
+    assert not list(pulls.glob("*.part*"))
     assert pulls.stat().st_mode & 0o777 == 0o700
     assert dumps[0].stat().st_mode & 0o777 == 0o600
 
@@ -74,6 +75,7 @@ def test_db_pull_with_a_bad_password_reports_the_error(
     assert "Access denied" in text or "ERROR 1045" in text
     assert not (project.path / "pulls" / "LATEST-dev.sql.gz").exists()
     assert not list((project.path / "pulls").glob("demo-dev-*.sql.gz"))
+    assert not list((project.path / "pulls").glob("*.part*"))
     assert project.sandbox.credentials_files() == []
 
 
