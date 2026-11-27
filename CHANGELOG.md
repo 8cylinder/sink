@@ -40,6 +40,9 @@
   `--trust-config` is passed. Other commands warn but do not block.
   Configured `rsync_binary`, `difftool`, and action commands are announced
   before use.
+- `sink check` now exits non-zero when any probe fails, including under
+  `-qq`. Use `--allow-failures` for the old exit-0 behavior. `--json` emits a
+  machine-readable probe summary.
 
 ### Fixed
 

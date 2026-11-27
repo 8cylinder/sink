@@ -6,6 +6,7 @@ import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.text import Text
@@ -16,6 +17,15 @@ from sink.shell import remote_command, run
 from sink.ui import ui
 
 
+@dataclass(frozen=True, slots=True)
+class ProbeResult:
+    """One probe result for machine-readable output."""
+
+    ok: bool
+    message: str
+    value: str | None = None
+
+
 class TestConfig:
     """Run the configured server and URL checks."""
 
@@ -23,9 +33,17 @@ class TestConfig:
     bad = "[✗]"
     timeout = 25
 
-    def __init__(self, config: Config, insecure: bool = False) -> None:
+    def __init__(
+        self,
+        config: Config,
+        insecure: bool = False,
+        json_output: bool = False,
+    ) -> None:
         self.config = config
         self.insecure = insecure
+        self.json_output = json_output
+        self.failed = False
+        self.results: list[ProbeResult] = []
 
     def test_unknown_keys(self) -> None:
         """Report unknown config keys as warnings without failing the run."""
@@ -178,7 +196,10 @@ class TestConfig:
         spaces: int = 0,
     ) -> None:
         """Print one colored status line with the marker in front."""
-        if ui.quiet >= 2:
+        self.results.append(ProbeResult(ok=ok, message=msg, value=value))
+        if not ok:
+            self.failed = True
+        if self.json_output or ui.quiet >= 2:
             return
         text = Text()
         text.append(

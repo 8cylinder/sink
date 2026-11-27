@@ -47,7 +47,7 @@ def test_check_reports_a_bad_mysql_password(live_project) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "[✗]" in text
     assert "Access denied" in text or "ERROR 1045" in text
@@ -62,7 +62,7 @@ def test_check_rejects_an_unknown_host_key(live_project, monkeypatch) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "ssh login failed" in text
     assert (
@@ -76,7 +76,7 @@ def test_check_reports_a_bad_ssh_user(live_project) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "ssh login failed" in text
     assert "nobody" in text

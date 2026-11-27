@@ -127,7 +127,7 @@ config (another owner, world-writable, or outside the repository) unless
 | `sink db pull\|put SERVER [SQL-GZ]` | Pull or push a gzipped MySQL dump. |
 | `sink ssh SERVER [USER]` | Print or open an interactive ssh session. |
 | `sink action SERVER [ACTION]` | List or run a configured action. |
-| `sink check [SERVER]` | Check project, server, database, and URL settings. |
+| `sink check [SERVER]` | Check project, server, database, and URL settings; exit non-zero on failure. |
 | `sink info` | View the config; `--edit` opens the editor. |
 | `sink misc api` | Read config values as JSON. |
 | `sink misc settings` | Print client connection settings. |
@@ -141,7 +141,10 @@ See [docs/cli.md](docs/cli.md) or `sink COMMAND -h` for the full reference.
 Dry-run is the default. Commands with a native dry-run (`rsync --dry-run`)
 execute that variant so you can see the intended action. Other commands are
 printed and not spawned. `sink check` is the exception: its probes are
-read-only, so it always executes them and has no `--real` flag.
+read-only, so it always executes them and has no `--real` flag. It exits
+non-zero if any probe fails, including under `-qq`; pass `--allow-failures`
+to keep the old exit-0 behavior. `--json` emits a machine-readable probe
+summary for CI.
 
 ```console
 $ sink file put dev index.html

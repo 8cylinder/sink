@@ -36,7 +36,7 @@ def test_check_reports_a_missing_rsync_binary(project_factory) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     assert "missing-rsync-binary" in combined(result)
     assert "missing" in combined(result)
 
@@ -90,7 +90,7 @@ def test_check_reports_url_probe_errors(
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     assert expected in combined(result)
 
 
@@ -115,7 +115,7 @@ def test_check_uses_a_unicode_cross_for_failures(project_factory) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "[✗] pulls_dir" in text
     assert "[X]" not in text
@@ -162,7 +162,7 @@ def test_check_error_output_is_compact(project_factory) -> None:
         },
     )
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     assert (
         '  [✗] ssh login failed for "deploy@example.com". (error: 1)'
         in result.output

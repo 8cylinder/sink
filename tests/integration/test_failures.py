@@ -162,7 +162,7 @@ def test_check_probes_every_database_and_filters_servers(
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "DB(demo) as sink" in text
     assert "DB(demo) as nopriv" in text
@@ -175,7 +175,7 @@ def test_check_reports_a_missing_pulls_directory(live_project) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "pulls_dir" in text
     assert "missing" in text
@@ -203,7 +203,7 @@ def test_check_reports_a_missing_remote_root(live_project) -> None:
 
     result = project.invoke("check", "dev")
 
-    assert result.exit_code == 0, combined(result)
+    assert result.exit_code != 0, combined(result)
     text = combined(result)
     assert "root dir does not exist" in text
     assert "[✗]" in text
@@ -231,7 +231,7 @@ def test_check_url_success_and_failure(live_project) -> None:
 
         result = project.invoke("check", "dev")
 
-        assert result.exit_code == 0, combined(result)
+        assert result.exit_code != 0, combined(result)
         text = combined(result)
         assert f"[✓] URL(http://127.0.0.1:{good_port}/)" in text
         assert f"[✗] URL(http://127.0.0.1:{bad_port}/)" in text

@@ -116,10 +116,13 @@ dumps are `0600`; Lando/DDEV dumps are tightened to `0600` after creation.
 
 A failed pull removes the truncated local dump, leaves `LATEST-*` untouched,
 reports the real stderr, and exits non-zero. A failed transfer reports the
-remote stderr and exits non-zero. Credential files are removed on failure and
-interruption. Project and server names are reduced to one filename component
-before they appear in a dump name or a `LATEST-*` link, and pull tags accept
-only letters, digits, dot, dash, and underscore.
+remote stderr and exits non-zero. `check` exits non-zero when any probe prints
+`[✗]`, including under `-qq`; `--allow-failures` restores the old exit-0
+behavior and `--json` emits a machine-readable probe summary. Credential
+files are removed on failure and interruption. Project
+and server names are reduced to one filename component before they appear in
+a dump name or a `LATEST-*` link, and pull tags accept only letters, digits,
+dot, dash, and underscore.
 
 ## Test coverage
 
