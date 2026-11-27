@@ -35,6 +35,9 @@
   successful transfer. Failed, interrupted, and startup-failed pulls remove
   the partial file and leave `LATEST-*` untouched; stale parts older than a
   day are cleaned up before the next pull.
+- A failed single-file pull now removes only rsync temp files created during
+  that transfer. Pre-existing backups and editor swap files named like
+  `.<name>.*` are preserved.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

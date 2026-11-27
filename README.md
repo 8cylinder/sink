@@ -99,6 +99,8 @@ working tree. `.git/` and `.sink/` are always excluded. Automatic
 Rsync runs with `--safe-links`. A directory put also refuses absolute
 symlinks or links whose targets leave `project.root`; safe relative in-tree
 links are preserved. Pulls ignore remote links that escape the destination.
+A failed single-file pull removes only rsync temp files created during that
+transfer; pre-existing backups and editor swap files are preserved.
 
 Every non-interactive SSH path uses `StrictHostKeyChecking=yes` and
 `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.

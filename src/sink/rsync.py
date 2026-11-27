@@ -308,20 +308,27 @@ class Transfer:
         if local.is_dir():
             remote = f"{remote}/"
             self.multiple = True
+        before: set[Path] = set()
+        if not self.multiple:
+            with suppress(OSError):
+                before = set(local.parent.iterdir())
         try:
             self._rsync(local, remote, Action.PULL, self._flags(extra_flags))
         except BaseException:
             # rsync creates .NAME.XXXXXX beside a single-file destination and
             # does not always remove it when the transfer is interrupted or
-            # fails.  Clean it before propagating the failure.
+            # fails.  Remove only entries that did not exist before this
+            # transfer so backups and editor swap files survive.
             if not self.multiple:
-                self._remove_pull_temp(local)
+                self._remove_pull_temp(local, before)
             raise
 
     @staticmethod
-    def _remove_pull_temp(local: Path) -> None:
-        """Remove rsync temp files left beside an interrupted file pull."""
+    def _remove_pull_temp(local: Path, before: set[Path]) -> None:
+        """Remove only rsync temp files created by this failed pull."""
         for candidate in local.parent.glob(f".{local.name}.*"):
+            if candidate in before:
+                continue
             with suppress(OSError):
                 candidate.unlink()
 

@@ -130,8 +130,10 @@ after a successful transfer, and only then updates `LATEST-*`. A failed,
 interrupted, or startup-failed pull removes the partial file, leaves
 `LATEST-*` untouched, reports the real stderr, and exits non-zero; stale
 parts older than a day are removed at the start of the next pull. A failed
-transfer reports the remote stderr and exits non-zero. `check` exits non-zero
-when any probe prints
+single-file pull removes only rsync temp files that did not exist before that
+transfer, so backups and editor swap files named like `.file.*` are
+preserved. A failed transfer reports the remote stderr and exits non-zero.
+`check` exits non-zero when any probe prints
 `[✗]`, including under `-qq`; `--allow-failures` restores the old exit-0
 behavior and `--json` emits a machine-readable probe summary. Credential
 files are removed on failure and interruption. Project

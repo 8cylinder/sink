@@ -105,6 +105,10 @@ def test_sigint_during_a_large_file_pull_does_not_claim_success(
     )
     local = project.path / "project" / "remote.bin"
     local.unlink(missing_ok=True)
+    backup = project.path / "project" / ".remote.bin.backup"
+    backup.write_text("keep\n")
+    swap = project.path / "project" / ".remote.bin.swp"
+    swap.write_text("keep\n")
 
     code, text = _run_and_interrupt(
         project,
@@ -122,7 +126,14 @@ def test_sigint_during_a_large_file_pull_does_not_claim_success(
     assert code != 0
     assert "[Success" not in text
     assert not local.exists()
-    assert not list((project.path / "project").glob(".remote.bin.*"))
+    assert backup.exists()
+    assert swap.exists()
+    leftovers = [
+        path
+        for path in (project.path / "project").glob(".remote.bin.*")
+        if path not in {backup, swap}
+    ]
+    assert leftovers == []
 
 
 def _create_big_table(project, rows: int = 10_000) -> None:

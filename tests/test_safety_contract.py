@@ -191,19 +191,26 @@ def test_environment_expansion_is_not_shell_syntax(
     assert not marker.exists()
 
 
-def test_interrupted_pull_removes_only_rsync_temp_files(
+def test_interrupted_pull_removes_only_new_rsync_temp_files(
     tmp_path: Path,
 ) -> None:
     local = tmp_path / "remote.bin"
     local.write_text("complete")
-    temporary = tmp_path / ".remote.bin.14r3Y9"
-    temporary.write_text("partial")
+    backup = tmp_path / ".remote.bin.backup"
+    backup.write_text("keep")
+    swap = tmp_path / ".remote.bin.swp"
+    swap.write_text("keep")
     unrelated = tmp_path / ".other.bin.14r3Y9"
     unrelated.write_text("keep")
+    temporary = tmp_path / ".remote.bin.14r3Y9"
+    temporary.write_text("partial")
+    before = {local, backup, swap, unrelated}
 
-    Transfer._remove_pull_temp(local)
+    Transfer._remove_pull_temp(local, before)
 
     assert local.exists()
+    assert backup.exists()
+    assert swap.exists()
     assert unrelated.exists()
     assert not temporary.exists()
 
@@ -213,11 +220,13 @@ def test_interrupted_pull_removes_the_temp_before_reraising(
 ) -> None:
     transfer = Transfer(_project(tmp_path), Server(name="dev", root=tmp_path))
     local = tmp_path / "remote.bin"
+    backup = tmp_path / ".remote.bin.backup"
+    backup.write_text("keep")
     temporary = tmp_path / ".remote.bin.abc123"
-    temporary.write_text("partial")
 
     def interrupted(*args, **kwargs) -> None:
         _ = args, kwargs
+        temporary.write_text("partial")
         raise KeyboardInterrupt
 
     monkeypatch.setattr(transfer, "_rsync", interrupted)
@@ -225,4 +234,5 @@ def test_interrupted_pull_removes_the_temp_before_reraising(
     with pytest.raises(KeyboardInterrupt):
         transfer.pull(local, None)
 
+    assert backup.exists()
     assert not temporary.exists()
