@@ -55,8 +55,11 @@ and cloud credential files. A directory `file put` that contains one of
 those paths is refused unless `--allow-secret-files` is passed. Explicit
 single-file transfers are not filtered. Directory pulls always keep the
 built-in exclusions, so a remote cannot overwrite `sink.yaml` or add a dump
-to the working tree. The exclusions are applied before per-server includes;
-automatic `.env.<server>` inclusion is no longer available.
+to the working tree. `.git/` and `.sink/` are always excluded. The
+exclusions are applied before per-server includes; automatic
+`.env.<server>` inclusion is no longer available. Rsync uses `--safe-links`,
+and a directory put refuses absolute symlinks or links whose targets leave
+`project.root`.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Secrets are redacted from rendered commands and from `misc api` /

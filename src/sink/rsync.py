@@ -1,5 +1,6 @@
 """Build and run rsync transfers."""
 
+import errno
 import fnmatch
 import os
 import shlex
@@ -16,6 +17,13 @@ from sink.errors import TransferError
 from sink.shell import Argv, Pipeline, run
 from sink.ui import ui
 
+# Metadata that a generic whole-project transfer should never include, even
+# with --allow-secret-files.
+ALWAYS_EXCLUDES = (
+    ".git/",
+    ".sink/",
+)
+
 # Directory transfers must never upload credential or production-data files
 # by accident.  These rules are applied before per-server includes so a later
 # include cannot re-expose a secret path.  Explicit single-file transfers are
@@ -23,7 +31,6 @@ from sink.ui import ui
 SAFE_EXCLUDES = (
     "sink.yaml",
     "sink.yaml.*",
-    ".sink/",
     "pulls/",
     "*.sql.gz",
     ".env*",
@@ -31,7 +38,6 @@ SAFE_EXCLUDES = (
     "*.key",
     "id_*",
     ".ssh/",
-    ".git/",
     ".aws/",
     ".config/gcloud/",
     ".netrc",
@@ -43,7 +49,10 @@ SAFE_EXCLUDES = (
     ".#*",
 )
 
-_SAFE_EXCLUDE_DIRS = frozenset({".sink", "pulls", ".ssh", ".git", ".aws"})
+# .git is excluded from transfers but is not a credential directory, so it
+# must not make a normal repository fail the secret pre-scan.
+_SAFE_EXCLUDE_DIRS = frozenset({".sink", "pulls", ".ssh", ".aws"})
+_PRUNE_DIRS = _SAFE_EXCLUDE_DIRS | {".git"}
 _SAFE_EXCLUDE_FILE_PATTERNS = tuple(
     pattern for pattern in SAFE_EXCLUDES if not pattern.endswith("/")
 )
@@ -103,14 +112,16 @@ class Transfer:
             return None
         return Path(pulls).resolve()
 
-    def _safe_excludes(self) -> tuple[str, ...]:
+    def _safe_excludes(self, *, secret: bool = True) -> tuple[str, ...]:
         """Return built-in exclusions for directory transfers."""
-        patterns = list(SAFE_EXCLUDES)
-        pulls = self._pulls_relative()
-        if pulls is not None and pulls.as_posix() not in {".", ""}:
-            pattern = f"{pulls.as_posix()}/"
-            if pattern not in patterns:
-                patterns.append(pattern)
+        patterns = list(ALWAYS_EXCLUDES)
+        if secret:
+            patterns.extend(SAFE_EXCLUDES)
+            pulls = self._pulls_relative()
+            if pulls is not None and pulls.as_posix() not in {".", ""}:
+                pattern = f"{pulls.as_posix()}/"
+                if pattern not in patterns:
+                    patterns.append(pattern)
         return tuple(patterns)
 
     def _is_secret_path(
@@ -170,6 +181,100 @@ class Transfer:
             )
         ui.warn(f"Allowing secret-looking files:\n{rendered}")
 
+    @staticmethod
+    def _inside_root(target: Path, root: Path) -> bool:
+        """Return whether *target* stays inside *root*."""
+        try:
+            target.relative_to(root)
+        except ValueError:
+            return False
+        return True
+
+    @staticmethod
+    def _resolve_link(path: Path) -> Path | None:
+        """Resolve a symlink chain, returning ``None`` for a loop or error."""
+        try:
+            return Path(os.path.realpath(path, strict=True))
+        except OSError as error:
+            if error.errno == errno.ELOOP:
+                return None
+            if error.errno == errno.ENOENT:
+                # A broken link inside the tree is safe; resolve it without
+                # requiring the target to exist.
+                return Path(os.path.realpath(path, strict=False))
+            # Permissions and other resolution failures fail closed.
+            return None
+
+    def _unsafe_symlink_target(
+        self, path: Path, project_root: Path
+    ) -> tuple[bool, Path | None]:
+        """Return whether a symlink is unsafe and its target for display."""
+        try:
+            link = path.readlink()
+        except OSError:
+            return True, None
+        # --safe-links ignores every absolute link, even one that happens to
+        # point inside the tree.  Reject it so the deployed tree cannot
+        # silently differ from the local tree.
+        if link.is_absolute():
+            return True, link
+        target = self._resolve_link(path)
+        if target is None:
+            return True, None
+        return not self._inside_root(target, project_root), target
+
+    def _unsafe_symlinks(self, local: Path) -> list[tuple[Path, Path | None]]:
+        """Return unsafe symlinks under the local transfer root."""
+        root = Path(local).resolve()
+        project_root = self.project.root.resolve()
+        pulls = self._pulls_absolute()
+        # Without the override, the safe excludes remove these trees before
+        # rsync sees them.  With --allow-secret-files the tree is transferred,
+        # so every symlink in it must still be checked.
+        prune_safe = not self.allow_secret_files
+        unsafe: list[tuple[Path, Path | None]] = []
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+            base = Path(dirpath)
+            for name in list(dirnames):
+                path = base / name
+                if prune_safe and (
+                    path.name in _PRUNE_DIRS
+                    or self._is_secret_path(path, root, pulls)
+                ):
+                    dirnames.remove(name)
+                    continue
+                if path.is_symlink():
+                    is_unsafe, target = self._unsafe_symlink_target(
+                        path, project_root
+                    )
+                    if is_unsafe:
+                        unsafe.append((path, target))
+                    dirnames.remove(name)
+            for name in filenames:
+                path = base / name
+                if path.is_symlink():
+                    is_unsafe, target = self._unsafe_symlink_target(
+                        path, project_root
+                    )
+                    if is_unsafe:
+                        unsafe.append((path, target))
+        return sorted(unsafe)
+
+    def _check_symlinks(self, local: Path) -> None:
+        """Refuse a directory put with absolute or escaping symlinks."""
+        links = self._unsafe_symlinks(local)
+        if not links:
+            return
+        rendered = "\n".join(
+            f"  {path} -> {target if target is not None else '<unresolvable>'}"
+            for path, target in links
+        )
+        raise TransferError(
+            "Refusing to transfer symlinks that are absolute or escape the "
+            f"project root ({self.project.root}):\n{rendered}\n"
+            "Remove or retarget the links before putting the directory."
+        )
+
     def put(
         self,
         filename: str | Path,
@@ -184,6 +289,7 @@ class Transfer:
         if local.is_dir():
             self.multiple = True
             self._check_secret_material(local)
+            self._check_symlinks(local)
             local = f"{local}/"
         remote = locations["remote"]
         if dest_override:
@@ -404,7 +510,13 @@ class Transfer:
             argv.append(f"--chown={server.user or ''}:{server.group or ''}")
 
         argv.extend(
-            [*extra_flags, "--itemize-changes", "--links", "--compress"]
+            [
+                *extra_flags,
+                "--itemize-changes",
+                "--links",
+                "--safe-links",
+                "--compress",
+            ]
         )
         argv.append("--checksum")
 
@@ -420,16 +532,11 @@ class Transfer:
         # .env.<server> include was removed: a dotenv file is credential
         # material, so an explicit --allow-secret-files transfer is required.
         # A pull is a write to the local trust anchor, so its exclusions are
-        # not overridable.  --allow-secret-files only applies to a put.
-        safe_excludes_required = (
-            action == Action.PULL or not self.allow_secret_files
-        )
-        if (
-            self.multiple
-            and action in (Action.PUT, Action.PULL)
-            and safe_excludes_required
-        ):
-            for exclude in self._safe_excludes():
+        # not overridable.  --allow-secret-files only applies to a put, and
+        # metadata such as .git/ and .sink/ is always excluded.
+        if self.multiple and action in (Action.PUT, Action.PULL):
+            secret = action == Action.PULL or not self.allow_secret_files
+            for exclude in self._safe_excludes(secret=secret):
                 argv.extend(["--exclude", exclude])
 
         for include in (

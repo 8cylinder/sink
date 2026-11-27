@@ -98,6 +98,62 @@ def test_database_password_is_never_rendered(live_project) -> None:
     assert "defaults-extra-file=" in text
 
 
+def test_nested_symlinks_do_not_escape_on_put(live_project) -> None:
+    project = live_project()
+    assets = project.path / "project" / "assets"
+    assets.mkdir()
+    (assets / "abs").symlink_to("/etc/passwd")
+    (assets / "rel").symlink_to("../../outside")
+
+    result = project.invoke("file", "put", "dev", "--real")
+
+    assert result.exit_code != 0, combined(result)
+    assert "escape the project root" in combined(result)
+    assert not project.remote_exists("assets/abs")
+    assert not project.remote_exists("assets/rel")
+    assert not project.remote_exists("index.html")
+
+
+def test_pull_ignores_remote_escaping_symlinks(live_project) -> None:
+    project = live_project()
+    project.remote_write("safe.txt", "safe\n")
+    project.sandbox.exec(
+        "server",
+        "ln",
+        "-s",
+        "/etc/passwd",
+        project.remote_path("abs-link"),
+        user="deploy",
+    )
+    project.sandbox.exec(
+        "server",
+        "ln",
+        "-s",
+        "../../outside",
+        project.remote_path("rel-link"),
+        user="deploy",
+    )
+    project.sandbox.exec(
+        "server",
+        "ln",
+        "-s",
+        "safe.txt",
+        project.remote_path("safe-link"),
+        user="deploy",
+    )
+
+    result = project.invoke("file", "pull", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    local = project.path / "project"
+    assert not (local / "abs-link").exists()
+    assert not (local / "abs-link").is_symlink()
+    assert not (local / "rel-link").exists()
+    assert not (local / "rel-link").is_symlink()
+    assert (local / "safe-link").is_symlink()
+    assert (local / "safe-link").resolve() == (local / "safe.txt").resolve()
+
+
 def test_whole_project_put_refuses_secret_material(live_project) -> None:
     project = live_project()
     root = project.path / "project"

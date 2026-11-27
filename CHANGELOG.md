@@ -20,6 +20,13 @@
   keys by default. It no longer uses a pager, honors `-qq`, and adds
   `--show-secrets` with a terminal confirmation or the explicit `--yes`
   flag.
+- Rsync now runs with `--safe-links` for put, pull, and diff. Directory puts
+  refuse absolute symlinks and links whose resolved targets escape
+  `project.root`; safe relative in-tree links still transfer. Symlink loops
+  are reported instead of being followed.
+- `.git/` and `.sink/` are always excluded from directory transfers, even
+  with `--allow-secret-files`. `.git` no longer triggers the secret-file
+  refusal, so a normal repository root remains usable.
 
 ### Fixed
 

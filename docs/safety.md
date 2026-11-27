@@ -61,10 +61,21 @@ server `exclude` entries.
 secret-looking path, it prints the paths and exits non-zero. Pass
 `--allow-secret-files` to print the paths and proceed. The override is
 put-only: a directory pull always applies the safe exclusions so a remote
-cannot overwrite local config or add a dump to the working tree. Explicit
+cannot overwrite local config or add a dump to the working tree. `.git/` and
+`.sink/` metadata are always excluded, even with the override. Explicit
 single-file transfers are not filtered: `sink file put dev .env.prod`
 remains available for an intentional transfer. Automatic `.env.<server>`
 inclusion was removed; dotenv files are credential material.
+
+## Symlinks
+
+Rsync runs with `--links --safe-links` for put, pull, and diff. `--safe-links`
+ignores absolute links and links whose targets escape the destination tree.
+A directory put adds a stricter pre-scan: it refuses absolute symlinks and
+links whose resolved targets leave `project.root`. Safe relative links inside
+the root are transferred, and a symlink loop is reported as unresolvable.
+Pulls cannot pre-scan the remote, so they rely on `--safe-links` to ignore
+escaping remote links.
 
 ## Credentials
 

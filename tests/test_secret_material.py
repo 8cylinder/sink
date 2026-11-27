@@ -79,6 +79,8 @@ def test_directory_put_allows_secret_files_with_override(
     assert "sink.yaml" not in rsync[0].args
     assert ".env*" not in rsync[0].args
     assert ".env.dev" not in rsync[0].args
+    assert ".git/" in rsync[0].args
+    assert ".sink/" in rsync[0].args
 
 
 def test_safe_excludes_come_before_includes(project_factory) -> None:
@@ -141,6 +143,40 @@ def test_single_file_put_is_not_filtered(project_factory) -> None:
     assert len(rsync) == 1
     assert "sink.yaml" not in rsync[0].args
     assert ".env*" not in rsync[0].args
+
+
+def test_allow_secret_files_keeps_metadata_excluded(project_factory) -> None:
+    project = project_factory()
+    git = project.path / "project" / ".git"
+    git.mkdir()
+    (git / "config").write_text("[core]\n")
+    sink = project.path / "project" / ".sink"
+    sink.mkdir()
+    (sink / "state").write_text("state\n")
+
+    result = project.invoke("file", "put", "dev", "--allow-secret-files")
+
+    assert result.exit_code == 0, combined(result)
+    rsync = commands_named(project.stub_log, "rsync")
+    assert len(rsync) == 1
+    assert ".git/" in rsync[0].args
+    assert ".sink/" in rsync[0].args
+
+
+def test_directory_put_excludes_git_metadata_without_refusing(
+    project_factory,
+) -> None:
+    project = project_factory()
+    git_config = project.path / "project" / ".git" / "config"
+    git_config.parent.mkdir(parents=True)
+    git_config.write_text("[core]\n")
+
+    result = project.invoke("file", "put", "dev")
+
+    assert result.exit_code == 0, combined(result)
+    rsync = commands_named(project.stub_log, "rsync")
+    assert len(rsync) == 1
+    assert ".git/" in rsync[0].args
 
 
 def test_configured_pulls_dir_inside_root_is_refused(project_factory) -> None:

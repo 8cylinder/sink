@@ -29,4 +29,9 @@ Directory transfers exclude secret material by default: `sink.yaml`,
 and cloud credential files. A directory `sink file put` refuses to start when
 it finds one of those paths unless `--allow-secret-files` is passed; explicit
 single-file transfers are not filtered. Directory pulls always apply the
-exclusions. Automatic `.env.<server>` inclusion is not supported.
+exclusions, and `.git/`/`.sink/` are always excluded. Automatic
+`.env.<server>` inclusion is not supported.
+
+Rsync runs with `--safe-links`. A directory put refuses absolute symlinks and
+links whose resolved targets leave `project.root`; safe relative in-tree links
+remain transferable. Pulls ignore remote links that escape the destination.

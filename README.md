@@ -92,7 +92,12 @@ and cloud credential files. A directory `file put` that contains one of
 those paths is refused unless `--allow-secret-files` is passed; explicit
 single-file transfers are never filtered. Directory pulls always keep those
 exclusions, so a remote cannot overwrite `sink.yaml` or drop a dump into the
-working tree. Automatic `.env.<server>` inclusion is gone.
+working tree. `.git/` and `.sink/` are always excluded. Automatic
+`.env.<server>` inclusion is gone.
+
+Rsync runs with `--safe-links`. A directory put also refuses absolute
+symlinks or links whose targets leave `project.root`; safe relative in-tree
+links are preserved. Pulls ignore remote links that escape the destination.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Extra keys are allowed and ignored by normal commands; `sink check`
