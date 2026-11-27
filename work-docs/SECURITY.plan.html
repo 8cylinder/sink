@@ -1,0 +1,2844 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Self-contained security assessment and remediation plan for Sink 0.3.0. Source-based review; no production changes.">
+<title>Sink Security Plan — assessment, remediation, and user hardening</title>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --bg-soft: #e9eef7;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --text: #162033;
+  --muted: #5b667a;
+  --faint: #7b879c;
+  --border: #d7dfeb;
+  --border-strong: #b9c5d8;
+  --accent: #0b63c9;
+  --accent-2: #6d28d9;
+  --accent-soft: #e8f1ff;
+  --good: #16794a;
+  --good-soft: #e7f6ee;
+  --warn: #9a5b00;
+  --warn-soft: #fff4dd;
+  --critical: #b42318;
+  --critical-soft: #fee9e7;
+  --high: #b54708;
+  --high-soft: #ffefe2;
+  --medium: #8a6100;
+  --medium-soft: #fff6d9;
+  --low: #18794e;
+  --low-soft: #e8f7ef;
+  --code-bg: #0b1220;
+  --code-bar: #111c31;
+  --code-text: #dbe8fb;
+  --code-muted: #8fa4c4;
+  --shadow: 0 10px 28px rgba(24, 39, 75, .08), 0 2px 7px rgba(24, 39, 75, .05);
+  --shadow-soft: 0 4px 14px rgba(24, 39, 75, .06);
+  --radius: 14px;
+  --focus: 0 0 0 3px rgba(11, 99, 201, .32);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+html[data-theme="dark"] {
+  --bg: #080d18;
+  --bg-soft: #0d1526;
+  --panel: #111a2c;
+  --panel-2: #0e1728;
+  --text: #e7eef9;
+  --muted: #a7b5ca;
+  --faint: #8292aa;
+  --border: #24324a;
+  --border-strong: #354764;
+  --accent: #72b7ff;
+  --accent-2: #b79cff;
+  --accent-soft: #122440;
+  --good: #6ee7a8;
+  --good-soft: #0e2a1e;
+  --warn: #f2c66d;
+  --warn-soft: #2c220d;
+  --critical: #ff8d84;
+  --critical-soft: #341311;
+  --high: #ffb07a;
+  --high-soft: #341b0d;
+  --medium: #f5d36a;
+  --medium-soft: #2d250b;
+  --low: #7fe3ae;
+  --low-soft: #0d2a1d;
+  --code-bg: #050912;
+  --code-bar: #0a1222;
+  --code-text: #dbe8fb;
+  --code-muted: #8fa4c4;
+  --shadow: 0 14px 34px rgba(0, 0, 0, .35), 0 2px 8px rgba(0, 0, 0, .28);
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, .22);
+  --focus: 0 0 0 3px rgba(114, 183, 255, .36);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 92px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+::selection { background: var(--accent-soft); color: var(--text); }
+.skip-link {
+  position: fixed; left: 12px; top: -60px; z-index: 300;
+  background: var(--accent); color: #fff; padding: 10px 14px; border-radius: 8px;
+  font-weight: 700; transition: top .15s ease;
+}
+.skip-link:focus { top: 12px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+[hidden] { display: none !important; }
+
+/* Progress + header */
+#progress {
+  position: fixed; inset: 0 0 auto 0; height: 4px; z-index: 200;
+  background: transparent; pointer-events: none;
+}
+#progress-bar {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 12px rgba(11, 99, 201, .45);
+  transition: width .06s linear;
+}
+.site-header {
+  position: sticky; top: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 11px clamp(16px, 3vw, 42px);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+}
+@supports not (background: color-mix(in srgb, white 90%, transparent)) {
+  .site-header { background: var(--panel); }
+}
+.brand { display: flex; align-items: center; gap: 11px; min-width: 0; font-weight: 800; letter-spacing: -.01em; }
+.brand-mark {
+  display: inline-grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 10px; color: #fff; font-weight: 900;
+  background: linear-gradient(145deg, var(--accent), var(--accent-2));
+  box-shadow: 0 4px 12px rgba(11, 99, 201, .28);
+  flex: 0 0 auto;
+}
+.brand-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { color: var(--muted); font-weight: 500; font-size: .82rem; margin-left: 3px; }
+.header-tools { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.search-wrap { position: relative; width: min(440px, 42vw); }
+#global-search {
+  width: 100%; padding: 9px 12px 9px 34px;
+  color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 10px;
+  font: inherit; font-size: .9rem;
+}
+#global-search::placeholder { color: var(--faint); }
+.search-icon {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--faint); font-size: .95rem; pointer-events: none;
+}
+.search-results {
+  position: absolute; top: calc(100% + 7px); left: 0; width: min(560px, 86vw);
+  max-height: min(62vh, 520px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 6px; z-index: 150;
+}
+.search-hit {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  color: var(--text); padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  font: inherit;
+}
+.search-hit:hover, .search-hit:focus-visible { background: var(--accent-soft); }
+.search-hit .hit-kind {
+  display: inline-block; font-family: var(--mono); font-size: .7rem; font-weight: 700;
+  color: var(--accent); margin-right: 8px;
+}
+.search-hit strong { display: block; font-size: .9rem; line-height: 1.35; }
+.search-hit .hit-snippet { display: block; color: var(--muted); font-size: .78rem; line-height: 1.4; margin-top: 3px; }
+.search-hit mark { background: var(--warn-soft); color: var(--text); padding: 0 2px; border-radius: 3px; }
+.search-empty { padding: 12px; color: var(--muted); font-size: .86rem; }
+.icon-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+  border-radius: 10px; padding: 8px 11px; cursor: pointer; font: inherit; font-size: .86rem;
+  white-space: nowrap;
+}
+.icon-btn:hover { border-color: var(--border-strong); background: var(--accent-soft); }
+.mobile-only { display: none; }
+
+/* Layout */
+.layout {
+  width: min(1540px, 100%);
+  margin: 0 auto;
+  padding: 28px clamp(16px, 3vw, 42px) 70px;
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 42px);
+  align-items: start;
+}
+.toc {
+  position: sticky; top: 78px;
+  max-height: calc(100vh - 98px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 14px;
+  box-shadow: var(--shadow-soft);
+  z-index: 90;
+}
+.toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin: 0 6px 10px; color: var(--muted);
+  font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+}
+.toc-close { display: none; }
+.toc nav { display: flex; flex-direction: column; gap: 2px; }
+.toc a {
+  display: block; padding: 7px 10px; color: var(--muted); text-decoration: none;
+  border-left: 3px solid transparent; border-radius: 0 7px 7px 0;
+  font-size: .88rem; line-height: 1.35;
+}
+.toc a:hover { color: var(--text); background: var(--panel-2); }
+.toc a.active {
+  color: var(--accent); background: var(--accent-soft);
+  border-left-color: var(--accent); font-weight: 700;
+}
+.toc a .toc-id { font-family: var(--mono); font-size: .72rem; color: var(--faint); margin-right: 6px; }
+.toc-foot { margin: 14px 8px 0; padding-top: 12px; border-top: 1px solid var(--border); color: var(--faint); font-size: .74rem; line-height: 1.5; }
+.toc-backdrop { display: none; }
+
+main { min-width: 0; }
+.hero {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(900px 380px at 100% 0%, rgba(109, 40, 217, .14), transparent 60%),
+    radial-gradient(800px 380px at 0% 100%, rgba(11, 99, 201, .14), transparent 62%),
+    var(--panel);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: clamp(24px, 3.4vw, 44px);
+  box-shadow: var(--shadow);
+}
+.hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 42px 42px; opacity: .12;
+  mask-image: linear-gradient(120deg, transparent 45%, #000 100%);
+}
+.hero > * { position: relative; z-index: 1; }
+.eyebrow {
+  margin: 0 0 10px; color: var(--accent); font-size: .76rem; font-weight: 850;
+  letter-spacing: .16em; text-transform: uppercase;
+}
+h1 { margin: 0; font-size: clamp(2.15rem, 4.9vw, 4.2rem); line-height: 1.02; letter-spacing: -.035em; }
+.subtitle { margin: 14px 0 0; max-width: 820px; color: var(--muted); font-size: clamp(1rem, 1.5vw, 1.18rem); }
+.meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.meta-row span, .badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel-2);
+  color: var(--muted); font-size: .78rem; font-weight: 650;
+}
+.badge.ok { color: var(--good); background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 30%, var(--border)); }
+.hero-note {
+  margin-top: 22px; padding: 13px 15px;
+  border-left: 4px solid var(--accent); background: var(--accent-soft);
+  border-radius: 0 10px 10px 0; color: var(--text); font-size: .9rem;
+}
+.hero-badges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+
+.section {
+  margin-top: 30px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: clamp(20px, 2.6vw, 32px);
+  box-shadow: var(--shadow-soft); scroll-margin-top: 88px;
+}
+.section > h2 {
+  margin: 0 0 4px; font-size: clamp(1.45rem, 2.3vw, 2rem); line-height: 1.12; letter-spacing: -.02em;
+}
+.section > h2 .section-num {
+  color: var(--accent); font-family: var(--mono); font-size: .62em; margin-right: 8px; vertical-align: .12em;
+}
+.section-intro { margin: 8px 0 18px; color: var(--muted); font-size: .98rem; max-width: 940px; }
+h3 { margin: 26px 0 9px; font-size: 1.17rem; line-height: 1.25; letter-spacing: -.01em; }
+h4 { margin: 18px 0 7px; font-size: .95rem; letter-spacing: .01em; }
+p { margin: 9px 0; }
+ul, ol { margin: 9px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+li > ul, li > ol { margin: 4px 0; }
+strong { font-weight: 760; }
+code, kbd, samp {
+  font-family: var(--mono); font-size: .88em;
+  background: var(--bg-soft); border: 1px solid var(--border);
+  padding: .08em .34em; border-radius: 5px; overflow-wrap: anywhere;
+}
+kbd { font-size: .8em; border-bottom-width: 2px; }
+pre code { background: none; border: 0; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.lead { font-size: 1.03rem; color: var(--text); }
+.fineprint { color: var(--faint); font-size: .8rem; line-height: 1.55; }
+.muted { color: var(--muted); }
+
+/* Callouts */
+.callout {
+  margin: 16px 0; padding: 15px 17px; border-radius: 11px;
+  border: 1px solid var(--border); border-left: 5px solid var(--accent);
+  background: var(--panel-2);
+}
+.callout h3, .callout h4 { margin: 0 0 7px; font-size: 1rem; }
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+.callout.good { border-left-color: var(--good); background: var(--good-soft); }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout.danger { border-left-color: var(--critical); background: var(--critical-soft); }
+.callout.info { border-left-color: var(--accent); background: var(--accent-soft); }
+
+/* Stats */
+.stat-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 18px 0 8px; }
+.stat {
+  padding: 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--panel-2); border-top: 4px solid var(--faint);
+}
+.stat strong { display: block; font-size: 1.85rem; line-height: 1; letter-spacing: -.03em; }
+.stat span { display: block; margin-top: 6px; color: var(--muted); font-size: .78rem; line-height: 1.3; }
+.stat.critical { border-top-color: var(--critical); }
+.stat.high { border-top-color: var(--high); }
+.stat.medium { border-top-color: var(--medium); }
+.stat.low { border-top-color: var(--low); }
+.stat.critical strong { color: var(--critical); }
+.stat.high strong { color: var(--high); }
+.stat.medium strong { color: var(--medium); }
+.stat.low strong { color: var(--low); }
+
+/* Top five */
+.top-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 6px; }
+.top-card {
+  display: flex; flex-direction: column; gap: 6px; min-height: 196px;
+  padding: 15px; border: 1px solid var(--border); border-radius: 12px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--text); text-decoration: none; box-shadow: var(--shadow-soft);
+  transition: transform .14s ease, border-color .14s ease;
+}
+.top-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.top-num { font-family: var(--mono); font-size: .72rem; font-weight: 800; color: var(--accent); }
+.top-id { font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+.top-card strong { font-size: .94rem; line-height: 1.3; }
+.top-card span:last-child { color: var(--muted); font-size: .8rem; line-height: 1.45; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 11px; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 620px; }
+th, td { padding: 10px 11px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+th {
+  background: var(--panel-2); color: var(--muted); font-size: .73rem;
+  letter-spacing: .07em; text-transform: uppercase; font-weight: 800;
+  position: sticky; top: 0; z-index: 1;
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+@supports not (background: color-mix(in srgb, white 45%, transparent)) {
+  tbody tr:hover td { background: var(--panel-2); }
+}
+td.num { font-family: var(--mono); white-space: nowrap; }
+td.nowrap { white-space: nowrap; }
+.table-note { color: var(--faint); font-size: .78rem; margin: -4px 0 12px; }
+
+/* Pills, chips, status */
+.pill, .sev, .status {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel-2);
+  color: var(--muted); font-size: .7rem; font-weight: 750; line-height: 1.55;
+  white-space: nowrap;
+}
+.sev-critical { color: var(--critical); background: var(--critical-soft); border-color: color-mix(in srgb, var(--critical) 30%, var(--border)); }
+.sev-high { color: var(--high); background: var(--high-soft); border-color: color-mix(in srgb, var(--high) 30%, var(--border)); }
+.sev-medium { color: var(--medium); background: var(--medium-soft); border-color: color-mix(in srgb, var(--medium) 30%, var(--border)); }
+.sev-low { color: var(--low); background: var(--low-soft); border-color: color-mix(in srgb, var(--low) 30%, var(--border)); }
+.status.holds { color: var(--good); background: var(--good-soft); }
+.status.mostly { color: var(--warn); background: var(--warn-soft); }
+.status.gap { color: var(--high); background: var(--high-soft); }
+.status.overstated { color: var(--critical); background: var(--critical-soft); }
+
+/* Register */
+.register-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 12px; margin: 14px 0 10px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+}
+.filter-btn {
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  border-radius: 999px; padding: 6px 10px; cursor: pointer; font: inherit;
+  font-size: .8rem; font-weight: 650; white-space: nowrap;
+}
+.filter-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.filter-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.filter-btn .count { opacity: .75; font-family: var(--mono); font-size: .74rem; margin-left: 3px; }
+#register-search {
+  flex: 1 1 220px; min-width: 170px; padding: 7px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); color: var(--text); font: inherit; font-size: .84rem;
+}
+.register-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 10px; }
+#register-count { color: var(--muted); font-size: .82rem; }
+.register-empty { padding: 18px; border: 1px dashed var(--border-strong); border-radius: 10px; color: var(--muted); text-align: center; }
+
+.finding-list { display: flex; flex-direction: column; gap: 14px; }
+.finding {
+  border: 1px solid var(--border); border-radius: 13px; background: var(--panel);
+  padding: 18px; box-shadow: var(--shadow-soft); scroll-margin-top: 88px;
+}
+.finding-anchor { display: block; height: 0; scroll-margin-top: 96px; }
+.finding-anchor:target + * { color: inherit; }
+.finding:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.finding:has(.finding-anchor:target) { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.finding-head { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 7px; }
+.finding-id { font-family: var(--mono); font-size: .78rem; font-weight: 900; color: var(--accent); }
+.finding h3 { margin: 0 0 8px; font-size: 1.12rem; }
+.finding .impact { margin: 7px 0 12px; color: var(--text); font-size: .91rem; }
+.finding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
+.finding-grid h4 { margin: 0 0 5px; color: var(--muted); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+.finding ul { margin: 5px 0; padding-left: 18px; }
+.finding li { font-size: .87rem; }
+.evidence li { color: var(--text); }
+.evidence code { font-size: .8em; }
+.verify {
+  margin-top: 10px; padding: 10px 12px; border-radius: 9px;
+  background: var(--good-soft); border: 1px solid color-mix(in srgb, var(--good) 22%, var(--border));
+  font-size: .86rem;
+}
+@supports not (border-color: color-mix(in srgb, green 22%, white)) { .verify { border-color: var(--border); } }
+.verify strong { color: var(--good); }
+.verify ul { margin: 4px 0 0; }
+.deep-dive { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 9px; }
+.deep-dive summary { cursor: pointer; color: var(--accent); font-weight: 700; font-size: .86rem; }
+.deep-dive summary:hover { text-decoration: underline; }
+.deep-body { padding: 8px 2px 2px; }
+.deep-body p { font-size: .88rem; color: var(--muted); }
+.deep-body ul { margin-top: 6px; }
+
+/* Phases, decisions, playbook */
+.phase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.phase-card { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2); border-top: 4px solid var(--accent); }
+.phase-card:nth-child(2) { border-top-color: var(--medium); }
+.phase-card:nth-child(3) { border-top-color: var(--low); }
+.phase-card h3 { margin: 0 0 3px; font-size: 1rem; }
+.phase-window { color: var(--muted); font-family: var(--mono); font-size: .75rem; }
+.phase-card ul { padding-left: 18px; }
+.phase-card li { font-size: .85rem; }
+.decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.decision { padding: 15px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2); }
+.decision h3 { margin: 0 0 5px; font-size: .98rem; }
+.decision h3 .did { font-family: var(--mono); color: var(--accent); font-size: .82em; margin-right: 5px; }
+.decision p { font-size: .87rem; }
+.decision .rec { color: var(--good); font-weight: 700; }
+.step { margin: 18px 0; }
+.step > h3 { display: flex; align-items: center; gap: 9px; }
+.step-num {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 28px; height: 28px; border-radius: 9px;
+  color: #fff; background: linear-gradient(145deg, var(--accent), var(--accent-2));
+  font-family: var(--mono); font-size: .8rem; font-weight: 800;
+}
+.checklist { list-style: none; padding-left: 0; }
+.checklist li { position: relative; padding-left: 25px; margin: 6px 0; }
+.checklist li::before {
+  content: ""; position: absolute; left: 2px; top: .48em;
+  width: 11px; height: 11px; border: 2px solid var(--accent); border-radius: 3px;
+}
+.code-block { margin: 13px 0; border: 1px solid var(--border); border-radius: 11px; overflow: hidden; background: var(--code-bg); }
+.code-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 10px; background: var(--code-bar); border-bottom: 1px solid #1c2a44;
+  color: var(--code-muted); font-family: var(--mono); font-size: .72rem;
+}
+.code-bar .lang { letter-spacing: .05em; text-transform: uppercase; font-weight: 700; }
+.copy-btn {
+  border: 1px solid #2a3b59; background: #14213a; color: #c7d8f2;
+  border-radius: 6px; padding: 3px 8px; cursor: pointer; font: inherit; font-size: .7rem;
+}
+.copy-btn:hover { background: #1b2c4a; border-color: #3c557d; }
+.copy-btn.copied { color: #9df0bf; border-color: #2f7d55; }
+.code-block pre {
+  margin: 0; padding: 14px; overflow: auto; max-height: 460px;
+  color: var(--code-text); font-family: var(--mono); font-size: .82rem; line-height: 1.55;
+  tab-size: 2;
+}
+.code-block pre.json-preview { max-height: 420px; }
+.code-block pre.json-preview.expanded { max-height: none; }
+.spec-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.action-btn {
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+  border-radius: 8px; padding: 7px 11px; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 650;
+}
+.action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.spec-status { display: inline-block; margin: 8px 0; padding: 4px 9px; border-radius: 999px; font-size: .78rem; font-weight: 700; }
+.spec-status.ok { color: var(--good); background: var(--good-soft); }
+.spec-status.bad { color: var(--critical); background: var(--critical-soft); }
+.risk-list { margin: 8px 0; }
+.risk-list li { margin: 6px 0; }
+
+/* Misc */
+.gotop {
+  position: fixed; right: 18px; bottom: 18px; z-index: 110;
+  width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--panel); color: var(--text); cursor: pointer; box-shadow: var(--shadow);
+  display: grid; place-items: center; font-size: 1rem; opacity: 0; pointer-events: none;
+  transform: translateY(8px); transition: opacity .16s ease, transform .16s ease;
+}
+.gotop.visible { opacity: 1; pointer-events: auto; transform: none; }
+footer { color: var(--faint); font-size: .78rem; text-align: center; padding: 0 20px 36px; }
+footer p { margin: 4px 0; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 22px 0; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: .88rem; }
+.kv dt { color: var(--muted); font-weight: 650; }
+.kv dd { margin: 0; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.small { font-size: .82rem; }
+.critical-text { color: var(--critical); font-weight: 700; }
+.good-text { color: var(--good); font-weight: 700; }
+.warn-text { color: var(--warn); font-weight: 700; }
+
+@media (max-width: 1180px) {
+  .top-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .top-card { min-height: 0; }
+}
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 1fr; padding-top: 20px; }
+  .toc {
+    position: fixed; inset: 0 auto 0 0; width: min(330px, 88vw); max-height: none;
+    border-radius: 0 16px 16px 0; padding: 18px; transform: translateX(-105%);
+    transition: transform .2s ease; z-index: 220; box-shadow: 0 0 50px rgba(0,0,0,.35);
+  }
+  body.toc-open .toc { transform: translateX(0); }
+  .toc-close { display: inline-flex; }
+  .toc-backdrop {
+    position: fixed; inset: 0; z-index: 210; background: rgba(3, 8, 18, .55);
+    backdrop-filter: blur(2px);
+  }
+  body.toc-open .toc-backdrop { display: block; }
+  .mobile-only { display: inline-flex; }
+  .search-wrap { width: min(340px, 40vw); }
+  .phase-grid, .decision-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .brand-sub { display: none; }
+  .search-wrap { width: min(260px, 42vw); }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .top-grid { grid-template-columns: 1fr 1fr; }
+  .finding-grid { grid-template-columns: 1fr; }
+  .header-tools { gap: 6px; }
+  #theme-label { display: none; }
+  .section { padding: 18px; }
+  .hero { padding: 22px; }
+}
+@media (max-width: 540px) {
+  .site-header { flex-wrap: wrap; }
+  .header-tools { width: 100%; }
+  .search-wrap { flex: 1 1 auto; width: auto; }
+  .top-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .tab-only { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media print {
+  @page { margin: 13mm; }
+  html { scroll-padding-top: 0; }
+  body { background: #fff !important; color: #000 !important; font-size: 10.2pt; }
+  #progress, .site-header, .toc, .toc-backdrop, .gotop, .copy-btn, .code-bar,
+  .search-results, .register-toolbar, .spec-actions, .skip-link, .mobile-only { display: none !important; }
+  .layout { display: block; padding: 0; width: auto; }
+  main { display: block; }
+  .hero, .section, .finding, .phase-card, .decision, .callout, .table-wrap {
+    box-shadow: none !important; background: #fff !important; border-color: #999 !important;
+    break-inside: avoid;
+  }
+  .hero { padding: 0 0 12px; border: 0; }
+  .section { margin-top: 16px; padding: 0; border: 0; }
+  h1 { font-size: 28pt; }
+  h2 { font-size: 17pt; }
+  h3 { font-size: 12.5pt; }
+  a { color: #000 !important; text-decoration: underline; }
+  .sev, .status, .pill { border: 1px solid #777 !important; color: #000 !important; background: #fff !important; }
+  .finding, .code-block, .callout, .table-wrap { break-inside: avoid; }
+  .code-block pre { max-height: none; overflow: visible; white-space: pre-wrap; background: #f4f4f4 !important; color: #000 !important; }
+  .code-bar { display: none !important; }
+  #spec-preview, #spec .code-block { display: none !important; }
+  .finding[hidden] { display: block !important; }
+  .register-row[hidden] { display: table-row !important; }
+  .table-wrap { overflow: visible; }
+  table { min-width: 0; font-size: 8.8pt; }
+  th { position: static; background: #eee !important; color: #000 !important; }
+  .toc a.active { background: transparent; }
+  details { display: block; }
+  details > summary { list-style: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-bar"></div></div>
+
+<header class="site-header">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">S</span>
+    <span class="brand-text">Sink Security Plan <span class="brand-sub">v0.3.0</span></span>
+  </div>
+  <div class="header-tools">
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <label class="sr-only" for="global-search">Search this plan</label>
+      <input id="global-search" type="search" placeholder="Search plan…  Ctrl K" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-expanded="false">
+      <div id="search-results" class="search-results" role="listbox" hidden></div>
+    </div>
+    <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle dark mode" aria-pressed="false"><span id="theme-icon" aria-hidden="true">☾</span><span id="theme-label">Dark</span></button>
+    <button id="toc-toggle" class="icon-btn mobile-only" type="button" aria-label="Open table of contents" aria-expanded="false">Contents</button>
+  </div>
+</header>
+
+<div class="toc-backdrop" id="toc-backdrop"></div>
+
+<div class="layout">
+  <aside class="toc" id="toc" aria-label="Table of contents">
+    <div class="toc-head"><span>Contents</span><button class="icon-btn toc-close" id="toc-close" type="button" aria-label="Close table of contents">Close</button></div>
+    <nav>
+      <a href="#top"><span class="toc-id">00</span>Overview</a>
+      <a href="#exec"><span class="toc-id">01</span>Executive summary</a>
+      <a href="#threat"><span class="toc-id">02</span>Threat model</a>
+      <a href="#register"><span class="toc-id">03</span>Risk register</a>
+      <a href="#invariants"><span class="toc-id">04</span>Safety invariants</a>
+      <a href="#remediation"><span class="toc-id">05</span>Remediation plan</a>
+      <a href="#decisions"><span class="toc-id">06</span>Decisions</a>
+      <a href="#playbook"><span class="toc-id">07</span>User hardening</a>
+      <a href="#verification"><span class="toc-id">08</span>Verification</a>
+      <a href="#ai-brief"><span class="toc-id">09</span>AI brief</a>
+      <a href="#spec"><span class="toc-id">10</span>Machine spec</a>
+      <a href="#method"><span class="toc-id">11</span>Method &amp; limits</a>
+    </nav>
+    <div class="toc-foot">Source-based review of <code>sink 0.3.0</code> at <code>/workdir</code>. No production systems were changed.</div>
+  </aside>
+
+  <main id="main">
+    <section class="hero" id="top" data-nav="Overview">
+      <p class="eyebrow">Security assessment &amp; remediation plan</p>
+      <h1>Sink Security Plan</h1>
+      <p class="subtitle">Assessment, remediation, and user hardening for <strong>Sink 0.3.0</strong> — a Python/Click CLI that moves files and databases to remote servers.</p>
+      <div class="meta-row">
+        <span><strong>Date</strong> 2026-11-26</span>
+        <span><strong>Version</strong> 0.3.0</span>
+        <span><strong>Artifact</strong> self-contained HTML</span>
+        <span><strong>Review</strong> source-based</span>
+      </div>
+      <div class="hero-badges" aria-label="Key facts">
+        <span class="badge">18 findings</span>
+        <span class="badge">4 High · 1 Critical-if-untrusted</span>
+        <span class="badge">0 production changes</span>
+        <span class="badge ok">Offline · no network requests</span>
+      </div>
+      <div class="hero-note"><strong>No production changes were made during this review.</strong> The assessment is based on the Sink 0.3.0 source tree at <code>/workdir</code>, its tests, documentation, and CI configuration. No remote servers, databases, credentials, or deployments were touched. This page embeds its own CSS and JavaScript, loads no external fonts, images, scripts, analytics, or CDNs, and works when opened directly from disk.</div>
+    </section>
+
+    <section class="section" id="exec" data-nav="Executive summary">
+      <h2><span class="section-num">01</span>Executive summary</h2>
+      <p class="lead">Sink's execution architecture is good. The command layer builds argv arrays, never uses <code>shell=True</code>, quotes rendered commands with <code>shlex</code>, validates paths, checks gzip magic, sanitizes dump names, streams pipelines, stages remote MySQL credentials as <code>0600</code> files over SSH stdin with an <code>EXIT</code> trap, defaults to dry-run, does not add <code>--delete</code> by default, and uses batch SSH probes with host-key checking.</p>
+
+      <div class="callout good">
+        <h3>What is already strong</h3>
+        <ul>
+          <li><strong>No shell interpolation for ordinary commands.</strong> <code>subprocess</code> receives argv lists; <code>shlex.join</code> is used for rendered commands. There is no <code>shell=True</code> in <code>src/</code>.</li>
+          <li><strong>Path and name validation.</strong> Transfer paths are resolved and checked against the project root; dump tags reject separators and <code>..</code>; project/server names are reduced to one filename component; imports validate gzip magic before running remote commands.</li>
+          <li><strong>Credentials handled out of band on the remote side.</strong> Remote MySQL passwords are written with <code>umask 077; cat &gt; path</code> over SSH stdin, referenced by <code>--defaults-extra-file</code>, removed by an <code>EXIT</code> trap, with a separate cleanup command as fallback.</li>
+          <li><strong>Safe defaults.</strong> Destructive commands are printed unless <code>--real</code> is passed; rsync receives its native <code>--dry-run</code>; no <code>--delete</code> or <code>--remove-source-files</code> is added by Sink; pipelines stream rather than buffering payloads.</li>
+          <li><strong>Some output redaction exists.</strong> <code>misc api</code> masks sensitive key names, <code>misc settings</code> masks configured secrets, and pipeline errors can be passed a secrets tuple.</li>
+          <li><strong>Batch probes are conservative.</strong> Check, actions, and credential staging use <code>BatchMode=yes</code> and <code>StrictHostKeyChecking=yes</code> through <code>_ssh_base</code>.</li>
+          <li><strong>Failure signals are mostly honest.</strong> Pipeline execution reports the first non-zero stage; DB pull avoids updating <code>LATEST-*</code> on ordinary failure; dump collisions are avoided with unique names.</li>
+        </ul>
+      </div>
+
+      <div class="callout warn">
+        <h3>The main risk is trust-boundary and data handling, not shell injection</h3>
+        <p>The serious issues are: <strong>what gets uploaded</strong> when the project root is the repository, <strong>what gets printed</strong> when secrets are in the config, <strong>what a symlink can reach</strong>, <strong>how local dumps are stored</strong>, and <strong>what <code>sink.yaml</code> is allowed to execute</strong>. A malicious repo or parent-directory config is equivalent to a shell script plus a credential store; Sink does not sandbox it. That trust assumption must be explicit before anyone runs <code>sink check</code> or <code>--real</code> in an unfamiliar checkout.</p>
+      </div>
+
+      <h3>Top five</h3>
+      <div class="top-grid">
+        <a class="top-card" href="#sec-01"><span class="top-num">01</span><span class="top-id">SEC-01 · High · P0</span><strong>Whole-project put leaks secrets and dumps</strong><span><code>sink.yaml</code>, <code>pulls/</code>, <code>.env.*</code>, keys, and SQL dumps can be uploaded to a web root.</span></a>
+        <a class="top-card" href="#sec-02"><span class="top-num">02</span><span class="top-id">SEC-02 · High · P0</span><strong><code>sink info</code> prints plaintext secrets</strong><span>Reads the raw YAML through the pager and ignores <code>-qq</code>; adjacent redaction gaps remain.</span></a>
+        <a class="top-card" href="#sec-03"><span class="top-num">03</span><span class="top-id">SEC-03 · High · P0</span><strong>Nested symlinks escape the root</strong><span><code>--links</code> without <code>--safe-links</code>; only a top-level symlink is tested.</span></a>
+        <a class="top-card" href="#sec-04"><span class="top-num">04</span><span class="top-id">SEC-04 · High · P0</span><strong>Local dumps are world-readable</strong><span>Modes are umask-derived and <code>MYSQL_PWD</code> is passed to every pipeline stage.</span></a>
+        <a class="top-card" href="#sec-05"><span class="top-num">05</span><span class="top-id">SEC-05 · Critical-if-untrusted · P0</span><strong><code>sink.yaml</code> is executable code</strong><span><code>check</code> always runs probes; parent-directory discovery widens the trust boundary.</span></a>
+      </div>
+
+      <div class="stat-grid" aria-label="Finding counts">
+        <div class="stat"><strong>18</strong><span>Total findings</span></div>
+        <div class="stat high"><strong>4</strong><span>High</span></div>
+        <div class="stat critical"><strong>1</strong><span>Critical if untrusted</span></div>
+        <div class="stat medium"><strong>10</strong><span>Medium</span></div>
+        <div class="stat low"><strong>3</strong><span>Low / hardening</span></div>
+      </div>
+      <p class="fineprint">Executive roll-up: 4 High, 1 Critical-if-untrusted, 10 Medium, 3 Low/hardening (18 total). Filter buckets match severity labels.</p>
+    </section>
+
+    <section class="section" id="threat" data-nav="Threat model">
+      <h2><span class="section-num">02</span>Threat model</h2>
+      <p class="section-intro">Sink sits on a developer workstation and holds credentials that authorize production changes. The relevant adversaries are not only remote attackers; the tool's own configuration, parent directories, output surfaces, and local files are part of the attack surface.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Actor</th><th>Capability</th><th>Attack paths in Sink</th><th>Primary findings</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Network attacker</strong></td><td>Can intercept or redirect SSH/MySQL/TLS traffic; controls DNS or a proxy.</td><td>MITM an rsync or interactive SSH session because host-key policy is not consistent; observe plaintext HTTP URL checks or <code>--insecure</code> TLS; downgrade or intercept MySQL if TLS is not required.</td><td>SEC-07, SEC-11, SEC-05</td></tr>
+            <tr><td><strong>Compromised remote</strong></td><td>Controls the remote filesystem, shell, MySQL server, or a file served to a pull.</td><td>Read staged credentials from <code>/tmp</code>; plant nested or absolute symlinks for a pull; inject files that become executable code in the local checkout; lie during <code>check</code> probes.</td><td>SEC-15, SEC-03, SEC-13, SEC-01</td></tr>
+            <tr><td><strong>Local same-UID attacker</strong></td><td>Runs as the same user (malware, a compromised editor plugin, another terminal) or can read a shared backup/sync target.</td><td>Read <code>MYSQL_PWD</code> from <code>/proc/&lt;pid&gt;/environ</code>; read <code>0644</code> dumps; read pager temp or scrollback; race a remote credential path; influence <code>PATH</code>, <code>PAGER</code>, <code>LESSOPEN</code>, or <code>EDITOR</code>.</td><td>SEC-04, SEC-18, SEC-02</td></tr>
+            <tr><td><strong>Malicious repo/config</strong></td><td>Can commit a <code>sink.yaml</code> or place one in a parent directory the operator will discover.</td><td>Set <code>ssh.server</code>/<code>mysql.hostname</code> to an attacker host and exfiltrate <code>${DATABASE_PASSWORD}</code>; use <code>actions</code>, <code>difftool</code>, or <code>rsync_binary</code> for code execution; point <code>check</code> at internal URLs or metadata endpoints; use parent discovery to hijack unrelated commands.</td><td>SEC-05, SEC-12, SEC-17</td></tr>
+            <tr><td><strong>Careless operator</strong></td><td>Runs a plausible command with the wrong target, wrong flags, or an untrusted checkout.</td><td>Whole-project <code>put</code> uploads secrets; whole-project <code>pull</code> overwrites local work or config; <code>--extra-flags</code> adds <code>--delete</code>, <code>--remove-source-files</code>, <code>--rsync-path</code>, or <code>--files-from</code>; <code>db put</code> imports into the wrong server.</td><td>SEC-01, SEC-13, SEC-12, SEC-04</td></tr>
+            <tr><td><strong>Supply chain</strong></td><td>Controls a CI action tag, a downloaded binary, a dependency, or a binary on <code>PATH</code>.</td><td>Mutable action tags; <code>curl | tar</code> for gitleaks without a checksum; <code>ssh</code>/<code>rsync</code>/<code>mysql</code>/<code>gzip</code>/<code>git</code>/<code>less</code> resolved through <code>PATH</code>; dependencies from PyPI.</td><td>SEC-18, SEC-07, SEC-11</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Assets</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Asset</th><th>Why it matters</th><th>Where it lives</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Credentials</strong></td><td>SSH keys, SSH passwords, MySQL passwords, URL/HTTP-auth credentials, control-panel and hosting credentials, notes that may contain recovery details.</td><td><code>sink.yaml</code>, the SSH agent, <code>known_hosts</code>, remote <code>/tmp/sink-mysql-*.cnf</code>, environment variables, shell history.</td></tr>
+            <tr><td><strong>Production data / PII</strong></td><td>Database dumps, uploads, customer records, logs, backups, and any file mirrored by a whole-project transfer.</td><td>Remote web roots, local <code>pulls/</code>, temp diff directories, local backups and sync clients.</td></tr>
+            <tr><td><strong>Integrity / availability</strong></td><td>Production site content and database; the local working tree; <code>LATEST-*</code> restore points; CI gates.</td><td>Remote servers, the local checkout, <code>pulls/</code>, GitHub Actions, operator terminals.</td></tr>
+            <tr><td><strong>Developer workstation</strong></td><td>The trust anchor for every operation; a compromise here defeats SSH, TLS, and file permissions.</td><td>Laptop/desktop, dotfiles, <code>PATH</code>, <code>EDITOR</code>/<code>PAGER</code>, agent socket, disk, backups.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout danger">
+        <h3>Trust assumption to state in the README and SECURITY.md</h3>
+        <p><strong><code>sink.yaml</code> is executable code and trusted credential material.</strong> It can choose the SSH host, identity, MySQL host, URL targets, child process binary, remote shell fragment, diff tool, and action commands. Anyone who can write <code>sink.yaml</code> — or place one in a parent directory that Sink discovers — can cause code execution or credential exfiltration in the operator's context. Treat configs like shell scripts: review them, keep them in trusted repositories, restrict write access, and never run <code>sink check</code> or <code>--real</code> against an unreviewed checkout without reading the config and knowing which file was resolved.</p>
+      </div>
+    </section>
+
+    <section class="section" id="register" data-nav="Risk register">
+      <h2><span class="section-num">03</span>Risk register</h2>
+      <p class="section-intro">18 findings, ordered by severity and remediation priority. Filter by severity or search the full text of every finding. Each card includes evidence with source references, impact, remediation, verification tests, and an expandable deep dive.</p>
+
+      <div class="register-toolbar" role="group" aria-label="Filter risk register">
+        <button class="filter-btn" type="button" data-bucket="all" aria-pressed="true">All <span class="count">18</span></button>
+        <button class="filter-btn" type="button" data-bucket="critical" aria-pressed="false">Critical-if-untrusted <span class="count">1</span></button>
+        <button class="filter-btn" type="button" data-bucket="high" aria-pressed="false">High <span class="count">4</span></button>
+        <button class="filter-btn" type="button" data-bucket="medium" aria-pressed="false">Medium <span class="count">10</span></button>
+        <button class="filter-btn" type="button" data-bucket="low" aria-pressed="false">Low / hardening <span class="count">3</span></button>
+        <label class="sr-only" for="register-search">Filter findings by text</label>
+        <input id="register-search" type="search" placeholder="Filter by ID, title, file, impact…" autocomplete="off">
+        <button class="action-btn" type="button" id="register-clear">Clear</button>
+      </div>
+      <div class="register-meta">
+        <span id="register-count" role="status">Showing 18 of 18 findings</span>
+        <span class="fineprint">Severity chips and filter buckets both use each finding's actual severity label.</span>
+      </div>
+
+      <h3>Register index</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Severity</th><th>Area</th><th>Priority</th><th>Finding</th><th>Phase</th></tr></thead>
+          <tbody id="register-rows"></tbody>
+        </table>
+      </div>
+
+      <div id="register-empty" class="register-empty" hidden>No findings match this severity and text filter.</div>
+      <div id="finding-anchor-set" hidden aria-hidden="true">
+        <span id="sec-01" class="finding-anchor"></span><span id="sec-02" class="finding-anchor"></span><span id="sec-03" class="finding-anchor"></span><span id="sec-04" class="finding-anchor"></span><span id="sec-05" class="finding-anchor"></span><span id="sec-06" class="finding-anchor"></span><span id="sec-07" class="finding-anchor"></span><span id="sec-08" class="finding-anchor"></span><span id="sec-09" class="finding-anchor"></span><span id="sec-10" class="finding-anchor"></span><span id="sec-11" class="finding-anchor"></span><span id="sec-12" class="finding-anchor"></span><span id="sec-13" class="finding-anchor"></span><span id="sec-14" class="finding-anchor"></span><span id="sec-15" class="finding-anchor"></span><span id="sec-16" class="finding-anchor"></span><span id="sec-17" class="finding-anchor"></span><span id="sec-18" class="finding-anchor"></span>
+      </div>
+      <div id="finding-cards" class="finding-list"></div>
+      <noscript><div class="callout warn"><strong>JavaScript is disabled.</strong> The filterable register cards and generated tables need JavaScript. The complete machine-readable spec is still present in the <code>application/json</code> block near the end of this file, and the AI brief is plain HTML.</div></noscript>
+    </section>
+
+    <section class="section" id="invariants" data-nav="Safety invariants">
+      <h2><span class="section-num">04</span>Safety invariants — S1 to S14</h2>
+      <p class="section-intro">The project's <code>docs/safety.md</code> defines fourteen invariants. The table below records what the code actually enforces and where the contract overstates the guarantee. Status: <span class="status holds">Holds</span> <span class="status mostly">Mostly holds</span> <span class="status gap">Gap</span> <span class="status overstated">Overstated</span>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Invariant</th><th>Status</th><th>Observed gap / evidence</th></tr></thead>
+          <tbody id="invariant-rows"></tbody>
+        </table>
+      </div>
+      <p class="table-note">“Holds” means no material counterexample was found in source review and the automated suites; it is not a proof. “Overstated” means the stated absolute is contradicted by a reachable code path.</p>
+    </section>
+
+    <section class="section" id="remediation" data-nav="Remediation plan">
+      <h2><span class="section-num">05</span>Remediation plan</h2>
+      <p class="section-intro">Sequence matters: stop secret and data exposure first, then make failures and SSH trustworthy, then finish hardening. Phase 0 items are small, local, and independently shippable. Phase 1 changes command construction and failure semantics. Phase 2 is defense in depth and supply-chain work.</p>
+
+      <div class="phase-grid">
+        <div class="phase-card">
+          <h3>Phase 0 — Stop the bleeding</h3>
+          <p class="phase-window">1–3 days · P0</p>
+          <ul>
+            <li><strong>SEC-01</strong> safe excludes + narrow starter root</li>
+            <li><strong>SEC-02</strong> redact <code>info</code>, honor quiet</li>
+            <li><strong>SEC-03</strong> <code>--safe-links</code>, nested-symlink tests</li>
+            <li><strong>SEC-04</strong> 0600 dumps, 0700 pulls, per-stage env</li>
+            <li><strong>SEC-05</strong> trust warning + resolved config path</li>
+            <li><strong>SEC-08</strong> clean partial dumps on interrupt</li>
+            <li><strong>SEC-09</strong> narrow temp cleanup</li>
+          </ul>
+          <p class="fineprint">Exit: no test can upload a secret-looking file, print a configured password, escape via a nested symlink, or leave a readable dump.</p>
+        </div>
+        <div class="phase-card">
+          <h3>Phase 1 — Make failure and SSH honest</h3>
+          <p class="phase-window">1–2 weeks · P1</p>
+          <ul>
+            <li><strong>SEC-06</strong> aggregate check failures, non-zero exit</li>
+            <li><strong>SEC-07</strong> strict SSH options everywhere</li>
+            <li><strong>SEC-10</strong> missing key is a hard error in real mode</li>
+            <li><strong>SEC-11</strong> MySQL TLS configuration</li>
+            <li><strong>SEC-12</strong> block dangerous rsync flags</li>
+            <li><strong>SEC-13</strong> pull confirmation / clean-tree guard</li>
+            <li><strong>SEC-14</strong> quote <code>--rsh</code> with <code>shlex.join</code></li>
+            <li><strong>SEC-16</strong> central redaction across surfaces</li>
+          </ul>
+          <p class="fineprint">Exit: CI cannot pass a broken check; rsync cannot silently trust an unknown key; a remote pull cannot overwrite a dirty tree without consent.</p>
+        </div>
+        <div class="phase-card">
+          <h3>Phase 2 — Defense in depth</h3>
+          <p class="phase-window">2–4 weeks · P2</p>
+          <ul>
+            <li><strong>SEC-15</strong> private remote temp dir, control-char rejection</li>
+            <li><strong>SEC-17</strong> safe YAML generation for <code>misc init</code></li>
+            <li><strong>SEC-18</strong> success ordering, Rich markup, git flags, pager/PATH, CI pinning, YAML cycles, <code>skip_secure_auth</code></li>
+          </ul>
+          <p class="fineprint">Exit: no known low-severity path remains; residual risks are documented, owned, and re-tested each release.</p>
+        </div>
+      </div>
+
+      <h3>Acceptance criteria</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Criterion</th><th>Proves</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Uploads</strong></td><td>A whole-project <code>put</code> of a repo containing <code>sink.yaml</code>, <code>pulls/*.sql.gz</code>, <code>.env</code>, <code>.env.dev</code>, <code>.env.prod</code>, <code>*.pem</code>, <code>*.key</code>, <code>id_ed25519</code>, and <code>.ssh/</code> uploads none of them in either direction. An explicit override is required and is auditable. Safe excludes are evaluated before per-server includes.</td><td>SEC-01</td></tr>
+            <tr><td><strong>Secret display</strong></td><td><code>sink info</code> redacts password/passwd/secret/token values by default, <code>-qq</code> produces no config output, and <code>--show-secrets</code> is explicit. No configured secret appears in actions, check URLs, DB stderr, notes, or pager output in tests.</td><td>SEC-02, SEC-16</td></tr>
+            <tr><td><strong>Local data</strong></td><td>New dumps are <code>0600</code> under <code>umask 022</code>; <code>pulls/</code> is <code>0700</code>; local credential files are <code>0600</code>; <code>MYSQL_PWD</code> is absent from <code>ssh</code>, <code>gzip</code>, <code>cat</code>, <code>pv</code>, and <code>gunzip</code> environments.</td><td>SEC-04</td></tr>
+            <tr><td><strong>Paths</strong></td><td>Nested absolute and <code>../../</code> symlinks are not recreated outside the destination; <code>--safe-links</code> is present on put, pull, and diff; a safe in-tree relative symlink still works.</td><td>SEC-03</td></tr>
+            <tr><td><strong>Failure</strong></td><td>A failed, interrupted, or startup-failed pull leaves no final <code>.sql.gz</code> or <code>.part</code>, never changes <code>LATEST-*</code>, and exits non-zero. No success label is printed before the final rename and symlink.</td><td>SEC-08, SEC-09, SEC-18</td></tr>
+            <tr><td><strong>SSH</strong></td><td>Every non-interactive path (rsync, scp, check, actions, credentials) uses <code>StrictHostKeyChecking=yes</code>, <code>BatchMode=yes</code>, a dedicated known-hosts file, and <code>IdentitiesOnly=yes</code>. A missing configured key fails in real mode.</td><td>SEC-07, SEC-10</td></tr>
+            <tr><td><strong>Check</strong></td><td>Any failed SSH/root/DB/URL probe produces a non-zero exit by default (or under <code>--strict</code> during migration), including with <code>-qq</code>. A machine-readable mode is available for CI.</td><td>SEC-06</td></tr>
+            <tr><td><strong>Trust</strong></td><td>Sink prints the resolved config path before probes; parent discovery is bounded to the repo/worktree or requires explicit consent; configs outside the repo or owned by another user are flagged; the trust model is in README/SECURITY.md.</td><td>SEC-05</td></tr>
+            <tr><td><strong>Supply chain</strong></td><td>GitHub Actions are pinned by full commit SHA; gitleaks is checksum/signature verified; <code>git diff</code> uses <code>--no-ext-diff --no-textconv</code>; pager/editor helpers are neutralized or trusted; recursive YAML aliases are rejected.</td><td>SEC-18</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Residual risk after Phase 2</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Residual risk</th><th>Why it remains</th><th>Treatment / owner</th></tr></thead>
+          <tbody>
+            <tr><td>A compromised remote with a valid host key</td><td>TLS/SSH authenticates the endpoint, not the intent of the server; a compromised host can serve malicious files or read data it is sent.</td><td>Least-privilege deploy user, file integrity monitoring, backups, incident response; maintainer + ops.</td></tr>
+            <tr><td>A deliberately trusted malicious <code>sink.yaml</code></td><td>Config is code by design; consent and review do not sandbox it.</td><td>Trust model documentation, code review, signed releases/config policy; maintainer.</td></tr>
+            <tr><td>Same-UID malware or root on the workstation</td><td>It can read memory, environment, agent sockets, dumps, and keys regardless of file modes.</td><td>Full-disk encryption, endpoint protection, separate admin account, hardware-backed keys; operator/IT.</td></tr>
+            <tr><td>TOCTOU between path/symlink validation and rsync</td><td>The filesystem can change after a check; Sink is not a sandbox.</td><td>Run on trusted checkouts, avoid concurrent writers, use atomic deploys; maintainer.</td></tr>
+            <tr><td>Bugs in rsync, OpenSSH, MySQL, git, less, or Python</td><td>Out of scope; Sink invokes them.</td><td>Patch cadence, dependency updates, distro packages; operator/IT.</td></tr>
+            <tr><td>Cloud IAM / database auth plugins</td><td>Sink uses password/key auth patterns and does not model cloud identity.</td><td>Environment-specific review; ops.</td></tr>
+            <tr><td>Lando/DDEV, macOS, non-Ubuntu behaviour</td><td>Not covered by the Docker integration matrix.</td><td>Manual staging checks; maintainer.</td></tr>
+            <tr><td>Secrets in process memory and crash dumps</td><td>Python strings and child environments are observable to same-UID/root.</td><td>Minimize secret lifetime, disable core dumps, encrypted swap; operator.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="decisions" data-nav="Decisions">
+      <h2><span class="section-num">06</span>Decisions required</h2>
+      <p class="section-intro">Seven product decisions determine whether the fixes are compatible with existing workflows. Recommendations are written to fail closed while giving operators an explicit, auditable escape hatch.</p>
+
+      <div class="decision-grid">
+        <div class="decision"><h3><span class="did">D1</span>Non-overridable safe excludes?</h3><p><strong>Recommendation:</strong> make secret-material excludes non-overridable and add a per-path <code>--allow-secret-files</code> that prints the exact paths and requires an interactive confirmation.</p><p><code>sink.yaml</code>, <code>*.sql.gz</code>, <code>.env*</code>, <code>*.pem</code>, <code>*.key</code>, <code>.ssh/</code>, <code>.git/</code>, and cloud credential directories should never be transferred by a generic whole-project command. Explicit single-file transfers remain possible with the override. Document that safe excludes are evaluated before per-server includes.</p></div>
+        <div class="decision"><h3><span class="did">D2</span>Check fail default or <code>--strict</code>?</h3><p><strong>Recommendation:</strong> ship <code>--strict</code> immediately, make failure the default in the next minor, and keep <code>--allow-failures</code> as the explicit compatibility opt-out. Add <code>--json</code> for CI.</p><p>Changing the default is a breaking change for scripts that expect 0. Deprecate with a warning in 0.3.x, then flip in 0.4.0. The current test that asserts exit 0 must be updated, not preserved.</p></div>
+        <div class="decision"><h3><span class="did">D3</span>Config discovery boundary?</h3><p><strong>Recommendation:</strong> stop at the nearest repository root (directory containing <code>.git</code>) or after a bounded number of parents, and never cross into <code>$HOME</code>/<code>/tmp</code> implicitly. Print the resolved path. Require <code>--config PATH</code> or <code>--trust-parent-config</code> to go further.</p><p>Keep monorepo support by allowing an explicit config path and an environment variable. Flag configs outside the repo or owned by a different user. This removes the “planted parent config” attack without removing intentional workflows.</p></div>
+        <div class="decision"><h3><span class="did">D4</span><code>MYSQL_PWD</code> or a defaults file?</h3><p><strong>Recommendation:</strong> remove <code>MYSQL_PWD</code> and use a local <code>0600</code> defaults file in a private temp directory, passed only to the MySQL stage. Until then, pass the environment only to the MySQL process, never to <code>ssh</code>, <code>gzip</code>, <code>cat</code>, <code>pv</code>, or <code>gunzip</code>.</p><p>The remote path already uses <code>--defaults-extra-file</code>; local imports should match. Generate the file with <code>O_CREAT|O_EXCL|O_WRONLY</code> mode <code>0600</code>, clean it in a <code>finally</code>, and never render its contents.</p></div>
+        <div class="decision"><h3><span class="did">D5</span>Dangerous rsync flags?</h3><p><strong>Recommendation:</strong> allowlist safe flags and require <code>--allow-dangerous-rsync</code> for <code>--delete*</code>, <code>--remove-source-files</code>, <code>--rsync-path</code>, <code>--files-from</code>, <code>--log-file</code>, <code>--write-batch</code>, <code>--rsh</code>/<code>-e</code>, and <code>--copy-links</code>. Print the effective command before execution.</p><p>An allowlist is easier to defend than a denylist because rsync adds options over time. Keep <code>--bwlimit</code>, <code>--partial</code>, <code>--progress</code>, <code>--info</code>, and <code>--exclude</code> (with a warning that excludes can hide files) in the safe set.</p></div>
+        <div class="decision"><h3><span class="did">D6</span>Whole-project pull confirmation?</h3><p><strong>Recommendation:</strong> require confirmation when the destination is a Git worktree with local changes, contains <code>sink.yaml</code>, or is not empty; add <code>--force</code> for non-interactive automation; exclude local config and secrets; offer a backup/temp-dir mode.</p><p>A pull is a write to the local trust anchor. Treat it like a deploy: show the resolved source and destination, refuse by default in a dirty tree, and never overwrite <code>sink.yaml</code> without an explicit opt-in.</p></div>
+        <div class="decision"><h3><span class="did">D7</span>Support window?</h3><p><strong>Recommendation:</strong> support the current minor plus the previous minor for security fixes for 12 months; publish a 90-day coordinated-disclosure target; backport P0/P1 only; state Python 3.15 and Ubuntu LTS as the tested baseline.</p><p>Sink executes external tools, so the support statement should include the tested OpenSSH/rsync/MySQL versions and the Docker matrix. Unsupported combinations remain “best effort” with the documented residual risks.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="playbook" data-nav="User hardening">
+      <h2><span class="section-num">07</span>User hardening playbook</h2>
+      <p class="section-intro">These controls work with Sink 0.3.0 today and remain useful after the code fixes. The highest-leverage change is to stop treating the repository root as the deploy root.</p>
+
+      <div class="step">
+        <h3><span class="step-num">1</span>Narrow the root and move secrets above it</h3>
+        <p>Set <code>project.root</code> to the directory that is actually deployed. Keep <code>sink.yaml</code>, <code>pulls/</code>, env files, keys, and dumps outside that directory. The starter config's <code>root: .</code> is the root cause of the largest exposure.</p>
+        <div class="code-block">
+          <div class="code-bar"><span class="lang">yaml · hardened sink.yaml</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code># sink.yaml — hardened starting point.
+# Keep this file, pulls/, and all secrets ABOVE project.root.
+project:
+  name: example
+  root: public                 # only deployable content
+  pulls_dir: .sink/pulls       # outside root; 0700
+  exclude:
+    - .git
+    - .sink
+    - sink.yaml
+    - '*.sql.gz'
+    - '.env*'
+    - '*.pem'
+    - '*.key'
+    - '.ssh'
+    - '.aws'
+    - '.config/gcloud'
+    - '.netrc'
+    - '.npmrc'
+    - '.pypirc'
+    - '*.kdbx'
+    - '*.bak'
+    - '*~'
+    - '.#*'
+
+servers:
+  prod:
+    root: /var/www/example/current/public
+    warn: yes                  # ask before file/db overwrite
+    ssh:
+      - username: deploy
+        server: example.com
+        port: 22
+        key: ~/.ssh/sink_example_ed25519
+    mysql:
+      - db: example
+        username: sink_ro
+        password: ${DATABASE_PASSWORD}
+        hostname: db.internal
+        port: 3306</code></pre>
+        </div>
+        <div class="callout info"><p><strong>Why this works:</strong> a whole-project transfer now mirrors only <code>public/</code>. The secrets are siblings of <code>public/</code>, not children. Even if a future exclude is forgotten, the narrow root keeps the blast radius small. Keep <code>warn: yes</code> on production and use a dedicated deploy key.</p></div>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">2</span>Set restrictive modes and a safe umask</h3>
+        <div class="code-block">
+          <div class="code-bar"><span class="lang">bash</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code>install -d -m 700 .sink .sink/pulls
+chmod 600 sink.yaml
+chmod 700 .sink/pulls
+
+# In the shell that runs Sink, before any DB pull:
+umask 077
+
+# Verify:
+stat -c '%a %n' sink.yaml .sink/pulls
+# 600 sink.yaml
+# 700 .sink/pulls</code></pre>
+        </div>
+        <p>After SEC-04, Sink creates dumps <code>0600</code> and the pulls directory <code>0700</code> regardless of umask. Until then, <code>umask 077</code> is the only thing preventing a <code>0644</code> production dump on a default system.</p>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">3</span>Run the before-<code>--real</code> checklist</h3>
+        <ul class="checklist">
+          <li><code>sink --config</code> prints the config path; confirm it is the repository copy, not a parent or a checkout you do not trust.</li>
+          <li><code>git status --short</code> is clean or understood; no untracked env files, dumps, or keys will be swept into a whole-project transfer.</li>
+          <li>Read <code>sink.yaml</code>: server host, username, key, narrow root, <code>warn: yes</code>, and no unexpected actions or difftool.</li>
+          <li>Run the command without <code>--real</code> and read the rendered rsync/ssh command. For rsync, confirm the source and destination and the absence of <code>--delete</code>.</li>
+          <li>Back up the remote database and target directory; confirm the restore procedure, not just the backup.</li>
+          <li>Confirm the SSH host-key fingerprint out of band; do not accept a changed key because “it is probably fine”.</li>
+          <li>Review <code>--extra-flags</code> character by character; never pass it from an untrusted wrapper or CI variable.</li>
+          <li>For DB work, confirm the target database and that the dump is a test restore target, not production.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">4</span>Keep secrets out of config, output, and child environments</h3>
+        <ul>
+          <li>Resolve passwords from a secret manager or an environment variable at invocation time, for example <code>op run -- sink db pull prod</code>, <code>pass</code>, <code>direnv</code>, or your CI secret store. Do not commit literal passwords to <code>sink.yaml</code>.</li>
+          <li>Until SEC-02 is fixed, use <code>sink --config</code> (prints only the path) instead of <code>sink info</code>, and never run <code>sink info</code> in a recorded terminal or CI log.</li>
+          <li>Do not put secrets in action strings. Actions are printed by <code>sink action</code> and executed through a shell or SSH.</li>
+          <li>Sink copies the parent environment into child pipelines. Do not export production secrets globally; scope them to the single invocation, and unset them afterwards.</li>
+          <li>Treat <code>--show-secrets</code> as a break-glass flag. Prefer editing the minimum field instead of dumping the whole config.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">5</span>Pin SSH identity, host keys, and agent policy</h3>
+        <div class="code-block">
+          <div class="code-bar"><span class="lang">ssh_config</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code>Host example.com
+  HostName example.com
+  User deploy
+  IdentityFile ~/.ssh/sink_example_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking yes
+  UserKnownHostsFile ~/.ssh/known_hosts_sink
+  HashKnownHosts yes
+  ForwardAgent no
+  ForwardX11 no
+  ServerAliveInterval 30
+  ServerAliveCountMax 3
+
+# Seed the host key over a trusted network, then verify the fingerprint
+# against the provider console or an out-of-band channel:
+# ssh-keyscan -t ed25519 example.com &gt;&gt; ~/.ssh/known_hosts_sink
+# ssh-keygen -lf ~/.ssh/known_hosts_sink</code></pre>
+        </div>
+        <ul>
+          <li>Use one key per server or environment; do not share a production key with staging.</li>
+          <li>Generate Ed25519 keys with a passphrase and a long KDF time: <code>ssh-keygen -t ed25519 -a 100</code>. Load them into the agent for the session; keep <code>IdentitiesOnly yes</code> so Sink cannot silently fall back to another key.</li>
+          <li>Never forward the agent to a remote host. Sink's actions and rsync do not need it; forwarding turns a compromised remote into a key thief.</li>
+          <li>Set <code>StrictHostKeyChecking yes</code> in the config. Sink 0.3.0's rsync path does not pass this, so the SSH config is the current control; after SEC-07 it will be enforced in argv too.</li>
+          <li>When a host key changes, stop. Verify the fingerprint, DNS, and network path before editing <code>known_hosts</code>; if you already accepted a changed key, rotate the credentials used on that host.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">6</span>Harden MySQL access and treat dumps as sensitive code</h3>
+        <ul>
+          <li><strong>Least privilege:</strong> use a read-only dump account with only the grants the dump needs (<code>SELECT</code>, plus <code>LOCK TABLES</code>, <code>SHOW VIEW</code>, <code>EVENT</code>, <code>TRIGGER</code>, and <code>PROCESS</code> where required). Use a separate, staging-only import account for <code>db put</code>. Never use <code>root</code>.</li>
+          <li><strong>TLS:</strong> set <code>require_secure_transport=ON</code> on the server. On the client, require <code>VERIFY_IDENTITY</code> with a pinned CA, not <code>PREFERRED</code>. Do not use <code>--insecure</code> for <code>sink check</code> against production. Do not enable <code>skip_secure_auth</code>; upgrade the account/server instead.</li>
+          <li><strong>Backups:</strong> encrypt dumps at rest, restrict retention, test restores regularly, and keep dumps out of Git, chat, tickets, and cloud sync folders. A dump is a full copy of production PII.</li>
+          <li><strong>Consistency:</strong> <code>--single-transaction</code> gives a consistent snapshot for InnoDB tables, not MyISAM. Know which storage engines you have; a “successful” dump can still be internally inconsistent for non-transactional tables.</li>
+          <li><strong>Verification:</strong> run <code>gzip -t</code>, check size and checksum, restore to a scratch database, compare row counts and a few invariants. Never restore an unverified dump over production.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">7</span>Wrap <code>sink check</code> so failures fail CI</h3>
+        <p>Sink 0.3.0 prints <code>[✗]</code> lines but exits 0 on probe failure. Until SEC-06 lands, wrap it:</p>
+        <div class="code-block">
+          <div class="code-bar"><span class="lang">bash · sink-check wrapper</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code>#!/usr/bin/env bash
+set -euo pipefail
+
+out="$(sink check "$@" 2&gt;&amp;1)" || {
+  printf '%s\n' "$out"
+  exit 1
+}
+printf '%s\n' "$out"
+
+# 0.3.0 workaround: a printed failure is still exit 0.
+if grep -Fq '[✗]' &lt;&lt;&lt;"$out"; then
+  echo "sink check reported failures" &gt;&amp;2
+  exit 1
+fi</code></pre>
+        </div>
+        <p>Run this only on a trusted config (SEC-05). After the fix, prefer the native non-zero exit and <code>--json</code> output; keep the wrapper only if you need to support old versions.</p>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">8</span>Make transfers boring and reversible</h3>
+        <ul>
+          <li>Prefer a single file or a narrow directory over whole-project transfers. Type the path explicitly; do not rely on the default root.</li>
+          <li>Never add <code>--delete</code>, <code>--delete-excluded</code>, <code>--remove-source-files</code>, <code>--rsync-path</code>, <code>--files-from</code>, or <code>--log-file</code> through <code>--extra-flags</code>. If you need deletion, do it as a separate, reviewed operation with a backup.</li>
+          <li>Until Sink adds <code>--safe-links</code>, inspect trees for symlinks before a whole-project transfer and use a manual <code>rsync --safe-links</code> for untrusted inputs. Do not use <code>--copy-links</code> or <code>--copy-unsafe-links</code>: they upload the target content.</li>
+          <li>Pull a whole project only into a clean checkout you can discard. Commit or stash first; compare the remote tree before overwriting. Assume a compromised remote can inject executable files.</li>
+          <li>Keep <code>warn: yes</code> on production for both files and databases. A prompt is not a security boundary, but it catches wrong-target mistakes.</li>
+          <li>After a pull, inspect <code>git status</code> and <code>git diff</code> before running tests, builds, or actions that execute newly arrived code.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">9</span>Harden the workstation and supply chain</h3>
+        <ul>
+          <li>Put trusted directories first on <code>PATH</code> (<code>/usr/local/bin:/usr/bin:/bin</code>), never <code>.</code>; verify <code>command -v ssh rsync mysql mysqldump gzip git less</code> points at root-owned binaries. A hijacked <code>ssh</code> is game over regardless of Sink's argv.</li>
+          <li>Use full-disk encryption, screen lock, encrypted backups, and a separate admin account. Same-UID malware can read dumps and environment variables no matter how Sink writes them.</li>
+          <li>Pin GitHub Actions to full commit SHAs, not tags. Verify the gitleaks archive checksum/signature before extracting; do not pipe <code>curl</code> directly into <code>tar</code> on a release runner.</li>
+          <li>Run <code>uv sync --frozen</code>, review lockfile changes, and use dependency scanning. Keep Sink, Python, OpenSSH, rsync, MySQL client, git, and less patched.</li>
+          <li>Use a pre-commit secret scanner and a global <code>.gitignore</code> for env files, dumps, keys, and <code>.sink/</code>. Scan history before making a repository public.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <h3><span class="step-num">10</span>Incident response: three concrete playbooks</h3>
+        <div class="callout danger">
+          <h4>If a config or dump was exposed</h4>
+          <ol>
+            <li><strong>Contain:</strong> remove the file from the web root/repo, revoke public access, and preserve logs for investigation.</li>
+            <li><strong>Rotate everything in the file:</strong> SSH keys/passwords, MySQL users, URL/HTTP-auth credentials, control-panel/hosting credentials, API tokens, and any secret in notes. Assume all of them are compromised.</li>
+            <li><strong>Audit:</strong> search SSH auth logs, MySQL general/audit logs, web access logs, and Git history for use. Check for new keys, users, cron jobs, and database accounts.</li>
+            <li><strong>Notify and document:</strong> follow your breach process; record the timeline, scope, and rotation evidence. Scan backups and CI artifacts too.</li>
+          </ol>
+        </div>
+        <div class="callout warn">
+          <h4>If SSH reports a host-key change</h4>
+          <ol>
+            <li><strong>Stop.</strong> Do not run <code>ssh-keygen -R</code>, <code>StrictHostKeyChecking=no</code>, or accept the new key to “make it work”.</li>
+            <li>Verify the new fingerprint through the provider console, a signed message, or another trusted channel. Check DNS, your network, and whether the host was rebuilt.</li>
+            <li>If the change is unexplained, treat it as a possible MITM: rotate credentials used on that host and inspect for unauthorized access.</li>
+            <li>Only after verification, update the dedicated <code>known_hosts_sink</code> and document the change.</li>
+          </ol>
+        </div>
+        <div class="callout info">
+          <h4>If a DB pull was interrupted or a dump looks partial</h4>
+          <ol>
+            <li><strong>Do not restore, rename, or promote it.</strong> Treat it as corrupt and potentially attacker-controlled.</li>
+            <li>Check for a <code>.part</code> file, <code>gzip -t</code>, size, checksum, and whether <code>LATEST-*</code> changed. In 0.3.0 a partial final file can remain on SIGINT or startup failure.</li>
+            <li>Delete the partial artifact, re-pull to a fresh filename, and verify before use. If it was already imported, treat the target database as inconsistent and restore from a known-good backup.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verification" data-nav="Verification">
+      <h2><span class="section-num">08</span>Verification and test plan</h2>
+      <p class="section-intro">Every finding gets a regression test. The fast suite is hermetic: it stubs <code>ssh</code>, <code>rsync</code>, and MySQL and can run on every commit. Real behaviour — host keys, symlinks, file modes, signals, credential cleanup — belongs in the Docker integration suite. Timing-dependent interruption cases remain manual staging checks.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Finding</th><th>Layer</th><th>Verification</th></tr></thead>
+          <tbody id="verification-rows"></tbody>
+        </table>
+      </div>
+      <p class="table-note">Fast suite: <code>uv run pytest -q</code>. Docker: <code>make integration</code>, <code>make integration-oldest</code>, <code>make integration-matrix</code>. The review did not execute the Docker matrix or touch production; test descriptions are acceptance criteria, not claims that the fixes already exist.</p>
+    </section>
+
+    <section class="section" id="ai-brief" data-nav="AI brief">
+      <h2><span class="section-num">09</span>AI implementation brief</h2>
+      <p class="section-intro">A compact Markdown handoff for an implementation agent or engineer. Copy it into an issue, a pull-request description, or a planning session.</p>
+      <div class="code-block">
+        <div class="code-bar"><span class="lang">markdown · AI brief</span><button class="copy-btn" type="button" data-copy-target="ai-brief-code">Copy brief</button></div>
+        <pre id="ai-brief-code"><code># Sink 0.3.0 — security implementation brief
+
+Date: 2026-11-26
+Scope: /workdir @ 0.3.0. Source-based review; no production changes.
+Trust model: sink.yaml is executable code and trusted credential material.
+Main risk: trust boundary and data handling, not shell injection.
+
+## P0 — stop exposure (1–3 days)
+1. SEC-01: Safe, non-overridable excludes for sink.yaml, pulls/, *.sql.gz,
+   .env*, *.pem, *.key, .ssh/, .git/, cloud creds. Evaluate safe excludes
+   BEFORE per-server includes. Change starter root to public/ and pulls outside.
+   Refuse/warn on secret-looking files; add --allow-secret-files.
+2. SEC-02: Redact sink info by default; honor -qq; add explicit --show-secrets;
+   remove raw read_text()/pager path or redact it.
+3. SEC-03: Add --safe-links to put, pull, diff; reject nested symlinks that
+   resolve outside root; test absolute and ../../ nested links.
+4. SEC-04: Open local dumps with O_CREAT|O_EXCL|O_WRONLY, mode 0600; create/
+   verify pulls dir 0700; replace MYSQL_PWD with a local 0600 defaults file;
+   pass env only to the MySQL stage.
+5. SEC-05: Document the trust model; print the resolved config path before
+   probes; bound parent discovery to the repo; gate checks on untrusted configs.
+6. SEC-08: Write DB pulls to a .part file; cleanup on BaseException and startup
+   failure; atomic rename only on success; never touch LATEST-* before that.
+7. SEC-09: Replace broad .NAME.* deletion with a dedicated --temp-dir or an
+   exact rsync temp pattern; preserve .index.html.backup and editor swap files.
+
+## P1 — make failure/SSH honest (1–2 weeks)
+8. SEC-06: Aggregate check failures; add --strict now and non-zero default next
+   minor; support -qq and --json; update the test that asserts exit 0.
+9. SEC-07: Apply StrictHostKeyChecking=yes, BatchMode=yes, IdentitiesOnly=yes,
+   and a dedicated UserKnownHostsFile to rsync --rsh, scp, check, actions, and
+   credentials. Document interactive ssh policy.
+10. SEC-10: Missing configured key is a hard error in real mode; explicit agent
+    fallback only; keep dry-run rendering.
+11. SEC-11: Add ssl-mode/ssl-ca/ssl-cert/ssl-key; prefer VERIFY_IDENTITY; use a
+    local defaults file; warn/deprecate skip_secure_auth.
+12. SEC-12: Allowlist safe rsync flags; require --allow-dangerous-rsync for
+    --delete*, --remove-source-files, --rsync-path, --files-from, --log-file,
+    --write-batch, --rsh/-e, --copy-links.
+13. SEC-13: Confirm whole-project pull in a dirty tree or when sink.yaml exists;
+    add --force; exclude local config/secrets; offer backup/temp-dir mode.
+14. SEC-14: Use shlex.join for --rsh; test key paths with spaces, semicolons,
+    and $().
+15. SEC-16: Central value-based redaction; redact action listings, URL userinfo
+    and sensitive query params, check/DB stderr, and notes.
+
+## P2 — defense in depth (2–4 weeks)
+16. SEC-15: Use a remote private temp dir (mktemp -d, 0700) or O_EXCL; reject
+    newline/CR/NUL in option values; use --defaults-file; clean the dir.
+17. SEC-17: Validate server names and emit YAML with yaml.safe_dump/quoting.
+18. SEC-18: Create LATEST before printing success; use Text/escape for Rich
+    status; add git --no-ext-diff --no-textconv; neutralize LESSOPEN/PAGER/
+    EDITOR or use trusted values; pin CI actions by SHA; checksum gitleaks;
+    reject recursive YAML aliases; remove/deprecate skip_secure_auth.
+
+## User controls to document
+- root: public; pulls_dir outside root; warn: yes; dedicated key.
+- umask 077; chmod 600 sink.yaml; chmod 700 pulls.
+- StrictHostKeyChecking yes; IdentitiesOnly yes; ForwardAgent no.
+- TLS VERIFY_IDENTITY; least-privilege DB users; encrypted dumps.
+- No --delete/--rsync-path/--files-from; whole-project pull only to clean tree.
+- Check wrapper until non-zero exit ships; rotate on any host-key change.
+
+## Done when
+- No test can upload/print/leave-readable a configured secret.
+- Nested symlinks cannot escape; dumps are 0600; failures exit non-zero.
+- All non-interactive SSH paths enforce strict host keys and identity.
+- Config trust is explicit and the resolved path is visible.
+- CI is pinned and checksummed; residual risks are documented and owned.</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="spec" data-nav="Machine spec">
+      <h2><span class="section-num">10</span>Machine-readable specification</h2>
+      <p class="section-intro">The same assessment as JSON, embedded with <code>id=security-spec</code> and schema <code>sink-security-plan/v1</code>. It is the source of truth for the register cards, invariant table, and verification table on this page. Copy or download it for tooling.</p>
+      <div id="spec-status" class="spec-status">Parsing embedded JSON…</div>
+      <div class="spec-actions">
+        <button class="action-btn" type="button" id="json-copy">Copy JSON</button>
+        <button class="action-btn" type="button" id="json-download">Download JSON</button>
+        <button class="action-btn" type="button" id="json-expand">Expand preview</button>
+      </div>
+      <div class="code-block">
+        <div class="code-bar"><span class="lang">json · security-spec</span><button class="copy-btn" type="button" id="json-copy-top">Copy</button></div>
+        <pre id="spec-preview" class="json-preview"></pre>
+      </div>
+      <p class="fineprint">Validation performed before delivery: embedded JSON parsed with <code>json.loads</code>; finding IDs unique; required fields present; anchors resolve; static HTML tags balanced; inline JavaScript syntax-checked with Node. No network access is used at runtime.</p>
+    </section>
+
+    <section class="section" id="method" data-nav="Method & limits">
+      <h2><span class="section-num">11</span>Method, evidence, and limits</h2>
+      <p class="section-intro">This is a source-based security assessment, not a penetration test and not a formal audit of Sink's dependencies.</p>
+      <h3>What was reviewed</h3>
+      <ul>
+        <li>CLI command tree and option handling in <code>src/sink/cli/</code>, including <code>file</code>, <code>db</code>, <code>check</code>, <code>info</code>, <code>action</code>, <code>ssh</code>, and <code>misc</code>.</li>
+        <li>Execution layer <code>src/sink/shell.py</code>, transfer construction <code>src/sink/rsync.py</code>, database pipelines <code>src/sink/db.py</code>, remote credentials <code>src/sink/credentials.py</code>, SSH helpers <code>src/sink/ssh.py</code>, actions, applications, UI/redaction, and config loading.</li>
+        <li>Configuration models and loader: immutable models, environment expansion, parent discovery, SSH key resolution, unknown-key handling, YAML parsing.</li>
+        <li><code>docs/safety.md</code>, the pytest suite, Docker integration tests (including adversarial, interrupt, check, and credential tests), <code>pyproject.toml</code>, and GitHub Actions workflows.</li>
+      </ul>
+      <h3>Evidence standard</h3>
+      <p>Each finding cites the file and line range where the behaviour is visible. Where a claim depends on an external tool's behaviour (rsync filter precedence, <code>--rsh</code> parsing, MySQL option-file order, OpenSSH host-key policy), the document states the dependency rather than assuming Sink controls it. Severity is qualitative: High means a realistic path to broad credential or production-data exposure; Medium means a meaningful but narrower integrity/availability/trust issue; Low/hardening means defense in depth or operator-dependent exposure.</p>
+      <details class="deep-dive">
+        <summary>Limitations and out-of-scope areas</summary>
+        <div class="deep-body">
+          <ul>
+            <li>No dynamic exploitation, fuzzing, or runtime instrumentation was performed against a live Sink installation.</li>
+            <li>The Docker integration suite was read, not executed for this review; test descriptions are plans and acceptance criteria, not current results.</li>
+            <li>No formal audit of OpenSSH, rsync, MySQL client/server, Git, less, Python, Click, PyYAML, or Rich. Their vulnerabilities are inherited.</li>
+            <li>No review of hosting-provider controls, cloud IAM, PAM/sudo/SELinux/AppArmor policy, network segmentation, or physical security.</li>
+            <li>No cryptographic design review. TLS and SSH recommendations assume standard, patched implementations and correct host-key/CA management.</li>
+            <li>No CVSS scoring; severity and priority are relative to a developer workstation that can change production. Re-score in your environment.</li>
+            <li>Line references are for the reviewed 0.3.0 tree and may move after remediation.</li>
+          </ul>
+        </div>
+      </details>
+      <div class="callout info"><strong>Deliverable status:</strong> plan-mode only. No source, test, configuration, remote, or production file was modified. The only artifact created is this HTML document.</div>
+    </section>
+  </main>
+</div>
+
+<button class="gotop" id="back-to-top" type="button" aria-label="Back to top" title="Back to top">↑</button>
+
+<footer>
+  <p><strong>Sink Security Plan</strong> · 2026-11-26 · Sink 0.3.0 · self-contained, offline HTML</p>
+  <p>Source-based assessment. No production changes. Treat <code>sink.yaml</code> as executable code.</p>
+</footer>
+
+<script type="application/json" id="security-spec">{
+  "schema": "sink-security-plan/v1",
+  "generated": "2026-11-26",
+  "app": {
+    "name": "sink",
+    "version": "0.3.0",
+    "language": "Python 3.15",
+    "license": "GPL-2.0-only",
+    "repository": "/workdir",
+    "entrypoint": "sink.cli:main"
+  },
+  "scope": [
+    "CLI command tree and option handling",
+    "Execution layer (argv, pipelines, redaction)",
+    "rsync transfer construction and path handling",
+    "MySQL dump/import pipelines and credential staging",
+    "SSH helper construction and host-key policy",
+    "Config loader, environment expansion, and parent discovery",
+    "Actions, applications, UI output, and generated starter config",
+    "Safety documentation, fast tests, Docker integration tests, and CI workflows"
+  ],
+  "summary": {
+    "total_findings": 18,
+    "severity_counts": {
+      "critical_if_untrusted": 1,
+      "high": 4,
+      "medium": 10,
+      "low": 3
+    },
+    "severity_label_counts": {
+      "critical_if_untrusted": 1,
+      "high": 4,
+      "medium": 10,
+      "low": 3
+    },
+    "top_five": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05"],
+    "architecture_strengths": [
+      "Argv-only subprocess execution with no shell=True in src/",
+      "shlex quoting for rendered commands and shlex.join for remote fragments",
+      "Project-root path checks and sanitized dump names/tags",
+      "Gzip magic validation before imports",
+      "0600 remote MySQL credentials over SSH stdin with EXIT trap and fallback cleanup",
+      "Dry-run default and no --delete/--remove-source-files added by Sink",
+      "Streaming pipelines with first-nonzero-stage reporting",
+      "Batch SSH probes use BatchMode and StrictHostKeyChecking"
+    ],
+    "main_risk": "Trust-boundary and data-handling failures, not shell injection.",
+    "no_production_changes": true
+  },
+  "threat_model": {
+    "actors": [
+      {
+        "name": "Network attacker",
+        "capability": "Intercept or redirect SSH/MySQL/TLS; control DNS or a proxy.",
+        "paths": "MITM rsync or interactive SSH where host-key policy is absent; observe HTTP URL checks or --insecure TLS; downgrade MySQL when TLS is not required.",
+        "findings": ["SEC-07", "SEC-11", "SEC-05"]
+      },
+      {
+        "name": "Compromised remote",
+        "capability": "Control the remote filesystem, shell, MySQL server, or files served to a pull.",
+        "paths": "Read staged credentials in /tmp; plant nested or absolute symlinks; inject files that become executable locally; lie during check probes.",
+        "findings": ["SEC-15", "SEC-03", "SEC-13", "SEC-01"]
+      },
+      {
+        "name": "Local same-UID attacker",
+        "capability": "Run as the same user or read shared backups/sync targets.",
+        "paths": "Read MYSQL_PWD from /proc/<pid>/environ; read 0644 dumps; read pager temp/scrollback; race remote credential paths; influence PATH, PAGER, LESSOPEN, or EDITOR.",
+        "findings": ["SEC-04", "SEC-18", "SEC-02"]
+      },
+      {
+        "name": "Malicious repo or config",
+        "capability": "Commit a sink.yaml or plant one in a parent directory.",
+        "paths": "Point SSH/MySQL at an attacker host and exfiltrate ${DATABASE_PASSWORD}; execute through actions, difftool, or rsync_binary; probe internal URLs via check; hijack unrelated commands through parent discovery.",
+        "findings": ["SEC-05", "SEC-12", "SEC-17"]
+      },
+      {
+        "name": "Careless operator",
+        "capability": "Run a plausible command with the wrong target, flags, or checkout.",
+        "paths": "Whole-project put uploads secrets; whole-project pull overwrites local work; --extra-flags adds destructive options; db put targets the wrong server.",
+        "findings": ["SEC-01", "SEC-13", "SEC-12", "SEC-04"]
+      },
+      {
+        "name": "Supply chain",
+        "capability": "Control a CI action tag, downloaded binary, dependency, or PATH binary.",
+        "paths": "Mutable action tags; curl|tar without checksum; PATH-resolved ssh/rsync/mysql/gzip/git/less; PyPI dependencies.",
+        "findings": ["SEC-18", "SEC-07", "SEC-11"]
+      }
+    ],
+    "assets": [
+      "Credentials: SSH keys/passwords, MySQL passwords, URL/HTTP-auth credentials, control-panel and hosting credentials, recovery notes.",
+      "Production data and PII: database dumps, uploads, customer records, logs, backups, and mirrored files.",
+      "Integrity and availability: production content/database, local working tree, LATEST-* restore points, CI gates.",
+      "Developer workstation: the trust anchor for SSH, TLS, file modes, and every child process."
+    ],
+    "trust_assumption": "sink.yaml is executable code and trusted credential material. It can select the SSH host, identity, MySQL host, URL targets, child binary, remote shell fragment, diff tool, and action commands. Anyone who can write sink.yaml or place one in a discovered parent directory can cause code execution or credential exfiltration in the operator's context. Sink does not sandbox it."
+  },
+  "findings": [
+    {
+      "id": "SEC-01",
+      "severity": "High",
+      "severity_label": "High",
+      "bucket": "high",
+      "area": "Transfers / data exposure",
+      "priority": "P0",
+      "phase": "Phase 0",
+      "test_layer": "Integration + unit",
+      "title": "Whole-project put can upload sink.yaml, pulls, .env.*, keys, and dumps",
+      "evidence": [
+        "src/sink/init.py:28: the starter config sets project.root to '.', making the repository root the transfer root.",
+        "src/sink/init.py:38-54: excludes cover .git, .#*, .DS_Store, .well-known, Sass, storage/*, __pycache__, and exact .env; they do not cover sink.yaml, pulls/, *.sql.gz, .env.dev, .env.prod, *.pem, *.key, .ssh, or backups.",
+        "src/sink/rsync.py:283-304: --links and per-server .env.SERVER, robots.txt.SERVER, and .htaccess.SERVER includes are appended before excludes; the exact .env exclude does not match .env.dev or .env.prod, and excludes are only applied for directory transfers (self.multiple).",
+        "src/sink/cli/file.py:54-59,71-84: omitting FILENAME selects project.root, so 'sink file put prod --real' is a whole-project transfer."
+      ],
+      "impact": "A single whole-project put can upload the config (SSH, MySQL, URL, control-panel, and hosting secrets), local database dumps (production PII), .env files, private keys, and notes to a remote web root. If the web server serves any of it, the compromise is unauthenticated; even if not, every secret in the config and every row in the dumps should be treated as exposed. The transfer can also overwrite remote files with local config.",
+      "remediation": [
+        "Add built-in safe excludes evaluated before any per-server include: sink.yaml, sink.yaml.*, .sink/, pulls/, *.sql.gz, .env*, *.pem, *.key, id_*, .ssh/, .git/, .aws/, .config/gcloud/, .netrc, .npmrc, .pypirc, *.kdbx, *.bak, *~, .#*.",
+        "Anchor per-server includes to explicit public paths (for example /public/.env.prod) instead of basename patterns; do not include dotenv files from project.root at all.",
+        "Change the starter template to root: public with pulls_dir outside root, and document that secrets must live above the deployed directory.",
+        "Pre-scan the transfer set (lstat walk) for secret-looking names and high-risk content; refuse by default and require an explicit, auditable --allow-secret-files for exceptions.",
+        "Apply the same exclusions to pull so a compromised remote cannot overwrite local config or drop secret-looking files into the working tree."
+      ],
+      "tests": [
+        "Integration: whole-project put of a repo containing sink.yaml, pulls/dump.sql.gz, .env.dev, .env.prod, id_ed25519, and .ssh/config; assert none exist on the remote and the remote tree is unchanged.",
+        "Unit: assert safe excludes appear before per-server includes in the built argv; assert --allow-secret-files is required to override.",
+        "Integration: starter config with root: public and pulls outside root uploads only public content."
+      ],
+      "deep_dive": "The include/exclude ordering is the subtle part. rsync applies filter rules in order and the first matching rule wins. Sink currently adds per-server includes first, then excludes, so a later safe exclude cannot override an earlier .env.SERVER include. Any fix must either put safe excludes first and use a positive allowlist for public env files, or stop supporting dotenv includes altogether. The starter root is equally important: even a perfect exclude list will eventually miss a new secret filename, while a narrow root fails closed.",
+      "deep_points": [
+        "The exact pattern .env does not match .env.dev or .env.prod; rsync basename patterns are not shell globs for prefix matching.",
+        "Excludes only run when self.multiple is true, so single-file puts deliberately bypass the project exclude list.",
+        "A remote web root may serve .sql.gz, .env, and .git even when directory listing is off if the filename is known.",
+        "The starter template is the effective security policy for most users; root: . is the highest-leverage line to change."
+      ]
+    },
+    {
+      "id": "SEC-02",
+      "severity": "High",
+      "severity_label": "High",
+      "bucket": "high",
+      "area": "Secrets / CLI output",
+      "priority": "P0",
+      "phase": "Phase 0",
+      "test_layer": "Unit + integration",
+      "title": "sink info prints plaintext secrets and ignores -qq",
+      "evidence": [
+        "src/sink/cli/info.py:60-64: view mode calls click.echo_via_pager(cfg.path.read_text()) with no redaction and no quiet check.",
+        "The global -qq option sets ui.quiet=2, but click.echo_via_pager bypasses ui.echo/ui.output and writes the raw config anyway.",
+        "The config contains SSH passwords, MySQL passwords, URL/HTTP-auth passwords, control-panel/hosting passwords, notes, and environment-expanded secrets.",
+        "src/sink/cli/misc.py:38-55 and 91-107 implement redaction only for misc api, not for info."
+      ],
+      "impact": "Shoulder surfing, terminal scrollback, recorded demos, CI logs, and pager temp files expose every configured credential. The documented promise that -qq emits only the exit code is false for info, so scripts can leak secrets while believing output is suppressed. Combined with parent-directory discovery, info can print a config outside the repository the operator thinks they are using.",
+      "remediation": [
+        "Redact by explicit config path and by value for password, passwd, secret, token, htpassword, and credential-like note fields by default.",
+        "Add an explicit --show-secrets flag with a warning and TTY confirmation; never enable it by default in non-interactive mode.",
+        "Honor ui.quiet: at -qq print nothing (or only the config path when explicitly requested); at -q suppress the pager and secrets.",
+        "Avoid click.echo_via_pager for secret-bearing content; if a pager is kept, set a safe pager and disable LESSOPEN/LESSCLOSE.",
+        "Print the resolved config path and warn when it is outside the current repository or owned by another user."
+      ],
+      "tests": [
+        "Unit: invoke info against a config with sentinel secrets; assert no sentinel appears in output.",
+        "Unit: invoke info -qq; assert empty stdout and exit 0.",
+        "Unit: --show-secrets prints the sentinel only with the explicit flag; non-interactive confirmation fails closed.",
+        "Unit: pager is not invoked for secret-bearing output, or LESSOPEN is neutralized."
+      ],
+      "deep_dive": "Redaction by key name alone is fragile because control_panel and hosting are free-form mappings. A key such as 'pass' is not matched by the SENSITIVE tuple (password, passwd, secret, token), so a value can leak even through misc api. The robust approach is dual: structured known fields plus value-based replacement for every configured secret and environment-expanded `${...}` value.",
+      "deep_points": [
+        "click.echo_via_pager may write to a temporary file and invoke PAGER/LESS, widening exposure.",
+        "The pager can execute LESSOPEN, which is a code-execution surface for untrusted environments (see SEC-18).",
+        "info --edit uses EDITOR/VISUAL and trusts the editor environment; pair the fix with pager/editor hardening.",
+        "A quiet mode that still prints a secret is worse than no quiet mode because it breaks caller assumptions."
+      ]
+    },
+    {
+      "id": "SEC-03",
+      "severity": "High",
+      "severity_label": "High",
+      "bucket": "high",
+      "area": "Transfers / path safety",
+      "priority": "P0",
+      "phase": "Phase 0",
+      "test_layer": "Integration",
+      "title": "Nested symlinks can escape the project root; no --safe-links",
+      "evidence": [
+        "src/sink/rsync.py:284: transfers always add --links, which recreates symlinks on the receiving side, but never add --safe-links.",
+        "src/sink/rsync.py:201-218: _locations resolves only the top-level filename argument and checks it with relative_to(project.root); it does not walk the directory tree or inspect nested link targets.",
+        "tests/integration/test_adversarial.py:40-46: only a top-level symlink is tested; a symlink nested inside a transferred directory is not covered.",
+        "src/sink/rsync.py:70-90: pull receives whatever links the remote sends, including absolute targets and ../../ escapes."
+      ],
+      "impact": "A directory put can preserve a symlink pointing at /etc/passwd, a home-directory secret, or a path outside the project; a compromised remote can plant a symlink on pull that points outside the local destination. Later reads, backups, web serving, or a follow-up --copy-links transfer can expose content outside the root. The invariant 'local and remote paths stay inside the project root' is not true for nested links.",
+      "remediation": [
+        "Add --safe-links to put, pull, and diff. This makes rsync ignore symlinks whose targets are absolute or escape the destination tree.",
+        "Before a put, lstat-walk the transfer set and reject any symlink whose resolved target is outside project.root; allow safe relative in-tree links.",
+        "Do not use --copy-links or --copy-unsafe-links as a workaround; those upload the target content.",
+        "Consider --no-hard-links or document hard-link behaviour; --safe-links covers symlinks only.",
+        "Add integration fixtures with nested absolute links, ../../ links, and safe relative links."
+      ],
+      "tests": [
+        "Integration: project tree with a nested symlink to /etc/passwd and one to ../../outside; whole-project put must not create an escaping remote link.",
+        "Integration: compromised remote serves an absolute symlink and a ../../ symlink; pull must ignore them and leave no local escape.",
+        "Integration: a safe relative link inside the tree still round-trips.",
+        "Unit: built rsync argv contains --safe-links for put, pull, and diff."
+      ],
+      "deep_dive": "--safe-links is necessary but not sufficient. It protects the receiver from links that escape the destination, but it does not stop a local attacker from swapping a directory for a symlink between the walk and rsync (TOCTOU). It also does not address hard links or device nodes. Treat the checkout as trusted, run the validation and transfer close together, and keep the narrow-root deployment model.",
+      "deep_points": [
+        "A top-level path check is not a tree check; nested links are the gap.",
+        "On pull, the remote controls the link targets; on put, the local repo controls them.",
+        "rsync's --links is what preserves links; --safe-links is the guardrail.",
+        "The test suite should assert both directions, not only put."
+      ]
+    },
+    {
+      "id": "SEC-04",
+      "severity": "High",
+      "severity_label": "High",
+      "bucket": "high",
+      "area": "Database / local data",
+      "priority": "P0",
+      "phase": "Phase 0",
+      "test_layer": "Integration + unit",
+      "title": "Local DB dumps use umask-derived modes and MYSQL_PWD reaches every pipeline stage",
+      "evidence": [
+        "src/sink/shell.py:285: pipeline stdout_path.open('w') creates the dump with the process umask, commonly 0644 on a default system; there is no explicit 0600.",
+        "src/sink/db.py:141-146: _env_with_password copies os.environ and adds MYSQL_PWD.",
+        "src/sink/shell.py:315-323: the same env mapping is passed to every Popen stage in the pipeline, including ssh, gzip, cat, pv, and gunzip, not just mysql.",
+        "src/sink/db.py:233-234: the pulls directory is checked for existence but not created or chmodded to 0700."
+      ],
+      "impact": "Production dumps containing PII are readable by other local users, backup/sync tools, containers, and malware running as the same UID. MYSQL_PWD is visible in /proc/<pid>/environ to the same UID and root, inherited by unrelated child processes, and may be captured in crash dumps or process accounting. The remote credential file is 0600, but the local copy is not.",
+      "remediation": [
+        "Create dumps with os.open(path, O_CREAT|O_EXCL|O_WRONLY, 0o600), wrap the fd, and fsync before rename.",
+        "Create or verify pulls_dir as 0700; refuse to write a dump into a world-readable directory.",
+        "Replace MYSQL_PWD with a local 0600 defaults file in a private temp directory; pass it only to the MySQL stage.",
+        "Refactor pipeline execution to support per-stage environments so ssh/gzip/cat/pv never inherit database credentials.",
+        "Set temp files and diff downloads to 0600 and clean them on failure."
+      ],
+      "tests": [
+        "Integration: run db pull under umask 022; stat the dump and assert 0600 and pulls dir 0700.",
+        "Unit: assert the env mapping for ssh/gzip/cat/pv stages does not contain MYSQL_PWD; only the mysql stage does.",
+        "Integration: local defaults file is 0600, contains no rendered password in argv, and is removed on success/failure.",
+        "Integration: a dump cannot be created in a world-readable pulls directory without a warning/refusal."
+      ],
+      "deep_dive": "MYSQL_PWD is not visible in argv, which is why it is easy to miss. It is still an environment secret: on Linux /proc/<pid>/environ is readable by the same UID, and the variable is inherited across exec. The clean design mirrors the remote side: a 0600 option file with --defaults-file (not just --defaults-extra-file), created in a private directory, passed only to the mysql process, and deleted in a finally block.",
+      "deep_points": [
+        "umask 077 is a useful operator mitigation but not a code guarantee.",
+        "A 0700 pulls directory protects filenames and contents from other users, but not from same-UID malware.",
+        "fsync before rename matters for crash consistency, not just confidentiality.",
+        "ACLs and filesystem encryption are complementary, not replacements for 0600."
+      ]
+    },
+    {
+      "id": "SEC-05",
+      "severity": "Critical-if-untrusted",
+      "severity_label": "Critical (if untrusted)",
+      "bucket": "critical",
+      "area": "Trust boundary / config",
+      "priority": "P0",
+      "phase": "Phase 0",
+      "test_layer": "Unit + integration",
+      "title": "sink.yaml is executable code; check always executes; parent discovery widens trust",
+      "evidence": [
+        "src/sink/config/loader.py:99-106: find_config walks every parent directory to the filesystem root.",
+        "src/sink/check.py:196-214: run_cmd_on_server calls run(command, real=True) unconditionally; check has no --real and always probes.",
+        "src/sink/actions.py:38-62: configured action strings are split with shlex and executed locally, or sent to a remote shell over SSH.",
+        "src/sink/rsync.py:191-199: difftool is formatted from config and executed; src/sink/config/loader.py:577-591: rsync_binary is an arbitrary configured program name/path.",
+        "src/sink/config/loader.py:153-172 expands ${NAME} from the environment, including database passwords passed into credential files."
+      ],
+      "impact": "A malicious or compromised config can point ssh.server or mysql.hostname at an attacker, causing ${DATABASE_PASSWORD} and SSH authentication to be sent to that host; point check URLs at internal metadata/admin endpoints (SSRF); execute arbitrary commands through actions, difftool, or rsync_binary; or use a planted parent config to hijack commands in unrelated directories. Running sink check in an untrusted checkout is enough to trigger network probes.",
+      "remediation": [
+        "Document the trust model in README.md and SECURITY.md: sink.yaml is code and credential material; review it before running any command.",
+        "Print the resolved config path before probes and before --real operations; warn when it is outside the current repository or owned by another user.",
+        "Bound parent discovery to the nearest repository/worktree root or a small depth, and require explicit --config/--trust-parent-config to go further.",
+        "Add a consent gate for check when the config is untrusted, outside the repo, or world-writable; do not run probes silently.",
+        "Warn when actions, difftool, or rsync_binary are configured; show the exact command before execution.",
+        "Consider a --dry-run/--print-config mode that validates without network access."
+      ],
+      "tests": [
+        "Unit: parent discovery stops at the repo boundary; a planted config above it is not loaded without explicit consent.",
+        "Integration: sink check prints the resolved config path and refuses/prompts for a config outside the repo.",
+        "Unit: a config with ssh.server=attacker and mysql.hostname=attacker does not contact either without consent.",
+        "Unit: actions/difftool/rsync_binary are surfaced as executable config and shown before execution."
+      ],
+      "deep_dive": "The severity depends on trust: a reviewed config in a trusted repo is a feature, not a vulnerability. The unsafe default is discovery. Sink walks to /, so a config in $HOME, /tmp, or a shared parent can silently become the active project. Combine that with check's unconditional real=True and env-expanded passwords, and a cloned repo can exfiltrate credentials simply because the operator ran the documented health check. The fix is not to remove config power; it is to make the trust boundary visible and consent-based.",
+      "deep_points": [
+        "check's URL probes can reach link-local metadata services (169.254.169.254) and internal admin panels.",
+        "The MySQL password is sent during authentication to whatever hostname the config names.",
+        "SSH key/agent use follows ssh.server, so a malicious config can authenticate to an attacker host.",
+        "actions and difftool are intentional code execution; treating the config as data is a category error.",
+        "A world-writable config or one owned by another user is a strong tamper signal."
+      ]
+    },
+    {
+      "id": "SEC-06",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Check / CI",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "check prints failures but exits 0",
+      "evidence": [
+        "src/sink/check.py:196-214: run_cmd_on_server returns False on failure and prints the error with ui.error(..., exit=False); nothing aggregates the result.",
+        "src/sink/cli/check.py:26-32: the command calls test_unknown_keys/test_project/test_servers and returns None, so Click exits 0.",
+        "tests/test_check_always_runs.py:11-17: the current test explicitly asserts result.exit_code == 0 for a failing environment.",
+        "src/sink/check.py:181-182: -qq suppresses all status lines, so a failed check can be both silent and successful."
+      ],
+      "impact": "CI and staging gates report success while SSH, root, database, or URL checks are broken. Operators can ship a deploy that will fail, or miss a compromised host. With -qq, the only signal is the exit code, which is always 0. This turns check from a gate into a log.",
+      "remediation": [
+        "Aggregate failures in TestConfig and exit non-zero if any probe fails.",
+        "Ship --strict immediately; make non-zero the default in the next minor; keep an explicit --allow-failures compatibility flag.",
+        "Add --json for CI with per-probe status and a stable exit code contract.",
+        "Ensure -qq still exits non-zero and can emit a machine-readable failure summary.",
+        "Update tests/test_check_always_runs.py to assert the new contract."
+      ],
+      "tests": [
+        "Unit: failing SSH, root, DB, and URL probes each produce a non-zero exit under --strict and by default after migration.",
+        "Unit: -qq produces no human output but still exits non-zero.",
+        "Integration: stop MySQL or use an unknown host key; check exits non-zero.",
+        "Unit: --json output parses and contains each probe status."
+      ],
+      "deep_dive": "Returning false from a helper is not an error contract. The command layer must own the aggregate and the exit code. Be careful with --required, which currently only prints version commands; it should either be a separate mode with a documented exit or fail if requirements are missing. Also avoid printing 'success' anywhere in check until the aggregate is known.",
+      "deep_points": [
+        "check has no --real by design; its probes are always real, which makes the exit code more important, not less.",
+        "ui.error(exit=False) is correct for per-line reporting but must not be the only signal.",
+        "A silent -qq mode without a non-zero exit is the worst combination for automation."
+      ]
+    },
+    {
+      "id": "SEC-07",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "SSH / host verification",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "Host-key policy is inconsistent between batch SSH and rsync/interactive SSH",
+      "evidence": [
+        "src/sink/shell.py:408-439: _ssh_base adds BatchMode=yes and StrictHostKeyChecking=yes only when batch=True.",
+        "src/sink/check.py:200-206, src/sink/ssh.py:59-69, and src/sink/credentials.py:72-88 use batch=True.",
+        "src/sink/rsync.py:262-268: the rsync --rsh value is only 'ssh -p PORT -i KEY'; it inherits the user's default host-key policy.",
+        "src/sink/ssh.py:39-45: interactive ssh uses remote_command(..., tty=True) without batch options; src/sink/shell.py:494-514 scp likewise has no strict host-key option."
+      ],
+      "impact": "rsync and scp can silently accept a new host key (depending on the user's ssh_config) while check reports the host as good. A network attacker who wins the first connection can read or replace transferred files. The inconsistency also defeats operator training: a green check does not imply the transfer path is verified.",
+      "remediation": [
+        "Apply common non-interactive options to rsync --rsh and scp: StrictHostKeyChecking=yes, BatchMode=yes, IdentitiesOnly=yes, a dedicated UserKnownHostsFile, and ConnectTimeout.",
+        "Build --rsh with shlex.join and test it as one argument (also fixes SEC-14).",
+        "For interactive ssh, at minimum use StrictHostKeyChecking=yes (or ask) and document the policy; do not silently accept new keys.",
+        "Provide a dedicated known_hosts path for Sink and seed it out of band.",
+        "Fail closed on unknown host keys; do not offer an accept-new shortcut in automation."
+      ],
+      "tests": [
+        "Unit: rsync argv --rsh contains StrictHostKeyChecking=yes, BatchMode=yes, IdentitiesOnly=yes, and the dedicated known_hosts path.",
+        "Integration: rsync to an unknown host key fails; after seeding the key, it succeeds.",
+        "Unit: scp argv contains the same options; interactive ssh policy is documented and tested.",
+        "Integration: check and rsync agree on host-key acceptance for the same host."
+      ],
+      "deep_dive": "OpenSSH's default StrictHostKeyChecking is 'ask', which is interactive and often effectively 'accept-new' for users who press yes. Rsync invokes ssh without a TTY in many cases, so the behaviour depends on the user's config and can vary by machine. A security tool should not rely on ambient ssh_config for a non-interactive transfer. Set the options explicitly in argv and keep a dedicated known_hosts file under Sink's control.",
+      "deep_points": [
+        "accept-new is not verification; it trusts the first key.",
+        "Hashed known_hosts is fine for storage but complicates out-of-band inspection; document the tradeoff.",
+        "GlobalKnownHostsFile can reintroduce ambient trust; consider a dedicated file.",
+        "Host-key rotation is a legitimate event; the answer is out-of-band verification, not disabling checks."
+      ]
+    },
+    {
+      "id": "SEC-08",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Database / failure handling",
+      "priority": "P1",
+      "phase": "Phase 0",
+      "test_layer": "Integration",
+      "title": "Interrupted or startup-failed DB pulls can leave partial dumps",
+      "evidence": [
+        "src/sink/db.py:295-301: cleanup runs only when result.returncode is non-zero inside _report_pull; a raised BaseException never reaches it.",
+        "src/sink/shell.py:334-347: communicate() catches BaseException, terminates stages, and re-raises; the output file is closed in finally but not removed.",
+        "src/sink/db.py:227-285: the output file is opened by the pipeline before/while stages start; a startup failure (missing gzip/mysql, OSError) can leave an empty or partial file without _report_pull.",
+        "tests/integration/test_interrupt.py:154-171 checks exit code, LATEST, and credentials, but not a leftover partial dump file."
+      ],
+      "impact": "A partial dump can remain with a normal .sql.gz name, be mistaken for a backup, be restored, or be uploaded to another environment. It also leaves production PII on disk and can fill the disk. LATEST-* may remain untouched, but the file itself still looks usable to humans and scripts that glob *.sql.gz.",
+      "remediation": [
+        "Write to a temp file such as <name>.part created 0600; fsync and atomically rename to the final name only after a zero exit.",
+        "Clean up in except BaseException as well as non-zero return paths; cover startup failures before Popen.",
+        "Create/validate LATEST only after the rename succeeds; never print success before both.",
+        "Ignore .part files in docs/globs and add a startup cleanup for stale parts older than N hours.",
+        "Extend the interruption test to assert no .sql.gz and no .part remain."
+      ],
+      "tests": [
+        "Integration: SIGINT and SIGTERM during db pull; assert no final .sql.gz, no .part, no LATEST change, and non-zero exit.",
+        "Integration: missing gzip/mysql at startup; assert the empty/partial file is removed.",
+        "Integration: disk quota / RLIMIT_FSIZE failure; assert cleanup and non-zero exit.",
+        "Integration: successful pull renames .part to final and then creates LATEST."
+      ],
+      "deep_dive": "The pipeline's finally block closes the file, which is necessary but not sufficient: closing a partial file makes it durable, not correct. Use a distinct .part name so humans and globs do not confuse it with a real dump, and make the rename the commit point. SIGKILL cannot be caught; a stale .part cleanup policy handles that case. Success output must be after the rename and symlink, not before.",
+      "deep_points": [
+        "KeyboardInterrupt is a BaseException, not an Exception; cleanup must catch BaseException.",
+        "A startup failure can occur before _report_pull exists to inspect the return code.",
+        "Atomic rename on the same filesystem is the commit primitive; cross-device rename is not atomic.",
+        "LATEST-* is a pointer; it must never point at a file that is still being written."
+      ]
+    },
+    {
+      "id": "SEC-09",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Transfers / cleanup",
+      "priority": "P1",
+      "phase": "Phase 0",
+      "test_layer": "Unit + integration",
+      "title": "_remove_pull_temp deletes every .<name>.* file",
+      "evidence": [
+        "src/sink/rsync.py:92-97: _remove_pull_temp globs f'.{local.name}.*' in the destination directory and unlinks every match.",
+        "src/sink/rsync.py:82-90: the cleanup runs on any BaseException during a single-file pull, including user cancellation.",
+        "A file named .index.html.backup, .index.html.swp, .index.html.orig, or .index.html.1 matches the glob and is not an rsync temp file.",
+        "This contradicts safety invariant S11: transfers do not delete unrelated files."
+      ],
+      "impact": "A failed or cancelled pull can delete unrelated local backups, editor swap files, or user-created dotfiles that share the destination basename. The deletion is silent and happens in an error path, when the user is least likely to notice. It can also destroy the only copy of a manual backup.",
+      "remediation": [
+        "Use rsync --temp-dir to a dedicated per-transfer temp directory and remove only that directory.",
+        "If globbing is kept, match the exact rsync temp pattern (a dot, the basename, a dot, and the generated suffix) and only files created during this run (record inode/mtime before).",
+        "Prefer --partial-dir with a dedicated directory; never broad-glob the destination.",
+        "Add a regression fixture with .index.html.backup and .index.html.swp; assert they survive a failed pull.",
+        "Document that cleanup only removes artifacts Sink created."
+      ],
+      "tests": [
+        "Integration: create .index.html.backup and .index.html.swp, interrupt/fail a pull of index.html, assert both remain.",
+        "Unit: _remove_pull_temp does not delete a non-rsync dotfile.",
+        "Integration: an actual rsync temp file is removed.",
+        "Integration: filenames with spaces/unicode still clean only their own temp file."
+      ],
+      "deep_dive": "The safest cleanup is no guessing: give rsync a private --temp-dir outside the destination, then remove that directory. If you must clean beside the destination, record the directory entries before the transfer and remove only new entries that match rsync's temp naming, not every dotfile with the same prefix. The current glob is a data-loss bug in the name of tidiness.",
+      "deep_points": [
+        "rsync temp names are implementation details; relying on a broad prefix is fragile.",
+        "--partial-dir has its own naming and cleanup semantics; choose one mechanism.",
+        "Error paths deserve the most conservative deletion policy.",
+        "S11 is a user-facing promise; the implementation must be narrower than the promise, not broader."
+      ]
+    },
+    {
+      "id": "SEC-10",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "SSH / identity",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "Missing configured SSH key warns and falls back to agent/default keys",
+      "evidence": [
+        "src/sink/config/loader.py:553-574: _resolve_key appends a warning and returns None when the configured key is missing.",
+        "src/sink/shell.py:427-430: _ssh_base adds -i only when key is truthy; with None, ssh uses the agent and default identities.",
+        "src/sink/rsync.py:262-268: the same omission applies to rsync --rsh.",
+        "src/sink/ssh.py:72-81: get_key raises FileNotFoundError, but the main transfer/check paths do not call it.",
+        "Warnings are emitted through ui.warn and are hidden by -qq."
+      ],
+      "impact": "A typo or removed key silently authenticates with a different identity, possibly a personal key or an agent key with broader access. The operator believes the dedicated deploy key is in use. In the worst case, the host accepts a different account/key and the command succeeds against the wrong identity. -qq hides the only warning.",
+      "remediation": [
+        "Treat a configured-but-missing key as a hard error in real mode; render the command in dry-run with a visible warning.",
+        "Add an explicit key: agent or --use-agent option if fallback is desired; never fall back implicitly.",
+        "Set IdentitiesOnly=yes whenever an explicit key is configured.",
+        "Validate key existence and permissions at load time for real commands, with a clear error.",
+        "Ensure -qq cannot suppress a fatal identity error."
+      ],
+      "tests": [
+        "Unit: real command with a missing key exits non-zero and does not render -i-less ssh.",
+        "Unit: dry-run renders the command and a warning; -qq still shows the fatal error in real mode.",
+        "Integration: a missing key does not authenticate with the agent/default key.",
+        "Unit: explicit agent fallback works only when requested."
+      ],
+      "deep_dive": "The current warning is a reasonable developer convenience but a poor security default. A deployment tool should fail closed on identity mismatch. The fix is simple: if key is configured and does not exist, raise in real mode. Keep dry-run forgiving so operators can inspect commands. Add IdentitiesOnly so even a present key does not get supplemented by agent keys.",
+      "deep_points": [
+        "OpenSSH tries multiple identities by default; IdentitiesOnly changes that.",
+        "Agent forwarding is a separate risk; see the user playbook.",
+        "A key path with spaces can also fail; see SEC-14.",
+        "Warnings that -qq hides are not controls."
+      ]
+    },
+    {
+      "id": "SEC-11",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Database / transport security",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "MySQL TLS is not required or configurable; ambient option files can interfere",
+      "evidence": [
+        "src/sink/db.py:31-71: client options include host, user, port, and skip-secure-auth only; there are no ssl-mode, ssl-ca, ssl-cert, or ssl-key options.",
+        "src/sink/config/models.py:38-48 and loader.py:78-86: DatabaseConfig has no TLS fields.",
+        "src/sink/credentials.py:70: the client uses --defaults-extra-file, not --defaults-file, so ambient ~/.my.cnf and /etc/my.cnf can still be read and may supplement or override settings.",
+        "src/sink/db.py:45-47: skip_secure_auth maps to --skip-secure-auth, enabling old authentication."
+      ],
+      "impact": "MySQL traffic can be unencrypted or downgraded when the server does not require TLS, exposing credentials and production data on the network. Ambient option files can redirect or alter the connection in ways the operator did not intend. skip_secure_auth weakens authentication for legacy servers.",
+      "remediation": [
+        "Add ssl-mode, ssl-ca, ssl-cert, and ssl-key to DatabaseConfig and the loader; default to VERIFY_IDENTITY for remote hosts.",
+        "Generate a complete local/remote defaults file and use --defaults-file (or explicitly neutralize ambient files) so the connection is fully specified.",
+        "Document server-side require_secure_transport=ON and a pinned CA.",
+        "Deprecate skip_secure_auth with a warning; remove it in a future major.",
+        "Add an integration test with a TLS-required MySQL server and a wrong/absent CA."
+      ],
+      "tests": [
+        "Unit: built mysql/mysqldump argv contains --ssl-mode=VERIFY_IDENTITY and CA options when configured.",
+        "Integration: a TLS-required server rejects a non-TLS connection; VERIFY_IDENTITY fails with a self-signed cert unless the CA is provided.",
+        "Integration: an ambient ~/.my.cnf cannot override the explicit host/ssl settings.",
+        "Unit: skip_secure_auth emits a deprecation warning."
+      ],
+      "deep_dive": "MySQL's default ssl-mode has varied across versions and distributions; PREFERRED will fall back to plaintext. A security-sensitive tool should choose VERIFY_IDENTITY for remote hosts and require the server to enforce TLS. --defaults-extra-file is additive: it does not stop the client from reading user/global files, so fields absent from Sink's file can be filled in by ambient configuration. Use a full defaults file and document the precedence.",
+      "deep_points": [
+        "VERIFY_IDENTITY checks both the CA chain and hostname; VERIFY_CA alone does not stop a wrong host.",
+        "A pinned CA plus require_secure_transport is the server/client pair.",
+        "skip_secure_auth is a legacy compatibility flag, not a security feature.",
+        "TLS protects the wire, not a compromised client or server."
+      ]
+    },
+    {
+      "id": "SEC-12",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Transfers / flag injection",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "--extra-flags passes arbitrary options directly to rsync",
+      "evidence": [
+        "src/sink/cli/file.py:41: --extra-flags is a free-form string option.",
+        "src/sink/rsync.py:99-108: a string is split with shlex.split; a sequence is used as-is.",
+        "src/sink/rsync.py:283-284: extra flags are inserted before --itemize-changes, --links, and --compress with no allowlist.",
+        "Dangerous options include --delete, --delete-excluded, --remove-source-files, --rsync-path, --files-from, --log-file, --write-batch, --rsh/-e, and --copy-links."
+      ],
+      "impact": "A wrapper, CI variable, or typo can turn a copy into a destructive sync, delete local/remote files, remove sources, execute an arbitrary remote command via --rsync-path, read arbitrary local files via --files-from, write attacker-controlled logs, or follow symlinks. warn: yes only covers put and only prompts; it does not sanitize flags.",
+      "remediation": [
+        "Allowlist safe flags (for example --bwlimit, --partial, --progress, --info) and reject everything else by default.",
+        "Require --allow-dangerous-rsync plus an interactive confirmation for --delete*, --remove-source-files, --rsync-path, --files-from, --log-file, --write-batch, --rsh/-e, and --copy-links.",
+        "Print the full effective argv before execution and show which options came from --extra-flags.",
+        "Never accept --extra-flags from an untrusted environment variable or CI input without review.",
+        "Document the safe set and the override in the man page."
+      ],
+      "tests": [
+        "Unit: each dangerous flag is rejected without --allow-dangerous-rsync.",
+        "Unit: safe flags are accepted and appear in the built argv.",
+        "Integration: --extra-flags=--delete is refused and no remote file is deleted.",
+        "Integration: --extra-flags=--rsync-path='touch /tmp/pwned' is refused and nothing executes."
+      ],
+      "deep_dive": "An allowlist is more durable than a denylist because rsync adds options and aliases over time. --rsync-path is effectively remote code execution over SSH; --files-from can read any local file the process can open; --log-file writes attacker-chosen paths. The fact that the config is trusted does not make a CI variable or a copy-pasted wrapper trusted. Fail closed and make the override loud.",
+      "deep_points": [
+        "--delete and --delete-excluded are destructive even when the transfer succeeds.",
+        "--remove-source-files deletes the local source after upload.",
+        "--rsh/-e can override Sink's SSH construction, including host-key options.",
+        "--copy-links defeats --safe-links by uploading target content.",
+        "Some flags are position-sensitive; inserting them before built-ins may not neutralize them."
+      ]
+    },
+    {
+      "id": "SEC-13",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Transfers / local overwrite",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "Whole-project pull overwrites local config and source without warning or backup",
+      "evidence": [
+        "src/sink/rsync.py:70-90: pull has no confirmation, dirty-tree check, or backup.",
+        "src/sink/rsync.py:332-339: the warn: yes prompt is implemented only for Action.PUT.",
+        "src/sink/cli/file.py:71-84: omitting FILENAME pulls into project.root, which may contain sink.yaml, .git, and uncommitted work.",
+        "A remote can supply sink.yaml, executable files, or a .git directory that changes the local trust anchor."
+      ],
+      "impact": "Uncommitted work is overwritten, a local config is replaced by a remote one, and a compromised remote can inject code that the operator later executes. rsync's default overwrite behaviour plus --extra-flags=--delete can remove local files that do not exist remotely. The pull is a write to the most trusted part of the system with the least protection.",
+      "remediation": [
+        "Require confirmation for a whole-project pull when the destination is a dirty Git worktree, contains sink.yaml, or is non-empty.",
+        "Add --force for non-interactive automation; fail closed when stdin is not a TTY.",
+        "Exclude local config/secrets and .git from pull; never overwrite sink.yaml without explicit opt-in.",
+        "Offer a temp-dir or backup mode, and print the resolved source/destination before transfer.",
+        "Apply warn: yes to pull too, or introduce a separate pull warning policy."
+      ],
+      "tests": [
+        "Unit: whole-project pull into a dirty worktree prompts/refuses; --force proceeds.",
+        "Integration: sink.yaml is not overwritten by a pull; a backup or temp dir is used.",
+        "Integration: a remote file named sink.yaml with different credentials is ignored unless explicitly requested.",
+        "Integration: --extra-flags=--delete on pull is refused or requires the dangerous override."
+      ],
+      "deep_dive": "Pulling a whole project is not the inverse of pushing a deploy. It is a remote-code import into the developer's trust anchor. The safe pattern is a clean checkout or a temp directory, a diff/review step, and an explicit merge. At minimum, protect sink.yaml and .git, because those control what Sink and the developer do next.",
+      "deep_points": [
+        "rsync overwrites by default; the absence of --delete does not prevent overwrite.",
+        "A remote .git directory can change hooks, config, and what git commands execute.",
+        "A remote sink.yaml can change the SSH/MySQL target for the next command.",
+        "warn: yes is currently a put/db-put control, not a general overwrite control."
+      ]
+    },
+    {
+      "id": "SEC-14",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Execution / quoting",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit + integration",
+      "title": "rsync --rsh joins the key path without shell quoting",
+      "evidence": [
+        "src/sink/rsync.py:262-268: rsh is a list ['ssh', '-p', port, '-i', key], then argv.extend(['--rsh', ' '.join(rsh)]).",
+        "src/sink/config/loader.py:553-574: the key path comes from config and may contain spaces or shell metacharacters.",
+        "src/sink/rsync.py:241-321: no shlex.join/quote is applied to the --rsh value.",
+        "No test covers a key path with spaces, semicolons, or $() in the rsh string."
+      ],
+      "impact": "A key path with a space is split into multiple ssh arguments and authentication fails or uses the wrong identity. Metacharacters may be interpreted by rsync's remote-shell parsing or the remote shell, and a crafted path can inject additional ssh options such as -oProxyCommand. The config is trusted, but this is avoidable argument injection and a reliability bug.",
+      "remediation": [
+        "Build the rsh value with shlex.join(rsh) so it round-trips as one shell-like string.",
+        "Apply the same quoting to any future --rsh construction, including scp-like helpers.",
+        "Add tests with a key path containing a space, semicolon, single quote, and $().",
+        "Consider passing a dedicated ssh wrapper script instead of a string, with a fixed argv.",
+        "Do not accept a raw --rsh override through --extra-flags (see SEC-12)."
+      ],
+      "tests": [
+        "Unit: key path with a space produces a --rsh value that shlex.split round-trips to the original argv.",
+        "Integration: SSH key stored at a path with a space authenticates successfully.",
+        "Unit: semicolon and $() in the key path do not create extra ssh options or execute anything.",
+        "Integration: a path beginning with -o is treated as a path, not an option."
+      ],
+      "deep_dive": "rsync parses the --rsh string with shell-like rules, so ' '.join is not a safe serializer. The fix is shlex.join, which quotes each argument. The deeper fix is to avoid strings entirely: a small wrapper script with a fixed shebang and argv is easier to audit, but it still needs a safe way to pass the key path. Add a regression test that asserts the exact round-trip, not just that authentication works.",
+      "deep_points": [
+        "A space in a key path is a common macOS/Linux user directory issue.",
+        "Option injection after -i is possible if the path begins with -o or contains whitespace.",
+        "rsync may invoke the remote shell differently across versions; quoting is the portable fix.",
+        "This is a hardening item because the config is already trusted, but it is cheap to fix."
+      ]
+    },
+    {
+      "id": "SEC-15",
+      "severity": "Medium",
+      "severity_label": "Medium",
+      "bucket": "medium",
+      "area": "Credentials / remote temp",
+      "priority": "P2",
+      "phase": "Phase 2",
+      "test_layer": "Integration + unit",
+      "title": "Remote credential path is predictable in /tmp; cat > follows symlinks and option values allow newlines",
+      "evidence": [
+        "src/sink/credentials.py:47-50: the default path is Path(tempfile.gettempdir()) / f'sink-mysql-{uuid.uuid4().hex}.cnf', typically /tmp.",
+        "src/sink/credentials.py:72-79: stage_command runs 'umask 077; cat > path'. cat follows a symlink and does not chmod an existing file, so a pre-created link or 0644 file can capture or expose the secret.",
+        "src/sink/credentials.py:26-35: _option_value escapes backslash and double quote but not newline, carriage return, or NUL.",
+        "The remote path appears in the ssh fragment and may be visible in the remote process list while the command runs."
+      ],
+      "impact": "A same-user attacker on the remote host can race the staging command, pre-create a symlink at a known path, or read a file left by an earlier failure. If cat follows a symlink, the credential can be written to an attacker-chosen location. A newline in a password can inject additional option lines (for example an include or a weakened TLS setting) into the MySQL defaults file.",
+      "remediation": [
+        "Create a private remote directory with mktemp -d (mode 0700) and place the file inside it; remove the directory in the EXIT trap and cleanup command.",
+        "Or use mktemp to create the file with O_EXCL semantics, then write with a mode that cannot follow a pre-existing symlink.",
+        "Reject NUL, CR, and LF in option values; fail closed with a clear error.",
+        "Use --defaults-file and a full option set to reduce ambient-file influence.",
+        "Ensure cleanup removes the directory even when the command fails or the connection drops."
+      ],
+      "tests": [
+        "Integration: pre-create a symlink at the expected credential path; assert the secret is not written through it.",
+        "Integration: pre-create a 0644 file; assert the final mode is 0600.",
+        "Unit: password with newline/CR/NUL is rejected before staging.",
+        "Integration: cleanup removes the private directory and file on success/failure."
+      ],
+      "deep_dive": "UUID unpredictability helps, but the path is disclosed in the remote command and process list, and /tmp is shared. The robust pattern is a private directory created atomically by the remote user, with the file created inside it. `cat >` is convenient but not a secure create primitive: it truncates existing files and follows symlinks. Reject control characters at the config boundary because MySQL option-file syntax is line-oriented.",
+      "deep_points": [
+        "umask 077 only affects newly created files; it does not fix an existing 0644 file.",
+        "The EXIT trap is skipped on SIGKILL and some connection failures; the fallback cleanup helps but is not a guarantee.",
+        "A private directory is easier to clean than an individual file.",
+        "Option-file injection can change host, user, or TLS settings, not just the password."
+      ]
+    },
+    {
+      "id": "SEC-16",
+      "severity": "Low",
+      "severity_label": "Low",
+      "bucket": "low",
+      "area": "Secrets / redaction",
+      "priority": "P1",
+      "phase": "Phase 1",
+      "test_layer": "Unit",
+      "title": "Redaction gaps across actions, URLs, check errors, and notes",
+      "evidence": [
+        "src/sink/cli/misc.py:38-55: redaction relies on key-name substrings (password, passwd, secret, token); a free-form control_panel/hosting key such as 'pass' is not matched.",
+        "src/sink/cli/misc.py:91-107: sensitive_path only checks the requested key names; values under non-sensitive keys are not masked.",
+        "src/sink/actions.py:33-36: list_actions prints the full configured command, including inline secrets.",
+        "src/sink/check.py:142-165: URL status messages include the full URL, including userinfo and query strings; src/sink/check.py:210 prints DB stderr without a secrets argument.",
+        "src/sink/ui.py:79-84: redaction only runs when a caller passes a secrets iterable; many callers do not."
+      ],
+      "impact": "Secrets leak to terminals, CI logs, screenshots, and support tickets even when the operator expects redaction. URL userinfo and query tokens are especially likely to be pasted into incident reports. Action listings are a documented feature and therefore a reliable leak surface. Notes may contain recovery codes or passwords.",
+      "remediation": [
+        "Collect every configured secret value (including free-form mappings and notes) and redact by value on every output path.",
+        "Redact URL userinfo and sensitive query parameters (password, passwd, token, key, secret, auth, signature) before printing; show only scheme/host/path.",
+        "Mask action listings by default, or omit commands and add --show-commands; warn that commands may contain secrets.",
+        "Pass the secrets tuple to check/DB error reporting; redact stderr before display.",
+        "Add a central output sanitizer and test each surface with sentinel values."
+      ],
+      "tests": [
+        "Unit: action with --password=sentinel; list output does not contain sentinel.",
+        "Unit: check URL https://user:pass@host/path?token=sentinel; output redacts userinfo and token.",
+        "Unit: DB stderr containing the password sentinel is redacted.",
+        "Unit: control_panel.pass and note values are redacted by value even though the key name is not in SENSITIVE."
+      ],
+      "deep_dive": "Key-name redaction is a heuristic; value-based redaction is the backstop. Collect secrets at config load (including env-expanded values) into a redaction set, then apply it to every string that reaches a console, log, pager, or exception. Be careful not to over-redact short/common values; require a minimum length or exact configured-value matching. URL sanitization should be structural, not a regex over the whole message.",
+      "deep_points": [
+        "Free-form mappings are not validated, so key names cannot be trusted to reveal sensitivity.",
+        "check's URLError reason can include the full URL or a proxy error with credentials.",
+        "MySQL errors may include user/host but rarely the password; still redact by value.",
+        "A pager or log file turns a transient terminal leak into persistent storage."
+      ]
+    },
+    {
+      "id": "SEC-17",
+      "severity": "Low",
+      "severity_label": "Low",
+      "bucket": "low",
+      "area": "Config generation",
+      "priority": "P2",
+      "phase": "Phase 2",
+      "test_layer": "Unit",
+      "title": "misc init interpolates server names into YAML without quoting",
+      "evidence": [
+        "src/sink/init.py:58-62: each server name is interpolated directly as f'\\n            {server}:' into the YAML template.",
+        "src/sink/cli/misc.py:121-135: server names come from CLI arguments with no validation.",
+        "A name containing a newline, colon, #, leading dash, or quote can break the document or inject keys.",
+        "The output is intended to be redirected to sink.yaml, which is executable code (SEC-05)."
+      ],
+      "impact": "A malformed or injected config can add unexpected servers, actions, or credentials when the user redirects the output. This is not direct code execution by itself, but it creates a config that Sink will later execute. It also produces confusing parse errors and duplicate keys.",
+      "remediation": [
+        "Validate server names against ^[A-Za-z0-9._-]+$ and reject anything else with a clear error.",
+        "Render the whole document with yaml.safe_dump or quote each key with a YAML-safe serializer; do not use f-strings for structured data.",
+        "Add a round-trip test: generate, parse with yaml.safe_load, and assert the server keys match the input.",
+        "Reject duplicate names after normalization.",
+        "Document the allowed characters in the command help."
+      ],
+      "tests": [
+        "Unit: names with newline, colon, #, quote, and leading dash are rejected.",
+        "Unit: generated YAML parses and round-trips for valid names.",
+        "Unit: duplicate names are rejected or deduplicated intentionally.",
+        "Unit: output contains no injected top-level keys."
+      ],
+      "deep_dive": "This is a small bug with a large blast radius because the output is a config file. YAML is not a templating language; use a serializer for structure. If the template must stay for comments, quote keys with a safe YAML scalar function and validate names first. The same principle applies to any future generation of compose files, env files, or command lines.",
+      "deep_points": [
+        "A newline in a YAML key can start a new mapping entry.",
+        "A colon followed by a space changes the parse of a scalar.",
+        "A leading dash can turn a key into a sequence item.",
+        "Generated config is still executable; validation is not cosmetic."
+      ]
+    },
+    {
+      "id": "SEC-18",
+      "severity": "Low",
+      "severity_label": "Low",
+      "bucket": "low",
+      "area": "Hardening / supply chain",
+      "priority": "P2",
+      "phase": "Phase 2",
+      "test_layer": "Unit + CI",
+      "title": "Grouped hardening gaps: success ordering, Rich markup, git external diff, pager/PATH, CI pinning, YAML aliases, skip_secure_auth",
+      "evidence": [
+        "src/sink/db.py:308-319: the dump filename and success message are printed before make_symlink(actual); a symlink failure occurs after success.",
+        "src/sink/ui.py:61-67: console.status(message) receives a raw URL string; Rich interprets [link=...], [red], and similar markup.",
+        "src/sink/rsync.py:161-170: git diff runs without --no-ext-diff or --no-textconv, so repo config/.gitattributes can execute external diff drivers.",
+        "src/sink/cli/info.py:60-64 and src/sink/rsync.py:174-175 trust PAGER/LESS/LESSOPEN and EDITOR/VISUAL; src/sink/shell.py and db.py resolve ssh/rsync/mysql/mysqldump/gzip/cat/pv/git/less/lando/ddev through PATH.",
+        ".github/workflows/ci.yml:19-31 and codeql.yml:25-29 use action tags (checkout@v7, setup-uv@v10.3.3, codeql-action@v4) and download gitleaks via curl|tar without a checksum.",
+        "src/sink/config/loader.py:153-172 recursively expands mappings/lists without cycle detection; a recursive YAML alias can raise RecursionError/DoS.",
+        "src/sink/db.py:45-47 and 78-86 keep skip_secure_auth, which enables legacy authentication."
+      ],
+      "impact": "A symlink failure after success leaves the operator believing LATEST is updated. Rich markup can spoof or hide text in status output. A malicious repo can execute code through git external diff/textconv or LESSOPEN when diffing or viewing. PATH hijacking can run a fake ssh/rsync/mysql. Mutable CI action tags and unverified downloads put release integrity at risk. Recursive YAML can crash commands. Legacy auth weakens MySQL security.",
+      "remediation": [
+        "Create the LATEST symlink before printing success; report symlink failure as an error and exit non-zero.",
+        "Escape or use rich.text.Text for all config-derived strings passed to status/markup.",
+        "Add git --no-ext-diff --no-textconv and clear GIT_EXTERNAL_DIFF; consider -c diff.external= and core.pager=cat.",
+        "Neutralize LESSOPEN/LESSCLOSE and use a safe pager, or avoid pager/editor use for secret-bearing content; validate EDITOR/PAGER against an allowlist.",
+        "Resolve required binaries to trusted absolute paths or validate PATH entries; document the trusted-PATH requirement.",
+        "Pin GitHub Actions to full commit SHAs and verify the gitleaks archive checksum/signature.",
+        "Add YAML alias cycle/depth detection and a clear ConfigError.",
+        "Deprecate and remove skip_secure_auth; require modern auth."
+      ],
+      "tests": [
+        "Unit: force make_symlink to fail; assert non-zero exit and no success line.",
+        "Unit: status with [red]/[link=...] renders literal text, not markup.",
+        "Unit: git diff argv contains --no-ext-diff --no-textconv; a malicious textconv driver is not executed.",
+        "CI lint: all workflow uses are pinned by 40-char SHA; gitleaks download has a checksum check.",
+        "Unit: recursive YAML alias is rejected with ConfigError, not RecursionError.",
+        "Unit: skip_secure_auth emits a deprecation warning."
+      ],
+      "deep_dive": "These are individually small but share a theme: ambient configuration and output ordering. Success-before-symlink is a truthfulness bug. Rich markup is an output-integrity bug. Git external diff, LESSOPEN, and PATH are code-execution surfaces inherited from the environment. CI tags and curl|tar are supply-chain trust. Group them into one hardening PR with focused tests so the low-severity tail does not linger indefinitely.",
+      "deep_points": [
+        "A success label is a security claim; it must come after the last fallible step.",
+        "Rich markup can make a malicious URL look like a trusted link.",
+        "git diff can execute diff.external, textconv, and filters from repo config.",
+        "LESSOPEN runs a preprocessor on file open; a malicious environment variable is code execution.",
+        "A tag is mutable; a commit SHA is not.",
+        "PyYAML safe_load prevents arbitrary object construction but not recursive alias structures."
+      ]
+    }
+  ],
+  "safety_invariants": [
+    {
+      "id": "S1",
+      "invariant": "Nothing destructive runs without --real.",
+      "status": "Mostly holds",
+      "gap": "Destructive commands are printed by default and rsync uses its native dry-run, but the dry-run still contacts the remote over SSH; check always runs real probes; diff downloads a temp file even without --real."
+    },
+    {
+      "id": "S2",
+      "invariant": "check probes are read-only and always run.",
+      "status": "Mostly holds",
+      "gap": "Probes are read-oriented, but they stage and remove 0600 remote credential files, issue HTTP GETs that can have side effects, and always exit 0 on failure."
+    },
+    {
+      "id": "S3",
+      "invariant": "Local and remote paths stay inside the project root.",
+      "status": "Gap",
+      "gap": "Only the top-level path is checked; nested symlinks are preserved with --links and no --safe-links. --extra-flags=--files-from can widen the set, and the remote root is not canonicalized."
+    },
+    {
+      "id": "S4",
+      "invariant": "warn: yes asks before overwriting files or a database.",
+      "status": "Gap",
+      "gap": "The prompt exists only for file put and db put. file pull, whole-project pull, and --delete added through --extra-flags are not covered."
+    },
+    {
+      "id": "S5",
+      "invariant": "Passwords never appear in argv, rendered commands, logs, or output.",
+      "status": "Overstated",
+      "gap": "sink info prints the raw config; action listings print commands; check prints URL userinfo/query and unredacted DB stderr; notes and free-form mappings can leak. MYSQL_PWD is in the child environment, not argv, but still exposed."
+    },
+    {
+      "id": "S6",
+      "invariant": "Temporary credential files are 0600 and removed on success, failure, and interruption.",
+      "status": "Mostly holds",
+      "gap": "Remote umask 077 applies only on create; cat > follows symlinks and preserves an existing mode; SIGKILL bypasses the EXIT trap; cleanup has a fallback but no guarantee. Local dumps/temp files are not covered."
+    },
+    {
+      "id": "S7",
+      "invariant": "A failing pipeline stage fails the whole action and the real stderr is reported.",
+      "status": "Mostly holds",
+      "gap": "The execution layer returns the first non-zero stage and reports stderr, but check swallows failures into exit 0, and startup/interrupt paths can bypass reporting and cleanup."
+    },
+    {
+      "id": "S8",
+      "invariant": "Host-key and non-interactive SSH policy is enforced.",
+      "status": "Gap",
+      "gap": "Batch paths use BatchMode/StrictHostKeyChecking, but rsync --rsh, scp, and interactive ssh do not. The same host can be checked strictly and transferred loosely."
+    },
+    {
+      "id": "S9",
+      "invariant": "Config values cannot inject shell syntax or escape path boundaries.",
+      "status": "Overstated",
+      "gap": "Argv construction blocks ordinary shell injection, but config is executable: actions, difftool, rsync_binary, --extra-flags, and the --rsh join. Case evidence is SEC-05, SEC-12, and SEC-14."
+    },
+    {
+      "id": "S10",
+      "invariant": "A failed pull never becomes LATEST-* and never looks successful.",
+      "status": "Mostly holds",
+      "gap": "LATEST is not created on ordinary failure, but interrupted/startup-failed pulls can leave a partial final dump, and success is printed before the symlink is made."
+    },
+    {
+      "id": "S11",
+      "invariant": "Transfers do not delete unrelated files.",
+      "status": "Gap",
+      "gap": "_remove_pull_temp deletes every .<name>.* file, including backups and editor swaps. --extra-flags can add --delete or --remove-source-files."
+    },
+    {
+      "id": "S12",
+      "invariant": "Errors leave a non-zero exit code and do not claim success.",
+      "status": "Gap",
+      "gap": "check exits 0 on failed probes; db pull prints success before the LATEST symlink; partial dumps can remain; some errors use exit=False with no aggregate."
+    },
+    {
+      "id": "S13",
+      "invariant": "Large payloads stream without excessive memory use.",
+      "status": "Holds",
+      "gap": "Pipelines stream, and the integration suite has a max-RSS budget. check reads only config/small responses; exceptions are small metadata files."
+    },
+    {
+      "id": "S14",
+      "invariant": "A pull never overwrites an existing dump or its name collision.",
+      "status": "Mostly holds",
+      "gap": "Dump names use _unique_path and LATEST is replaced atomically, but file pull can overwrite, --extra-flags can add --delete, and _unique_path has a TOCTOU window."
+    }
+  ],
+  "phases": [
+    {
+      "id": "0",
+      "name": "Phase 0 — Stop the bleeding",
+      "window": "1–3 days",
+      "findings": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-08", "SEC-09"],
+      "objective": "Remove the direct paths to secret and production-data exposure.",
+      "exit_criteria": [
+        "No whole-project transfer can upload or overwrite a secret-looking file.",
+        "sink info does not print secrets and honors -qq.",
+        "Nested symlinks cannot escape the destination.",
+        "Dumps are 0600 and pulls is 0700; MYSQL_PWD is not inherited by unrelated stages.",
+        "Interrupted/startup-failed pulls leave no partial final dump.",
+        "Failed pull cleanup does not delete unrelated dotfiles."
+      ]
+    },
+    {
+      "id": "1",
+      "name": "Phase 1 — Make failure and SSH honest",
+      "window": "1–2 weeks",
+      "findings": ["SEC-06", "SEC-07", "SEC-10", "SEC-11", "SEC-12", "SEC-13", "SEC-14", "SEC-16"],
+      "objective": "Make CI signals, SSH identity, database transport, and overwrite consent trustworthy.",
+      "exit_criteria": [
+        "A failed check exits non-zero (default or --strict).",
+        "Every non-interactive SSH path enforces strict host keys and identity.",
+        "A missing configured key fails in real mode.",
+        "MySQL TLS is configurable and defaults to verification for remote hosts.",
+        "Dangerous rsync flags require an explicit override.",
+        "Whole-project pull refuses a dirty tree without consent.",
+        "Secrets are redacted across actions, URLs, check/DB errors, and notes."
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Phase 2 — Defense in depth",
+      "window": "2–4 weeks",
+      "findings": ["SEC-15", "SEC-17", "SEC-18"],
+      "objective": "Close the low-severity tail and reduce inherited-environment and supply-chain risk.",
+      "exit_criteria": [
+        "Remote credentials use a private directory and reject control characters.",
+        "misc init emits safe YAML.",
+        "Success ordering, Rich markup, git external diff, pager/PATH, CI pinning, YAML cycles, and skip_secure_auth are addressed.",
+        "Residual risks are documented and re-tested each release."
+      ]
+    }
+  ],
+  "user_controls": [
+    {
+      "control": "Narrow project.root to public/ and keep sink.yaml, pulls/, env files, and keys above it.",
+      "why": "A whole-project transfer mirrors only deployable content; this fails closed even if an exclude is missed.",
+      "how": "Set root: public; pulls_dir: .sink/pulls; add sink.yaml, *.sql.gz, .env*, *.pem, *.key, .ssh, .git, cloud credential paths to exclude; use warn: yes on prod."
+    },
+    {
+      "control": "Set umask 077 and restrictive modes.",
+      "why": "0.3.0 creates dumps with the process umask; pulls is not chmodded.",
+      "how": "umask 077 before db pull; chmod 600 sink.yaml; install -d -m 700 .sink .sink/pulls; verify with stat."
+    },
+    {
+      "control": "Use a dedicated SSH key per server and a dedicated known_hosts file.",
+      "why": "Prevents agent/default-key fallback and makes host-key verification consistent.",
+      "how": "IdentityFile, IdentitiesOnly yes, StrictHostKeyChecking yes, UserKnownHostsFile ~/.ssh/known_hosts_sink, ForwardAgent no, ForwardX11 no, ServerAlive."
+    },
+    {
+      "control": "Require MySQL TLS and least privilege.",
+      "why": "Protects credentials/data on the wire and limits the blast radius of a compromised account.",
+      "how": "require_secure_transport=ON; VERIFY_IDENTITY with a pinned CA; read-only dump user; staging-only import user; no skip_secure_auth."
+    },
+    {
+      "control": "Wrap check until non-zero exit ships.",
+      "why": "0.3.0 prints [✗] but exits 0, so CI can pass a broken environment.",
+      "how": "Capture output, print it, and exit 1 if [✗] is present; migrate to --strict/--json after the fix."
+    },
+    {
+      "control": "Avoid destructive rsync flags and whole-project pulls into dirty trees.",
+      "why": "Sink does not sanitize --extra-flags and pull has no confirmation/backup.",
+      "how": "No --delete/--remove-source-files/--rsync-path/--files-from/--log-file; pull only into a clean checkout; review git status after."
+    },
+    {
+      "control": "Trust the workstation and PATH.",
+      "why": "Sink executes external tools and copies the environment; a hijacked ssh or mysql defeats the app.",
+      "how": "Trusted PATH without '.', root-owned binaries, full-disk encryption, screen lock, endpoint protection, pinned CI actions, checksummed downloads."
+    },
+    {
+      "control": "Use incident-response playbooks for exposed config/dump and host-key changes.",
+      "why": "Rotation and verification are time-sensitive; improvising leaks more data or accepts a MITM.",
+      "how": "Rotate every secret in the file, audit logs/history, preserve evidence, verify fingerprints out of band, never restore a partial dump."
+    }
+  ],
+  "residual_risks": [
+    {
+      "risk": "Compromised remote with a valid host key",
+      "likelihood": "Medium",
+      "impact": "High",
+      "treatment": "Least-privilege deploy user, file integrity monitoring, backups, incident response.",
+      "owner": "Maintainer + operations"
+    },
+    {
+      "risk": "Deliberately trusted malicious sink.yaml",
+      "likelihood": "Low",
+      "impact": "Critical",
+      "treatment": "Trust-model documentation, code review, signed releases/config policy; no sandbox.",
+      "owner": "Maintainer"
+    },
+    {
+      "risk": "Same-UID malware or root on the workstation",
+      "likelihood": "Medium",
+      "impact": "High",
+      "treatment": "Full-disk encryption, endpoint protection, separate admin account, hardware-backed keys.",
+      "owner": "Operator / IT"
+    },
+    {
+      "risk": "TOCTOU between validation and transfer",
+      "likelihood": "Low",
+      "impact": "Medium",
+      "treatment": "Trusted checkouts, no concurrent writers, atomic deploys.",
+      "owner": "Maintainer"
+    },
+    {
+      "risk": "Bugs in rsync/OpenSSH/MySQL/git/less/Python",
+      "likelihood": "Medium",
+      "impact": "High",
+      "treatment": "Patch cadence, dependency updates, distro packages.",
+      "owner": "Operator / IT"
+    },
+    {
+      "risk": "Cloud IAM / database auth plugins",
+      "likelihood": "Medium",
+      "impact": "Medium",
+      "treatment": "Environment-specific review; not modeled by Sink.",
+      "owner": "Operations"
+    },
+    {
+      "risk": "Lando/DDEV, macOS, non-Ubuntu behaviour",
+      "likelihood": "Medium",
+      "impact": "Medium",
+      "treatment": "Manual staging checks; not in the Docker matrix.",
+      "owner": "Maintainer"
+    },
+    {
+      "risk": "Secrets in process memory and crash dumps",
+      "likelihood": "Medium",
+      "impact": "Medium",
+      "treatment": "Minimize secret lifetime, disable core dumps, encrypted swap.",
+      "owner": "Operator"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "Should built-in safe excludes be non-overridable?",
+      "recommendation": "Yes for secret material, with a per-path --allow-secret-files override that prints the paths and confirms interactively.",
+      "rationale": "Prevents the default whole-project path from uploading credentials/dumps while preserving explicit single-file workflows."
+    },
+    {
+      "id": "D2",
+      "question": "Should check fail by default or only under --strict?",
+      "recommendation": "Ship --strict now, make failure the default in the next minor, and keep --allow-failures as the compatibility opt-out.",
+      "rationale": "Immediate CI safety with a migration path for scripts that expect 0."
+    },
+    {
+      "id": "D3",
+      "question": "Where should config discovery stop?",
+      "recommendation": "Nearest repo/worktree root or a bounded depth; never cross into $HOME//tmp implicitly; explicit --config/--trust-parent-config.",
+      "rationale": "Removes planted-parent hijacks while preserving monorepos."
+    },
+    {
+      "id": "D4",
+      "question": "MYSQL_PWD or a local defaults file?",
+      "recommendation": "Remove MYSQL_PWD; use a 0600 defaults file in a private temp dir, passed only to the MySQL stage.",
+      "rationale": "Mirrors the remote design and keeps secrets out of unrelated child environments."
+    },
+    {
+      "id": "D5",
+      "question": "How should dangerous rsync flags be handled?",
+      "recommendation": "Allowlist safe flags; require --allow-dangerous-rsync plus confirmation for destructive/exec options.",
+      "rationale": "An allowlist is durable against new rsync options and CI/wrapper injection."
+    },
+    {
+      "id": "D6",
+      "question": "Should whole-project pull require confirmation?",
+      "recommendation": "Yes for dirty trees, existing sink.yaml, or non-empty destinations; add --force for automation and exclude local config/secrets.",
+      "rationale": "A pull writes to the local trust anchor and can import executable code."
+    },
+    {
+      "id": "D7",
+      "question": "What is the support window?",
+      "recommendation": "Current + previous minor for 12 months of security fixes; 90-day coordinated disclosure; P0/P1 backports only.",
+      "rationale": "Matches a CLI that executes external tools and needs a tested OS/toolchain baseline."
+    }
+  ]
+}</script>
+<script>(() => {
+  "use strict";
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const esc = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[ch]));
+  const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const root = document.documentElement;
+  const themeButton = $("#theme-toggle");
+  const themeIcon = $("#theme-icon");
+  const themeLabel = $("#theme-label");
+
+  function readTheme() {
+    try {
+      return localStorage.getItem("sink-theme");
+    } catch (error) {
+      return null;
+    }
+  }
+  function storeTheme(value) {
+    try {
+      localStorage.setItem("sink-theme", value);
+    } catch (error) {
+      /* file:// or privacy mode can block storage; the toggle still works for this session. */
+    }
+  }
+  function syncTheme() {
+    const dark = root.dataset.theme === "dark";
+    root.style.colorScheme = dark ? "dark" : "light";
+    if (themeIcon) themeIcon.textContent = dark ? "☀" : "☾";
+    if (themeLabel) themeLabel.textContent = dark ? "Light" : "Dark";
+    if (themeButton) themeButton.setAttribute("aria-pressed", String(dark));
+  }
+
+  const storedTheme = readTheme();
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = storedTheme === "dark" || storedTheme === "light" ? storedTheme : (prefersDark ? "dark" : "light");
+  syncTheme();
+
+  if (themeButton) {
+    themeButton.addEventListener("click", () => {
+      root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+      storeTheme(root.dataset.theme);
+      syncTheme();
+    });
+  }
+
+  let spec;
+  try {
+    spec = JSON.parse($("#security-spec").textContent);
+  } catch (error) {
+    const status = $("#spec-status");
+    if (status) {
+      status.className = "spec-status bad";
+      status.textContent = "Embedded JSON did not parse: " + error.message;
+    }
+    return;
+  }
+
+  const findings = Array.isArray(spec.findings) ? spec.findings : [];
+  const invariants = Array.isArray(spec.safety_invariants) ? spec.safety_invariants : [];
+  const bucketCounts = { all: findings.length, critical: 0, high: 0, medium: 0, low: 0 };
+  findings.forEach((finding) => {
+    if (Object.prototype.hasOwnProperty.call(bucketCounts, finding.bucket)) bucketCounts[finding.bucket] += 1;
+  });
+
+  const severityClass = (severity) => {
+    const value = String(severity || "");
+    if (value.indexOf("Critical") === 0) return "sev-critical";
+    if (value === "High") return "sev-high";
+    if (value === "Medium") return "sev-medium";
+    return "sev-low";
+  };
+
+  const statusClass = (status) => {
+    const value = String(status || "");
+    if (value.indexOf("Holds") === 0) return "holds";
+    if (value.indexOf("Mostly") === 0) return "mostly";
+    if (value.indexOf("Gap") === 0) return "gap";
+    if (value.indexOf("Overstated") === 0) return "overstated";
+    return "mostly";
+  };
+
+  const searchBlob = (finding) => [
+    finding.id,
+    finding.severity,
+    finding.severity_label,
+    finding.area,
+    finding.priority,
+    finding.phase,
+    finding.title,
+    finding.impact,
+    ...(finding.evidence || []),
+    ...(finding.remediation || []),
+    ...(finding.tests || []),
+    finding.deep_dive || "",
+    ...(finding.deep_points || [])
+  ].join(" ").toLowerCase();
+
+  const findingMarkup = (finding) => {
+    const evidence = (finding.evidence || []).map((item) => `<li>${esc(item)}</li>`).join("");
+    const remediation = (finding.remediation || []).map((item) => `<li>${esc(item)}</li>`).join("");
+    const tests = (finding.tests || []).map((item) => `<li>${esc(item)}</li>`).join("");
+    const deepPoints = (finding.deep_points || []).map((item) => `<li>${esc(item)}</li>`).join("");
+    const hardening = finding.bucket === "low" && finding.severity !== "Low" ? '<span class="pill">hardening</span>' : "";
+    return `<article class="finding" id="finding-${esc(String(finding.id).toLowerCase())}" data-bucket="${esc(finding.bucket)}" data-search="${esc(searchBlob(finding))}">
+      <div class="finding-head">
+        <span class="finding-id">${esc(finding.id)}</span>
+        <span class="sev ${severityClass(finding.severity)}">${esc(finding.severity_label || finding.severity)}</span>
+        <span class="pill">${esc(finding.area)}</span>
+        <span class="pill">${esc(finding.priority)}</span>
+        <span class="pill">${esc(finding.phase)}</span>
+        ${hardening}
+      </div>
+      <h3>${esc(finding.title)}</h3>
+      <p class="impact"><strong>Impact.</strong> ${esc(finding.impact)}</p>
+      <div class="finding-grid">
+        <div><h4>Evidence</h4><ul class="evidence">${evidence}</ul></div>
+        <div><h4>Remediation</h4><ul>${remediation}</ul></div>
+      </div>
+      <div class="verify"><strong>Verification</strong><ul>${tests}</ul></div>
+      <details class="deep-dive">
+        <summary>Deep dive: attack path, edge cases, and why the fix works</summary>
+        <div class="deep-body"><p>${esc(finding.deep_dive)}</p><ul>${deepPoints}</ul></div>
+      </details>
+    </article>`;
+  };
+
+  const rowMarkup = (finding) => `<tr class="register-row" data-bucket="${esc(finding.bucket)}" data-search="${esc(searchBlob(finding))}">
+    <td class="num"><a href="#${esc(String(finding.id).toLowerCase())}">${esc(finding.id)}</a></td>
+    <td><span class="sev ${severityClass(finding.severity)}">${esc(finding.severity_label || finding.severity)}</span></td>
+    <td>${esc(finding.area)}</td>
+    <td class="nowrap">${esc(finding.priority)}</td>
+    <td>${esc(finding.title)}</td>
+    <td class="nowrap">${esc(finding.phase)}</td>
+  </tr>`;
+
+  const registerRows = $("#register-rows");
+  const findingCards = $("#finding-cards");
+  if (registerRows) registerRows.innerHTML = findings.map(rowMarkup).join("");
+  if (findingCards) {
+    findingCards.innerHTML = findings.map(findingMarkup).join("");
+    findings.forEach((finding) => {
+      const card = document.getElementById("finding-" + String(finding.id).toLowerCase());
+      const anchor = document.getElementById(String(finding.id).toLowerCase());
+      if (card && anchor) card.prepend(anchor);
+    });
+  }
+
+  const invariantRows = $("#invariant-rows");
+  if (invariantRows) {
+    invariantRows.innerHTML = invariants.map((item) => `<tr>
+      <td class="num">${esc(item.id)}</td>
+      <td>${esc(item.invariant)}</td>
+      <td><span class="status ${statusClass(item.status)}">${esc(item.status)}</span></td>
+      <td>${esc(item.gap)}</td>
+    </tr>`).join("");
+  }
+
+  const verificationRows = $("#verification-rows");
+  if (verificationRows) {
+    verificationRows.innerHTML = findings.map((finding) => `<tr>
+      <td class="num"><a href="#${esc(String(finding.id).toLowerCase())}">${esc(finding.id)}</a></td>
+      <td>${esc(finding.title)}</td>
+      <td class="nowrap">${esc(finding.test_layer || "Unit / integration")}</td>
+      <td><ul>${(finding.tests || []).map((item) => `<li>${esc(item)}</li>`).join("")}</ul></td>
+    </tr>`).join("");
+  }
+
+  $$(".filter-btn").forEach((button) => {
+    const bucket = button.dataset.bucket;
+    const count = button.querySelector(".count");
+    if (count && Object.prototype.hasOwnProperty.call(bucketCounts, bucket)) count.textContent = String(bucketCounts[bucket]);
+  });
+
+  let activeBucket = "all";
+  const registerSearch = $("#register-search");
+  const registerCount = $("#register-count");
+  const registerEmpty = $("#register-empty");
+
+  function matchesQuery(blob, query) {
+    const terms = query.split(/\s+/).filter(Boolean);
+    return terms.every((term) => blob.indexOf(term) !== -1);
+  }
+
+  function applyRegisterFilter() {
+    const query = registerSearch ? registerSearch.value.trim().toLowerCase() : "";
+    let shown = 0;
+    const cards = findingCards ? Array.from(findingCards.querySelectorAll(".finding")) : [];
+    cards.forEach((card) => {
+      const bucketOk = activeBucket === "all" || card.dataset.bucket === activeBucket;
+      const textOk = !query || matchesQuery(card.dataset.search || "", query);
+      const visible = bucketOk && textOk;
+      card.hidden = !visible;
+      if (visible) shown += 1;
+    });
+    if (registerRows) {
+      Array.from(registerRows.querySelectorAll(".register-row")).forEach((row) => {
+        const bucketOk = activeBucket === "all" || row.dataset.bucket === activeBucket;
+        const textOk = !query || matchesQuery(row.dataset.search || "", query);
+        row.hidden = !(bucketOk && textOk);
+      });
+    }
+    if (registerCount) registerCount.textContent = `Showing ${shown} of ${cards.length} findings`;
+    if (registerEmpty) registerEmpty.hidden = shown !== 0;
+  }
+
+  $$(".filter-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeBucket = button.dataset.bucket || "all";
+      $$(".filter-btn").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+      applyRegisterFilter();
+    });
+  });
+  if (registerSearch) registerSearch.addEventListener("input", applyRegisterFilter);
+  const registerClear = $("#register-clear");
+  if (registerClear) {
+    registerClear.addEventListener("click", () => {
+      activeBucket = "all";
+      if (registerSearch) registerSearch.value = "";
+      $$(".filter-btn").forEach((item) => item.setAttribute("aria-pressed", String(item.dataset.bucket === "all")));
+      applyRegisterFilter();
+    });
+  }
+
+  /* Search index and dropdown */
+  const searchIndex = [];
+  function buildSearchIndex() {
+    searchIndex.length = 0;
+    $$("section.section, section.hero").forEach((section) => {
+      const heading = section.querySelector("h1, h2");
+      if (!heading) return;
+      const body = section.textContent.replace(/\s+/g, " ").trim();
+      searchIndex.push({
+        target: section.id,
+        kind: "Section",
+        title: heading.textContent.replace(/\s+/g, " ").trim(),
+        body: body
+      });
+    });
+    findings.forEach((finding) => {
+      const body = [
+        finding.title,
+        finding.area,
+        finding.impact,
+        ...(finding.evidence || []),
+        ...(finding.remediation || []),
+        ...(finding.tests || [])
+      ].join(" ").replace(/\s+/g, " ").trim();
+      searchIndex.push({ target: String(finding.id).toLowerCase(), kind: finding.id, title: finding.title, body: body });
+    });
+  }
+
+  const searchInput = $("#global-search");
+  const searchPanel = $("#search-results");
+
+  function highlight(text, query) {
+    const index = text.toLowerCase().indexOf(query);
+    if (index < 0) return esc(text);
+    return esc(text.slice(0, index)) + "<mark>" + esc(text.slice(index, index + query.length)) + "</mark>" + esc(text.slice(index + query.length));
+  }
+
+  function snippet(text, query) {
+    const index = text.toLowerCase().indexOf(query);
+    const start = Math.max(0, index - 55);
+    const end = Math.min(text.length, start + 170);
+    return (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : "");
+  }
+
+  function closeSearch() {
+    if (!searchPanel) return;
+    searchPanel.hidden = true;
+    if (searchInput) searchInput.setAttribute("aria-expanded", "false");
+  }
+
+  function renderSearch(query) {
+    if (!searchPanel) return;
+    if (!query || query.length < 2) {
+      closeSearch();
+      return;
+    }
+    const matches = searchIndex
+      .filter((item) => (item.title + " " + item.body).toLowerCase().indexOf(query) !== -1)
+      .slice(0, 10);
+    if (!matches.length) {
+      searchPanel.innerHTML = '<div class="search-empty">No matches. Try a finding ID, file name, or phrase.</div>';
+    } else {
+      searchPanel.innerHTML = matches.map((item) => `<button type="button" class="search-hit" data-target="${esc(item.target)}" role="option">
+        <span class="hit-kind">${esc(item.kind)}</span><strong>${highlight(item.title, query)}</strong>
+        <span class="hit-snippet">${highlight(snippet(item.body, query), query)}</span>
+      </button>`).join("");
+    }
+    searchPanel.hidden = false;
+    if (searchInput) searchInput.setAttribute("aria-expanded", "true");
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", () => renderSearch(searchInput.value.trim().toLowerCase()));
+    searchInput.addEventListener("focus", () => {
+      if (searchInput.value.trim().length >= 2) renderSearch(searchInput.value.trim().toLowerCase());
+    });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeSearch();
+        searchInput.blur();
+      } else if (event.key === "Enter" && searchPanel && !searchPanel.hidden) {
+        const first = searchPanel.querySelector(".search-hit");
+        if (first) {
+          event.preventDefault();
+          first.click();
+        }
+      }
+    });
+  }
+
+  if (searchPanel) {
+    searchPanel.addEventListener("click", (event) => {
+      const hit = event.target.closest(".search-hit");
+      if (!hit) return;
+      const target = document.getElementById(hit.dataset.target);
+      if (target) {
+        closeSearch();
+        if (searchInput) searchInput.value = "";
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        try {
+          history.replaceState(null, "", "#" + target.id);
+        } catch (error) {
+          /* history can be restricted on file://; scrolling already happened. */
+        }
+      }
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search-wrap")) closeSearch();
+  });
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+    if (event.key === "Escape") closeSearch();
+  });
+
+  /* Table of contents, progress, and back-to-top */
+  const tocLinks = $$("#toc a[href^='#']");
+  const sectionTargets = tocLinks
+    .map((link) => document.getElementById(link.getAttribute("href").slice(1)))
+    .filter(Boolean);
+  const progressBar = $("#progress-bar");
+  const progressRoot = $("#progress");
+  const backToTop = $("#back-to-top");
+  let scrollQueued = false;
+
+  function setActiveSection() {
+    if (!sectionTargets.length) return;
+    const marker = window.scrollY + 165;
+    let current = sectionTargets[0];
+    for (const section of sectionTargets) {
+      if (section.offsetTop <= marker) current = section;
+    }
+    tocLinks.forEach((link) => {
+      link.classList.toggle("active", link.getAttribute("href") === "#" + current.id);
+    });
+  }
+
+  function updateScrollState() {
+    scrollQueued = false;
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - window.innerHeight;
+    const percent = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
+    if (progressBar) progressBar.style.width = percent.toFixed(2) + "%";
+    if (progressRoot) progressRoot.setAttribute("aria-valuenow", String(Math.round(percent)));
+    if (backToTop) backToTop.classList.toggle("visible", window.scrollY > 600);
+    setActiveSection();
+  }
+
+  function queueScroll() {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    window.requestAnimationFrame(updateScrollState);
+  }
+
+  window.addEventListener("scroll", queueScroll, { passive: true });
+  window.addEventListener("resize", queueScroll);
+  if (backToTop) {
+    backToTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+
+  const tocToggle = $("#toc-toggle");
+  const tocClose = $("#toc-close");
+  const tocBackdrop = $("#toc-backdrop");
+  function setToc(open) {
+    document.body.classList.toggle("toc-open", open);
+    if (tocToggle) tocToggle.setAttribute("aria-expanded", String(open));
+  }
+  if (tocToggle) tocToggle.addEventListener("click", () => setToc(!document.body.classList.contains("toc-open")));
+  if (tocClose) tocClose.addEventListener("click", () => setToc(false));
+  if (tocBackdrop) tocBackdrop.addEventListener("click", () => setToc(false));
+  tocLinks.forEach((link) => link.addEventListener("click", () => setToc(false)));
+
+  /* Copy buttons */
+  async function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        /* Fall through to execCommand for file:// or restricted contexts. */
+      }
+    }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    area.style.top = "0";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (error) {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+
+  function copyTargetFor(button) {
+    const id = button.dataset.copyTarget;
+    if (id) return document.getElementById(id);
+    const block = button.closest(".code-block");
+    return block ? block.querySelector("pre") : null;
+  }
+
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest(".copy-btn");
+    if (!button) return;
+    const target = copyTargetFor(button);
+    if (!target) return;
+    const original = button.textContent;
+    const ok = await copyText(target.textContent);
+    button.textContent = ok ? "Copied" : "Copy failed";
+    button.classList.toggle("copied", ok);
+    window.setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove("copied");
+    }, 1600);
+  });
+
+  /* JSON preview, copy, download, expand */
+  let specText = "";
+  try {
+    specText = JSON.stringify(spec, null, 2);
+  } catch (error) {
+    specText = "{}";
+  }
+  const specPreview = $("#spec-preview");
+  if (specPreview) specPreview.textContent = specText;
+
+  const jsonCopy = $("#json-copy");
+  if (jsonCopy) {
+    jsonCopy.addEventListener("click", async () => {
+      const ok = await copyText(specText);
+      const original = jsonCopy.textContent;
+      jsonCopy.textContent = ok ? "Copied JSON" : "Copy failed";
+      window.setTimeout(() => { jsonCopy.textContent = original; }, 1600);
+    });
+  }
+
+  const jsonDownload = $("#json-download");
+  if (jsonDownload) {
+    jsonDownload.addEventListener("click", () => {
+      const blob = new Blob([specText], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "sink-security-spec.json";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1200);
+    });
+  }
+
+  const jsonExpand = $("#json-expand");
+  if (jsonExpand && specPreview) {
+    jsonExpand.addEventListener("click", () => {
+      const expanded = specPreview.classList.toggle("expanded");
+      jsonExpand.textContent = expanded ? "Collapse preview" : "Expand preview";
+    });
+  }
+
+  /* Embedded spec validation and page-level consistency checks */
+  const requiredFields = ["id", "severity", "area", "priority", "title", "evidence", "impact", "remediation", "tests"];
+  const ids = findings.map((finding) => finding.id);
+  const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+  const missingFields = [];
+  findings.forEach((finding) => {
+    requiredFields.forEach((field) => {
+      if (!(field in finding)) missingFields.push(finding.id + "." + field);
+    });
+  });
+  const anchorsOk = findings.every((finding) => document.getElementById(String(finding.id).toLowerCase()) !== null);
+  const schemaOk = spec.schema === "sink-security-plan/v1";
+  const countOk = findings.length === 18 && invariants.length === 14;
+  const valid = schemaOk && countOk && duplicateIds.length === 0 && missingFields.length === 0 && anchorsOk;
+  const status = $("#spec-status");
+  if (status) {
+    status.className = "spec-status " + (valid ? "ok" : "bad");
+    status.textContent = valid
+      ? `Valid JSON · ${spec.schema} · ${findings.length} findings · ${invariants.length} invariants · unique IDs · anchors resolve`
+      : `Spec check failed · schema=${schemaOk} · findings=${findings.length} · invariants=${invariants.length} · duplicateIds=${duplicateIds.length} · missingFields=${missingFields.length} · anchors=${anchorsOk}`;
+  }
+
+  /* Print: open all details so deep dives are included, then restore. */
+  let printOpened = [];
+  window.addEventListener("beforeprint", () => {
+    printOpened = $$("details:not([open])");
+    printOpened.forEach((detail) => { detail.open = true; });
+  });
+  window.addEventListener("afterprint", () => {
+    printOpened.forEach((detail) => { detail.open = false; });
+    printOpened = [];
+  });
+
+  buildSearchIndex();
+  applyRegisterFilter();
+  updateScrollState();
+})();</script>
+</body>
+</html>
