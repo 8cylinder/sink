@@ -1,2 +1,2 @@
-+ MYSQL_PWD="${MYSQL_PWD}" mamp/mysqldump --host localhost --user dbuser --single-transaction --triggers --events --routines --no-tablespaces demo | gzip -c > <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
++ mamp/mysqldump --defaults-extra-file=/tmp/<LOCAL_CREDS_FILE> --single-transaction --triggers --events --routines --no-tablespaces demo | gzip -c > <CONFIG_DIR>/pulls/demo-dev-<DB_STAMP>.sql.gz
 [Success (DRY RUN)] dev: sql download complete

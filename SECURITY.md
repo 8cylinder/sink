@@ -17,9 +17,10 @@ real passwords, private keys, or production host details.
 
 ## Secret handling
 
-Sink never renders database passwords into commands. Local clients use
-`MYSQL_PWD`; remote clients use a temporary remote credentials file written
-over ssh stdin. `misc api`, `misc settings`, and `info` redact secrets unless
+Sink never renders database passwords into commands. Local clients use a
+`0600` defaults file in a private temporary directory; remote clients use a
+temporary remote credentials file written over ssh stdin. `MYSQL_PWD` is not
+exported. `misc api`, `misc settings`, and `info` redact secrets unless
 `--show-secrets` is passed. `info --show-secrets` requires a terminal
 confirmation or the explicit `--yes` flag. The repository's gitleaks hook and
 CI scan guard against accidental committed secrets.

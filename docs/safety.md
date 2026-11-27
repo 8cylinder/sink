@@ -86,11 +86,16 @@ callers must add `--yes`. `-qq` prints nothing. The view no longer uses a
 pager, so `LESSOPEN`, scrollback, and pager temporary files cannot expose the
 config.
 
-Local MySQL imports use `MYSQL_PWD` in the child environment. Remote imports
-and dumps write a `0600` option file over SSH stdin and pass only
-`--defaults-extra-file=<path>`. An `EXIT` trap removes the file, with a
-separate cleanup command as a fallback. Rendered commands contain the file
-path, never the password.
+Local MySQL clients use a `0600` option file inside a private temporary
+directory and pass only `--defaults-extra-file=<path>`. Sink does not export
+`MYSQL_PWD`. Remote imports and dumps write a `0600` option file over SSH
+stdin and pass only `--defaults-extra-file=<path>`. An `EXIT` trap removes
+the remote file, with a separate cleanup command as a fallback. Rendered
+commands contain the file path, never the password.
+
+`db pull` creates a missing pulls directory with mode `0700` and refuses to
+write a dump into a directory that is accessible by group or other. New
+dumps are `0600`; Lando/DDEV dumps are tightened to `0600` after creation.
 
 ## Failure behavior
 

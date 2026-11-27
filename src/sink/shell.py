@@ -71,7 +71,6 @@ class Argv:
 
     argv: tuple[str, ...]
     dry_run_flag: str | None = None
-    env_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.argv:
@@ -91,11 +90,7 @@ class Argv:
 
     def render(self, real: bool) -> str:
         """Render the argv as a safe shell command."""
-        command = shlex.join(self.argv_for(real))
-        if self.env_refs:
-            prefix = " ".join(f'{name}="${{{name}}}"' for name in self.env_refs)
-            return f"{prefix} {command}"
-        return command
+        return shlex.join(self.argv_for(real))
 
     def execute(
         self,
@@ -170,6 +165,7 @@ class Pipeline:
 
     stages: tuple[Command, ...]
     stdout_path: Path | None = None
+    stdout_mode: int | None = None
     stderr_path: Path | None = None
     stderr_devnull: bool = False
 
@@ -282,7 +278,16 @@ def _execute_pipeline(
         if stdout is not None:
             output = stdout
         elif pipeline.stdout_path is not None:
-            output_file = pipeline.stdout_path.open("w")
+            if pipeline.stdout_mode is None:
+                output_file = pipeline.stdout_path.open("w")
+            else:
+                fd = os.open(
+                    pipeline.stdout_path,
+                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                    pipeline.stdout_mode,
+                )
+                os.fchmod(fd, pipeline.stdout_mode)
+                output_file = os.fdopen(fd, "w")
             output = output_file
         elif capture:
             output = subprocess.PIPE

@@ -59,6 +59,7 @@ def write_config(
     root = tmp_path / name.replace(".yaml", "")
     (root / "project").mkdir(parents=True)
     (root / "pulls").mkdir()
+    (root / "pulls").chmod(0o700)
     (root / "id_rsa").write_text("key\n")
     path = root / name
     path.write_text(yaml.safe_dump(data, sort_keys=False))

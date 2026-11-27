@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -118,6 +119,23 @@ def test_pipeline_writes_the_redirection(tmp_path: Path) -> None:
     assert result.ok
     assert destination.read_text() == "hello\n"
     assert str(destination) in pipeline.render(True)
+
+
+def test_pipeline_output_mode_is_private(tmp_path: Path) -> None:
+    destination = tmp_path / "dump.sql.gz"
+    pipeline = Pipeline(
+        (Argv((sys.executable, "-c", "print('dump')")),),
+        stdout_path=destination,
+        stdout_mode=0o600,
+    )
+    previous = os.umask(0o022)
+    try:
+        result = pipeline.execute(real=True, capture=True)
+    finally:
+        os.umask(previous)
+
+    assert result.ok
+    assert destination.stat().st_mode & 0o777 == 0o600
 
 
 def test_pipeline_reports_a_failing_producer() -> None:

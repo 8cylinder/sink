@@ -27,6 +27,10 @@
 - `.git/` and `.sink/` are always excluded from directory transfers, even
   with `--allow-secret-files`. `.git` no longer triggers the secret-file
   refusal, so a normal repository root remains usable.
+- Local database pulls create dumps with mode `0600`. `db pull` creates a
+  missing `pulls_dir` with `0700` and refuses a group- or world-accessible
+  directory. Local MySQL clients use a private `0600` defaults file instead
+  of `MYSQL_PWD`, which is no longer exported to any pipeline stage.
 
 ### Fixed
 

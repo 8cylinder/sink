@@ -61,6 +61,10 @@ exclusions are applied before per-server includes; automatic
 and a directory put refuses absolute symlinks or links whose targets leave
 `project.root`.
 
+`db pull` creates a missing `pulls_dir` with mode `0700` and refuses a
+group- or world-accessible directory. New dumps are `0600`. Local MySQL
+clients use a private `0600` defaults file; `MYSQL_PWD` is not exported.
+
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Secrets are redacted from rendered commands and from `misc api` /
 `misc settings` unless `--show-secrets` is passed.

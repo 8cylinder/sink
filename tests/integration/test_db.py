@@ -30,6 +30,19 @@ def test_db_pull_uses_special_password_and_cleans_up(live_project) -> None:
     assert project.sandbox.credentials_files() == []
 
 
+def test_db_pull_writes_a_private_dump(live_project) -> None:
+    project = live_project()
+
+    result = project.invoke("db", "pull", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    pulls = project.path / "pulls"
+    dumps = list(pulls.glob("demo-dev-*.sql.gz"))
+    assert dumps
+    assert pulls.stat().st_mode & 0o777 == 0o700
+    assert dumps[0].stat().st_mode & 0o777 == 0o600
+
+
 def test_db_put_loads_a_gzipped_dump(live_project) -> None:
     project = live_project()
     dump = project.path / "put.sql.gz"

@@ -31,6 +31,15 @@ def test_only_the_shell_module_imports_subprocess() -> None:
     assert offenders == []
 
 
+def test_mysql_pwd_is_not_exported() -> None:
+    offenders = [
+        path.name
+        for path in SRC.glob("*.py")
+        if "MYSQL_PWD" in path.read_text()
+    ]
+    assert offenders == []
+
+
 def test_command_module_and_plumbum_are_gone() -> None:
     assert not (SRC / "command.py").exists()
     pyproject = (REPO / "pyproject.toml").read_text()

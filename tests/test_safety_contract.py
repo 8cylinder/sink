@@ -96,6 +96,7 @@ def test_db_pull_does_not_overwrite_a_same_second_dump(
 ) -> None:
     pulls = tmp_path / "pulls"
     pulls.mkdir()
+    pulls.chmod(0o700)
     db = DB(_project(tmp_path), _server(), real=True)
     frozen = datetime.datetime(2026, 11, 26, 12, 0, 0, tzinfo=datetime.UTC)
 
@@ -125,6 +126,7 @@ def test_db_pull_does_not_overwrite_a_same_second_dump(
 def test_db_failed_pull_removes_the_partial_dump(tmp_path: Path) -> None:
     pulls = tmp_path / "pulls"
     pulls.mkdir()
+    pulls.chmod(0o700)
     db = DB(_project(tmp_path), _server(), real=True)
     partial = pulls / "partial.sql.gz"
     partial.write_bytes(b"partial")
@@ -140,6 +142,7 @@ def test_db_dump_path_stays_inside_pulls_for_hostile_names(
 ) -> None:
     pulls = tmp_path / "pulls"
     pulls.mkdir()
+    pulls.chmod(0o700)
     project = _project(tmp_path, name="../../project-escape")
     server = _server(name="../../server-escape")
     db = DB(project, server)
@@ -154,6 +157,7 @@ def test_latest_symlink_stays_inside_pulls_for_hostile_server(
 ) -> None:
     pulls = tmp_path / "pulls"
     pulls.mkdir()
+    pulls.chmod(0o700)
     db = DB(_project(tmp_path), _server(name="../../escape"), real=True)
     dump = pulls / "dump.sql.gz"
     dump.write_text("x")

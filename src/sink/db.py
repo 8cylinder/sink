@@ -12,7 +12,12 @@ from pathlib import Path
 import click
 
 from sink.config.models import DatabaseConfig, Project, Server
-from sink.credentials import RemoteCredentials, remote_mysql_credentials
+from sink.credentials import (
+    LocalCredentials,
+    RemoteCredentials,
+    local_mysql_credentials,
+    remote_mysql_credentials,
+)
 from sink.errors import CommandError
 from sink.shell import Argv, Command, Pipeline, Result, remote_command, run
 from sink.ui import ui
@@ -29,7 +34,8 @@ def _port(db: DatabaseConfig) -> int | None:
 
 
 def _client_options(
-    db: DatabaseConfig, credentials: RemoteCredentials | None = None
+    db: DatabaseConfig,
+    credentials: RemoteCredentials | LocalCredentials | None = None,
 ) -> list[str]:
     """Build mysql client arguments without a password flag."""
     if credentials is not None:
@@ -49,7 +55,7 @@ def _client_options(
 
 def _dump_argv(
     db: DatabaseConfig,
-    credentials: RemoteCredentials | None = None,
+    credentials: RemoteCredentials | LocalCredentials | None = None,
     *,
     mysqlpump: bool = False,
 ) -> list[str]:
@@ -128,7 +134,8 @@ def _validate_gzip(path: Path) -> None:
 
 
 def _mysql_argv(
-    db: DatabaseConfig, credentials: RemoteCredentials | None = None
+    db: DatabaseConfig,
+    credentials: RemoteCredentials | LocalCredentials | None = None,
 ) -> list[str]:
     """Build the mysql import argv."""
     return [
@@ -136,14 +143,6 @@ def _mysql_argv(
         *_client_options(db, credentials),
         db.db or "",
     ]
-
-
-def _env_with_password(db: DatabaseConfig) -> dict[str, str]:
-    """Return an environment carrying ``MYSQL_PWD``."""
-    env = os.environ.copy()
-    if db.password:
-        env["MYSQL_PWD"] = db.password
-    return env
 
 
 class DB:
@@ -179,15 +178,31 @@ class DB:
         dest = Path(dest)
         self._pull(dest, local=False)
 
+    def _ensure_pulls_dir(self) -> Path:
+        """Create the pulls directory 0700 or refuse an unsafe one."""
+        pulls = self.project.pulls_dir
+        if pulls is None:
+            raise CommandError("project.pulls_dir is not configured")
+        if not pulls.exists():
+            pulls.mkdir(parents=True)
+            pulls.chmod(0o700)
+        if not pulls.is_dir():
+            raise CommandError(f"pulls path is not a directory: {pulls}")
+        mode = pulls.stat().st_mode & 0o777
+        if mode & 0o077:
+            raise CommandError(
+                f"pulls directory {pulls} is accessible by group or other "
+                f"(mode {mode:o}); run: chmod 700 {pulls}"
+            )
+        return pulls
+
     def pull(self, tag: str | None = None) -> None:
         """Pull a dump into the pulls directory."""
         p = self.project
         s = self.server
         self._database()
-
-        if p.pulls_dir is None:
-            raise CommandError("project.pulls_dir is not configured")
-        sqlfile = self._dest(p.name, p.pulls_dir, s.name, tag=tag)
+        pulls = self._ensure_pulls_dir()
+        sqlfile = self._dest(p.name, pulls, s.name, tag=tag)
 
         if s.server_type == "lando":
             # lando adds the gz extension itself so we remove here
@@ -239,16 +254,24 @@ class DB:
 
         if s.mamp:
             mysqldump = str(Path(s.mamp) / "mysqldump")
-            argv = [mysqldump, *_dump_argv(db)[1:]]
-            command = Pipeline(
-                (
-                    Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
-                    Argv(("gzip", "-c")),
-                ),
-                stdout_path=Path(sqlfile),
-            )
-            env = _env_with_password(db)
-            result = run(command, real=self.real, capture=True, env=env)
+            with local_mysql_credentials(
+                user=db.username,
+                password=db.password or "",
+                host=db.hostname,
+                port=_port(db),
+                skip_secure_auth=db.skip_secure_auth,
+                real=self.real,
+            ) as credentials:
+                argv = [mysqldump, *_dump_argv(db, credentials)[1:]]
+                command = Pipeline(
+                    (
+                        Argv(tuple(argv)),
+                        Argv(("gzip", "-c")),
+                    ),
+                    stdout_path=Path(sqlfile),
+                    stdout_mode=0o600,
+                )
+                result = run(command, real=self.real, capture=True)
             self._report_pull(result, Path(sqlfile), local)
             return
 
@@ -273,6 +296,7 @@ class DB:
                         Argv(("gzip", "-c")),
                     ),
                     stdout_path=Path(sqlfile),
+                    stdout_mode=0o600,
                 )
             else:
                 destination = shlex.quote(str(sqlfile))
@@ -307,6 +331,11 @@ class DB:
             )
         elif local and (sqlfile.exists() or Path(f"{sqlfile}.gz").exists()):
             actual = sqlfile if sqlfile.exists() else Path(f"{sqlfile}.gz")
+            # Lando/DDEV and tools that create the file themselves may use a
+            # wider mode.  The private pulls directory is the primary control;
+            # this is defense in depth for the dump itself.
+            with suppress(OSError):
+                actual.chmod(0o600)
             filename = str(actual.absolute())
             if ui.quiet < 2:
                 ui.console.print(filename, style="green")
@@ -410,16 +439,23 @@ class DB:
 
         if s.mamp:
             mysql = str(Path(s.mamp) / "mysql")
-            argv = [mysql, *_mysql_argv(db)[1:]]
-            command = Pipeline(
-                (
-                    self._source_stage(sqlfile),
-                    Argv(("gunzip", "-c")),
-                    Argv(tuple(argv), env_refs=("MYSQL_PWD",)),
+            with local_mysql_credentials(
+                user=db.username,
+                password=db.password or "",
+                host=db.hostname,
+                port=_port(db),
+                skip_secure_auth=db.skip_secure_auth,
+                real=self.real,
+            ) as credentials:
+                argv = [mysql, *_mysql_argv(db, credentials)[1:]]
+                command = Pipeline(
+                    (
+                        self._source_stage(sqlfile),
+                        Argv(("gunzip", "-c")),
+                        Argv(tuple(argv)),
+                    )
                 )
-            )
-            env = _env_with_password(db)
-            result = run(command, real=self.real, capture=True, env=env)
+                result = run(command, real=self.real, capture=True)
             self._report_put(result)
             return
 

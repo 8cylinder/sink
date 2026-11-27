@@ -151,6 +151,12 @@ by default. `--show-secrets` prints the raw file only after a terminal
 confirmation; in a non-interactive context pass `--yes` to confirm. `-qq`
 suppresses the view entirely.
 
+Local database pulls create dumps with mode `0600` and require the pulls
+directory to be `0700`. `db pull` creates a missing `pulls_dir` with `0700`
+and refuses a group- or world-accessible directory. Local MySQL clients use
+a `0600` defaults file in a private temporary directory; Sink does not export
+`MYSQL_PWD`.
+
 ## Completions
 
 ```console

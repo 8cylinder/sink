@@ -139,6 +139,7 @@ def project_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         (root / "project" / "sub").mkdir()
         (root / "project" / "sub" / "file.txt").write_text("hello\n")
         (root / "pulls").mkdir()
+        (root / "pulls").chmod(0o700)
         (root / "outside.txt").write_text("outside\n")
         (root / "id_rsa").write_text("dummy key\n")
 

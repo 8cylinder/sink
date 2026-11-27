@@ -646,6 +646,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
         (project_root / "index.html").write_text("local index\n")
         (project_root / "sub" / "file.txt").write_text("local sub\n")
         (project_dir / "pulls").mkdir()
+        (project_dir / "pulls").chmod(0o700)
 
         remote_root = f"/var/www/sink-{uuid.uuid4().hex[:12]}"
         sandbox.exec(
