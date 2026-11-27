@@ -4,6 +4,9 @@ Usage: sink info [OPTIONS]
 
   If edit, it will be opened in the default editor.
 
+  The view mode redacts passwords, tokens, notes, and free-form credential
+  keys.  Use --show-secrets to print the raw file.
+
   To config the default editor, add the following lines to ~/.bashrc.  Change
   the 'program' to editor name.
 
@@ -12,4 +15,7 @@ Usage: sink info [OPTIONS]
 
 Options:
   -v, --view / -e, --edit  View or edit config file.
+  --show-secrets           Print secret values instead of redacting them.
+  -y, --yes                Confirm --show-secrets without an interactive
+                           prompt.
   -h, --help               Show this message and exit.

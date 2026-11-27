@@ -141,6 +141,11 @@ Use `--real`/`-r` to execute. The command is printed in both modes.
 - `--completions` writes a static bash completion script and prints its path.
 - `-v/--verbose` enables diagnostics.
 
+`sink info` redacts passwords, tokens, notes, and free-form credential keys
+by default. `--show-secrets` prints the raw file only after a terminal
+confirmation; in a non-interactive context pass `--yes` to confirm. `-qq`
+suppresses the view entirely.
+
 ## Completions
 
 ```console

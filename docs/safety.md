@@ -68,6 +68,13 @@ inclusion was removed; dotenv files are credential material.
 
 ## Credentials
 
+`sink info` prints a redacted view of the config by default: passwords,
+tokens, notes, and free-form credential keys are masked. `--show-secrets`
+prints the raw file only after a terminal confirmation; non-interactive
+callers must add `--yes`. `-qq` prints nothing. The view no longer uses a
+pager, so `LESSOPEN`, scrollback, and pager temporary files cannot expose the
+config.
+
 Local MySQL imports use `MYSQL_PWD` in the child environment. Remote imports
 and dumps write a `0600` option file over SSH stdin and pass only
 `--defaults-extra-file=<path>`. An `EXIT` trap removes the file, with a

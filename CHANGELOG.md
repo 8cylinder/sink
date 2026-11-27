@@ -16,6 +16,10 @@
   or `--allow-secret-files`.
 - The starter config now uses `root: public` and a `pulls_dir` outside the
   deployed root.
+- `sink info` now redacts passwords, tokens, notes, and free-form credential
+  keys by default. It no longer uses a pager, honors `-qq`, and adds
+  `--show-secrets` with a terminal confirmation or the explicit `--yes`
+  flag.
 
 ### Fixed
 
