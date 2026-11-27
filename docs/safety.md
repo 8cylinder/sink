@@ -159,6 +159,15 @@ Sink passes a complete `--defaults-file`, so ambient `~/.my.cnf` and
 `/etc/my.cnf` cannot override the connection. `skip_secure_auth` is
 deprecated and emits a warning.
 
+## Redaction
+
+Sink collects configured password, token, credential, free-form `pass`, and
+note values and redacts them by value from action output, check output,
+`misc api`, `misc settings`, and `info`. Check URLs mask userinfo and
+sensitive query parameters. Action listings show names only by default;
+`--show-commands` displays the commands with a warning that they may contain
+secrets.
+
 ## Failure behavior
 
 A database pull writes to `<name>.part`, renames it to the final dump only

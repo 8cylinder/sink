@@ -156,7 +156,7 @@ config (another owner, world-writable, or outside the repository) unless
 | `sink diff SERVER [FILENAME]` | Compare a local file with its remote copy. |
 | `sink db pull\|put SERVER [SQL-GZ]` | Pull or push a gzipped MySQL dump. |
 | `sink ssh SERVER [USER]` | Print or open an interactive ssh session. |
-| `sink action SERVER [ACTION]` | List or run a configured action. |
+| `sink action SERVER [ACTION]` | List or run a configured action; commands are hidden unless `--show-commands`. |
 | `sink check [SERVER]` | Check project, server, database, and URL settings; exit non-zero on failure. |
 | `sink info` | View the config; `--edit` opens the editor. |
 | `sink misc api` | Read config values as JSON. |
@@ -197,6 +197,11 @@ Use `--real`/`-r` to execute. The command is printed in both modes.
 by default. `--show-secrets` prints the raw file only after a terminal
 confirmation; in a non-interactive context pass `--yes` to confirm. `-qq`
 suppresses the view entirely.
+
+Configured secret values are redacted from action output, check URLs and
+errors, `misc api`, `misc settings`, and `info`. `sink action` lists names
+only by default; `--show-commands` prints the commands with a warning that
+they may contain secrets.
 
 Local database pulls create dumps with mode `0600` and require the pulls
 directory to be `0700`. `db pull` creates a missing `pulls_dir` with `0700`

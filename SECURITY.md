@@ -48,9 +48,10 @@ over ssh stdin. Option values containing NUL, CR, or LF are rejected.
 `ssl_ca`/`ssl_cert`/`ssl_key` for a private CA or client certificate. Sink
 passes a complete `--defaults-file` so ambient option files cannot override
 the connection. `skip_secure_auth` is deprecated. `misc api`, `misc settings`,
-and `info` redact secrets unless
-`--show-secrets` is passed. `info --show-secrets` requires a terminal
-confirmation or the explicit `--yes` flag. The repository's gitleaks hook and
+`info`, check output, and action output redact configured secrets;
+`--show-secrets` is the explicit opt-out where offered. Action listings hide
+commands unless `--show-commands` is passed. `info --show-secrets` requires a
+terminal confirmation or the explicit `--yes` flag. The repository's gitleaks hook and
 CI scan guard against accidental committed secrets.
 
 Directory transfers exclude secret material by default: `sink.yaml`,

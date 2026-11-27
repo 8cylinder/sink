@@ -11,28 +11,14 @@ from sink.applications import Applications
 from sink.cli import CONTEXT_SETTINGS, AppCommand, AppGroup, cli
 from sink.config.models import Config
 from sink.init import Init
+from sink.redaction import collect_secret_values, is_sensitive_key
 from sink.runtime import Runtime
 from sink.ui import ui
 
-SENSITIVE = ("password", "passwd", "secret", "token")
-
 
 def _config_secrets(config: Config) -> tuple[str, ...]:
-    """Collect configured passwords for output redaction."""
-    secrets: set[str] = set()
-    for server in config.servers.values():
-        for ssh in server.ssh:
-            if ssh.password:
-                secrets.add(ssh.password)
-        for database in server.databases:
-            if database.password:
-                secrets.add(database.password)
-        for url in server.urls:
-            if url.password:
-                secrets.add(url.password)
-            if url.htpassword:
-                secrets.add(url.htpassword)
-    return tuple(secrets)
+    """Collect configured secrets for output redaction."""
+    return collect_secret_values(config)
 
 
 def _redact_value(value: object, show_secrets: bool) -> object:
@@ -44,7 +30,7 @@ def _redact_value(value: object, show_secrets: bool) -> object:
             key: (
                 "********"
                 if isinstance(key, str)
-                and any(part in key.lower() for part in SENSITIVE)
+                and (is_sensitive_key(key) or key.lower() == "note")
                 and item
                 else _redact_value(item, show_secrets)
             )
@@ -89,7 +75,7 @@ def api(rt: Runtime, keys: tuple[str, ...], show_secrets: bool) -> None:
     """
     data = rt.config.raw
     sensitive_path = any(
-        part in str(key).lower() for key in keys for part in SENSITIVE
+        is_sensitive_key(str(key)) or str(key).lower() == "note" for key in keys
     )
     for key in keys:
         try:

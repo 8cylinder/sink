@@ -13,6 +13,7 @@ from rich.text import Text
 
 from sink.config.models import Config, DatabaseConfig, SSHConfig
 from sink.credentials import remote_mysql_credentials
+from sink.redaction import collect_secret_values, redact_url
 from sink.shell import remote_command, run
 from sink.ui import ui
 
@@ -42,6 +43,7 @@ class TestConfig:
         self.config = config
         self.insecure = insecure
         self.json_output = json_output
+        self.secrets = collect_secret_values(config)
         self.failed = False
         self.results: list[ProbeResult] = []
 
@@ -162,7 +164,8 @@ class TestConfig:
                 if not u.url:
                     continue
                 ok = False
-                with ui.status(f"Checking {u.url}"):
+                safe_url = redact_url(u.url)
+                with ui.status(f"Checking {safe_url}"):
                     try:
                         # Default verifies the certificate chain and hostname;
                         # --insecure is the explicit opt-out for self-signed sites.
@@ -174,18 +177,18 @@ class TestConfig:
                             u.url, timeout=self.timeout, context=ctx
                         )
                     except urllib.error.HTTPError as e:
-                        msg = f"URL({u.url}): HTTPError: {e.code}."
+                        msg = f"URL({safe_url}): HTTPError: {e.code}."
                     except urllib.error.URLError as e:
-                        msg = f"URL({u.url}): URLError: {e.reason}."
+                        msg = f"URL({safe_url}): URLError: {e.reason}."
                     except ValueError:
-                        msg = f"URL({u.url}): Not a valid URL."
+                        msg = f"URL({safe_url}): Not a valid URL."
                     except AttributeError as e:
-                        msg = f"AttributeError? {u.url} {e}"
+                        msg = f"AttributeError? {safe_url} {e}"
                     except TimeoutError:
-                        msg = f"URL({u.url}) Timeout."
+                        msg = f"URL({safe_url}) Timeout."
                     else:
                         ok = True
-                        msg = f"URL({u.url})"
+                        msg = f"URL({safe_url})"
                 self.line(ok, msg, spaces=2)
 
     def table(self, rows: Sequence[tuple[str, str, str]]) -> None:
@@ -201,6 +204,9 @@ class TestConfig:
         spaces: int = 0,
     ) -> None:
         """Print one colored status line with the marker in front."""
+        msg = ui.redact(msg, self.secrets)
+        if value is not None:
+            value = ui.redact(value, self.secrets)
         self.results.append(ProbeResult(ok=ok, message=msg, value=value))
         if not ok:
             self.failed = True
@@ -233,7 +239,12 @@ class TestConfig:
         if result.returncode:
             self.line(False, f"{bad} (error: {result.returncode})", spaces=2)
             if result.stderr:
-                ui.error(result.stderr, exit=False, indent=6)
+                ui.error(
+                    result.stderr,
+                    exit=False,
+                    indent=6,
+                    secrets=self.secrets,
+                )
             return False
 
         self.line(True, good, spaces=2)

@@ -3,6 +3,7 @@
 import errno
 import os
 import shlex
+from collections.abc import Iterable
 from pathlib import Path
 
 from sink.config.models import Server
@@ -64,7 +65,7 @@ class SSH:
             capture=False,
         )
 
-    def run(self, remote_cmd: str) -> str:
+    def run(self, remote_cmd: str, secrets: Iterable[str] = ()) -> str:
         """Run a remote shell fragment and return its output."""
         command = remote_command(
             self.ssh,
@@ -72,9 +73,14 @@ class SSH:
             batch=True,
             timeout=25,
         )
-        result = run(command, real=self.real, capture=True)
+        result = run(command, real=self.real, capture=True, secrets=secrets)
         if self.real and result.returncode:
-            raise CommandError(result.stderr.strip() or "remote command failed")
+            raise CommandError(
+                ui.redact(
+                    result.stderr.strip() or "remote command failed",
+                    secrets,
+                )
+            )
         return result.stdout
 
     def get_key(self) -> str:

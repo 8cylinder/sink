@@ -12,7 +12,7 @@ import os
 import shlex
 import subprocess
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -399,10 +399,11 @@ def run(
     stdout: IO[str] | None = None,
     stderr: IO[str] | None = None,
     quiet: int = 0,
+    secrets: Iterable[str] = (),
 ) -> Result:
     """Print *command* and run the variant that belongs to this mode."""
     if quiet < 1:
-        ui.display_cmd(command.render(real))
+        ui.display_cmd(command.render(real), secrets=secrets)
     identity_error = getattr(command, "identity_error", None)
     if real and identity_error:
         raise CommandError(identity_error)

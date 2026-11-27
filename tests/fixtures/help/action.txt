@@ -9,7 +9,7 @@ Usage: sink action [OPTIONS] SERVER [ACTION_NAME]
   files ending in .cache on the requested server.
 
   actions:
-    find-cache: find -iname '*.cache'
+    find-cache: find . -iname cache
 
   Instead of using one of the servers, you can use the special name 'local'
   for a server.  This will use the commands in the project section.
@@ -19,4 +19,5 @@ Usage: sink action [OPTIONS] SERVER [ACTION_NAME]
 
 Options:
   -r, --real
-  -h, --help  Show this message and exit.
+  --show-commands  Show action commands; they may contain secrets.
+  -h, --help       Show this message and exit.

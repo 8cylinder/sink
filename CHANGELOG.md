@@ -57,6 +57,10 @@
   noclobber write, not a predictable file in `/tmp`. The directory is removed
   by the EXIT trap and fallback cleanup. NUL, CR, and LF in option values are
   rejected.
+- Redaction is centralized across action output, check URLs and errors,
+  `misc api`, `misc settings`, and `info`. URL userinfo and sensitive query
+  parameters are masked. Action listings hide commands by default;
+  `--show-commands` displays them with a warning.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

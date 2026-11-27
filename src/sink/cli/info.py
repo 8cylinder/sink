@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import sys
-from collections.abc import Mapping
 from pathlib import Path
 
 import click
@@ -12,25 +11,14 @@ import yaml
 
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
 from sink.config.models import Config
+from sink.redaction import (
+    collect_secret_values,
+    is_sensitive_key,
+    redact_values,
+)
 from sink.runtime import Runtime
 from sink.ui import ui
 
-# Free-form keys in control_panel and hosting are not schema-validated.  A
-# key such as "pass" must be treated as a credential even though it is not
-# named password or secret.
-_SENSITIVE_SUBSTRINGS = (
-    "password",
-    "passwd",
-    "secret",
-    "token",
-    "credential",
-    "api_key",
-    "api-key",
-    "apikey",
-    "private_key",
-)
-_SENSITIVE_TOKENS = frozenset({"pass", "pwd", "passphrase", "pin"})
-_MIN_SECRET_LENGTH = 4
 _KEY_LINE = re.compile(
     r"^(?P<indent>\s*)(?P<key>-?\s*[^:#][^:]*?):(?P<rest>.*)$"
 )
@@ -40,57 +28,6 @@ _EMPTY_VALUES = frozenset({"", '""', "''", "null", "Null", "NULL", "~"})
 def _key_name(key: str) -> str:
     """Return a YAML key without a list-item marker or surrounding space."""
     return key.removeprefix("-").strip()
-
-
-def _sensitive_key(key: str) -> bool:
-    """Return whether a config key name looks like credential material."""
-    lowered = key.lower()
-    if any(part in lowered for part in _SENSITIVE_SUBSTRINGS):
-        return True
-    tokens = re.split(r"[^a-z0-9]+", lowered)
-    return any(token in _SENSITIVE_TOKENS for token in tokens)
-
-
-def _collect_secret_values(config: Config) -> tuple[str, ...]:
-    """Collect configured values that must be redacted from output."""
-    values: set[str] = set()
-
-    def walk(value: object) -> None:
-        """Visit a config fragment and collect secret values."""
-        if isinstance(value, Mapping):
-            for key, item in value.items():
-                if (
-                    isinstance(key, str)
-                    and isinstance(item, str)
-                    and item
-                    and (key.lower() == "note" or _sensitive_key(key))
-                ):
-                    values.add(item)
-                walk(item)
-        elif isinstance(value, list):
-            for item in value:
-                walk(item)
-
-    walk(config.raw)
-    # Longest first so a value that contains another secret is replaced
-    # before the shorter substring.
-    return tuple(sorted(values, key=len, reverse=True))
-
-
-def _redact_values(text: str, secrets: tuple[str, ...]) -> str:
-    """Replace known secret values in arbitrary config text."""
-    for secret in secrets:
-        if len(secret) >= _MIN_SECRET_LENGTH:
-            text = text.replace(secret, "********")
-        # A multi-line note may be rendered as a quoted or folded scalar.
-        # Redact each substantive line as a backstop when the key-based pass
-        # cannot see through the YAML quoting.
-        if "\n" in secret:
-            for line in secret.splitlines():
-                part = line.strip()
-                if len(part) >= _MIN_SECRET_LENGTH:
-                    text = text.replace(part, "********")
-    return text
 
 
 def _redact_yaml(text: str, config: Config) -> str:
@@ -110,7 +47,7 @@ def _redact_yaml(text: str, config: Config) -> str:
             key = match.group("key")
             name = _key_name(key)
             rest = match.group("rest")
-            if name.lower() == "note" or _sensitive_key(name):
+            if name.lower() == "note" or is_sensitive_key(name):
                 stripped = rest.strip()
                 if stripped.startswith(("|", ">")):
                     indent = len(match.group("indent"))
@@ -140,7 +77,7 @@ def _redact_yaml(text: str, config: Config) -> str:
     redacted = "\n".join(output)
     if text.endswith("\n"):
         redacted += "\n"
-    return _redact_values(redacted, _collect_secret_values(config))
+    return redact_values(redacted, collect_secret_values(config))
 
 
 def _stdin_is_tty() -> bool:

@@ -4,6 +4,7 @@ import click
 
 from sink.actions import Actions
 from sink.cli import CONTEXT_SETTINGS, AppCommand, cli
+from sink.redaction import collect_secret_values
 from sink.runtime import Runtime
 
 
@@ -11,9 +12,18 @@ from sink.runtime import Runtime
 @click.argument("server")
 @click.argument("action_name", required=False)
 @click.option("--real", "-r", is_flag=True)
+@click.option(
+    "--show-commands",
+    is_flag=True,
+    help="Show action commands; they may contain secrets.",
+)
 @click.pass_obj
 def action(
-    rt: Runtime, server: str, action_name: str | None, real: bool
+    rt: Runtime,
+    server: str,
+    action_name: str | None,
+    real: bool,
+    show_commands: bool,
 ) -> None:
     """Run a pre defined command on the server.
 
@@ -35,11 +45,14 @@ def action(
     will be listed.
     """
     cfg = rt.config
+    secrets = collect_secret_values(cfg)
     if server == "local":
-        actions = Actions(cfg.project, None, real)
+        actions = Actions(cfg.project, None, real, secrets=secrets)
     else:
-        actions = Actions(cfg.project, cfg.server(server), real)
+        actions = Actions(
+            cfg.project, cfg.server(server), real, secrets=secrets
+        )
     if action_name:
         actions.run(action_name)
     else:
-        actions.list_actions()
+        actions.list_actions(show_commands=show_commands)
