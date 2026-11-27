@@ -103,6 +103,11 @@ enforces strict host keys but keeps the session interactive. Set
 changed host key stops the command—verify the fingerprint before updating
 the file.
 
+A configured key must exist. Dry-run warns and renders the command without
+`-i`; real mode exits non-zero and does not run the command. Sink never falls
+back to the agent or default identities implicitly. Set `key: agent` to use
+the SSH agent deliberately.
+
 ## Credentials
 
 `sink info` prints a redacted view of the config by default: passwords,

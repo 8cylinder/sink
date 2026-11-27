@@ -62,6 +62,10 @@ servers:
 enforces strict host keys. Seed a dedicated known-hosts file out of band
 before the first connection; a changed key stops the command.
 
+A configured `ssh.key` must exist. Dry-run prints a warning and renders the
+command without `-i`; real mode exits non-zero instead of falling back to the
+agent or a default identity. Set `key: agent` to use the SSH agent explicitly.
+
 Extra keys are allowed. Sink ignores them during normal commands so a
 `sink.yaml` can hold unrelated project data; `sink check` lists them as
 unknown-key warnings to catch misspellings.

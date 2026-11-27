@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from sink.errors import CommandError
 from sink.shell import (
     Argv,
     Pipeline,
@@ -89,6 +92,21 @@ def test_print_only_does_not_spawn(tmp_path: Path) -> None:
     result = run(command, real=True, capture=True)
     assert result.ok
     assert marker.exists()
+
+
+def test_identity_error_blocks_real_execution(tmp_path: Path) -> None:
+    marker = tmp_path / "ran"
+    command = Argv(
+        ("touch", str(marker)),
+        identity_error="ssh key does not exist",
+    )
+
+    with pytest.raises(CommandError):
+        run(command, real=True)
+
+    assert not marker.exists()
+    dry = run(command, real=False)
+    assert dry.ok
 
 
 def test_pipeline_executes_the_rendered_stages() -> None:

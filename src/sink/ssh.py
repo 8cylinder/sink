@@ -48,13 +48,21 @@ class SSH:
         """Upload one file with scp."""
         remote = f"{self.ssh.username}@{self.ssh.server}"
         argv = scp_argv(self.ssh, str(localfile), remote)
-        run(Argv(argv), real=self.real, capture=False)
+        run(
+            Argv(argv, identity_error=self.ssh.key_error),
+            real=self.real,
+            capture=False,
+        )
 
     def scp_pull(self, remotefile: str | Path, dest: str | Path) -> None:
         """Download one file with scp."""
         remote = f"{self.ssh.username}@{self.ssh.server}:{remotefile}"
         argv = scp_argv(self.ssh, remote, str(dest))
-        run(Argv(argv), real=self.real, capture=False)
+        run(
+            Argv(argv, identity_error=self.ssh.key_error),
+            real=self.real,
+            capture=False,
+        )
 
     def run(self, remote_cmd: str) -> str:
         """Run a remote shell fragment and return its output."""

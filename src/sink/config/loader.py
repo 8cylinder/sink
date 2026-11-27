@@ -358,8 +358,17 @@ def _ssh_configs(
             unknown_keys,
         )
         key = _string(raw.get("key"), path, f"{item_where}.key")
-        if key:
+        key_error = None
+        if key == "agent":
+            # Explicit opt-in to the SSH agent instead of a dedicated key.
+            key = None
+        elif key:
+            configured_key = key
             key = _resolve_key(key, path, project, warnings, item_where)
+            if key is None:
+                key_error = (
+                    f"ssh key does not exist: {configured_key} ({item_where})"
+                )
         known_hosts = _string(
             raw.get("known_hosts"), path, f"{item_where}.known_hosts"
         )
@@ -378,6 +387,7 @@ def _ssh_configs(
                 ),
                 server=_string(raw.get("server"), path, f"{item_where}.server"),
                 key=key,
+                key_error=key_error,
                 known_hosts=known_hosts,
                 port=_optional_int(raw.get("port"), path, f"{item_where}.port"),
                 note=_string(raw.get("note"), path, f"{item_where}.note"),

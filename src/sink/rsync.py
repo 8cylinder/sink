@@ -586,6 +586,7 @@ class Transfer:
         return Argv(
             tuple(argv),
             dry_run_flag="--dry-run" if native_dry_run else None,
+            identity_error=ssh.key_error,
         )
 
     def run(

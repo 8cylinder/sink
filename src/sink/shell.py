@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
 
+from sink.errors import CommandError
 from sink.ui import ui
 
 
@@ -71,6 +72,7 @@ class Argv:
 
     argv: tuple[str, ...]
     dry_run_flag: str | None = None
+    identity_error: str | None = None
 
     def __post_init__(self) -> None:
         if not self.argv:
@@ -122,6 +124,7 @@ class RemoteCommand:
 
     ssh_argv: tuple[str, ...]
     fragment: str
+    identity_error: str | None = None
 
     def argv_for(self, real: bool) -> tuple[str, ...]:
         """Append the remote fragment as one ssh argument."""
@@ -400,6 +403,9 @@ def run(
     """Print *command* and run the variant that belongs to this mode."""
     if quiet < 1:
         ui.display_cmd(command.render(real))
+    identity_error = getattr(command, "identity_error", None)
+    if real and identity_error:
+        raise CommandError(identity_error)
     if not command.can_execute(real):
         return Result(returncode=0)
     return command.execute(
@@ -501,6 +507,7 @@ def remote_command(
             compress=compress,
         ),
         fragment=fragment,
+        identity_error=getattr(ssh, "key_error", None),
     )
 
 

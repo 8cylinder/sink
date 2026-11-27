@@ -107,7 +107,10 @@ Every non-interactive SSH path uses `StrictHostKeyChecking=yes` and
 Interactive `sink ssh` also enforces strict host keys. Set
 `ssh.known_hosts` to a dedicated file seeded out of band if you do not want
 to rely on the default `~/.ssh/known_hosts`. A changed host key stops the
-command; verify the new fingerprint before updating the file.
+command; verify the new fingerprint before updating the file. A configured
+key must exist: dry-run warns and renders without `-i`, real mode exits
+non-zero, and Sink never falls back to the agent implicitly. Set `key: agent`
+to opt into the SSH agent explicitly.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Extra keys are allowed and ignored by normal commands; `sink check`

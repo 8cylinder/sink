@@ -34,7 +34,9 @@ user, world-writable, or outside the detected repository unless
 All non-interactive SSH paths enforce `StrictHostKeyChecking=yes` and
 `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
 Interactive `sink ssh` also enforces strict host keys. Set
-`ssh.known_hosts` to a dedicated file seeded out of band.
+`ssh.known_hosts` to a dedicated file seeded out of band. A configured key
+must exist; real mode fails instead of falling back to the agent. Set
+`key: agent` to opt into agent identities explicitly.
 
 ## Secret handling
 

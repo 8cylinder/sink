@@ -51,6 +51,10 @@
   `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
   Interactive `sink ssh` also enforces strict host keys. Added optional
   `ssh.known_hosts` for a dedicated known-hosts file.
+- A configured SSH key that does not exist now fails in real mode instead of
+  silently falling back to the agent or default identities. Dry-run still
+  renders the command with a warning. Set `key: agent` to use the SSH agent
+  explicitly.
 - `sink check` now exits non-zero when any probe fails, including under
   `-qq`. Use `--allow-failures` for the old exit-0 behavior. `--json` emits a
   machine-readable probe summary.

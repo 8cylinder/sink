@@ -31,6 +31,7 @@ class SSHConfig:
     password: str | None = None
     server: str | None = None
     key: str | None = None
+    key_error: str | None = None
     known_hosts: str | None = None
     port: int | None = None
     note: str | None = None
