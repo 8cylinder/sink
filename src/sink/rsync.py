@@ -372,6 +372,7 @@ class Transfer:
 
             if difftool:
                 command = self._difftool_command(tmp_file_fixed, local_file)
+                ui.warn(f"configured difftool: {self.project.difftool}")
                 result = run(command, real=self.real, capture=False)
                 if self.real and result.returncode:
                     raise TransferError(
@@ -483,6 +484,8 @@ class Transfer:
             ui.error(f"Server has no ssh settings ({server.name}).")
         ssh = server.ssh[0]
         rsyncb = self.project.rsync_binary
+        if rsyncb != "rsync":
+            ui.warn(f"configured rsync binary: {rsyncb}")
 
         argv = [rsyncb]
 

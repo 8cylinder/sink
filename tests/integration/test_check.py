@@ -28,6 +28,20 @@ def test_check_reports_real_success(live_project) -> None:
     assert project.sandbox.credentials_files() == []
 
 
+def test_check_refuses_an_untrusted_config(live_project) -> None:
+    project = live_project()
+    (project.path / "sink.yaml").chmod(0o666)
+
+    refused = project.invoke("check", "dev")
+
+    assert refused.exit_code != 0, combined(refused)
+    assert "--trust-config" in combined(refused)
+
+    trusted = project.invoke("check", "dev", "--trust-config")
+
+    assert trusted.exit_code == 0, combined(trusted)
+
+
 def test_check_reports_a_bad_mysql_password(live_project) -> None:
     project = live_project(mysql_password="wrong-password")  # noqa: S106
 

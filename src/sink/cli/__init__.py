@@ -49,10 +49,15 @@ def _version() -> str:
 def _config_callback(
     ctx: click.Context, _param: click.Parameter, value: bool
 ) -> None:
-    """Print the discovered config path and exit."""
+    """Print the resolved config path and exit."""
     if not value or ctx.resilient_parsing:
         return
-    path = Runtime.discover_config(Path.cwd())
+    explicit = ctx.params.get("config_file")
+    path = (
+        Path(explicit).resolve()
+        if explicit is not None
+        else Runtime.discover_config(Path.cwd())
+    )
     if path is None:
         raise click.ClickException(
             "You are not in a project. A sink.yaml file was not found "
@@ -117,6 +122,12 @@ def _completions_callback(
     help="Print the discovered sink.yaml path and exit.",
 )
 @click.option(
+    "--config-file",
+    type=click.Path(path_type=Path, dir_okay=False, exists=True),
+    is_eager=True,
+    help="Load this sink.yaml instead of discovering one.",
+)
+@click.option(
     "--completions",
     is_flag=True,
     is_eager=True,
@@ -133,6 +144,7 @@ def cli(
     silent: bool,
     verbose: int,
     color: str,
+    config_file: Path | None,
 ) -> None:
     """🐙 Tools to manage projects.
 
@@ -150,9 +162,11 @@ def cli(
     if verbose:
         configure_logging(verbose)
     if ctx.obj is None:
-        ctx.obj = Runtime.create(quiet=effective_quiet)
+        ctx.obj = Runtime.create(quiet=effective_quiet, config_file=config_file)
     else:
         ctx.obj.quiet = max(ctx.obj.quiet, effective_quiet)
+        if config_file is not None:
+            ctx.obj.config_file = config_file
 
 
 def main() -> int:

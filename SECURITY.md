@@ -15,6 +15,22 @@ Do not open a public issue for a vulnerability. Include the affected version,
 a minimal reproduction, and any relevant configuration. Please do not include
 real passwords, private keys, or production host details.
 
+## Trust model
+
+`sink.yaml` is executable code and trusted credential material. It selects
+the SSH host and identity, MySQL host, URL targets, child-process binary,
+diff tool, and action commands. Anyone who can write the config, or place one
+in a discovered parent directory, can cause code execution or credential
+exfiltration in the operator's context. Review the config before running
+commands and keep it in a trusted repository with restricted write access.
+
+Implicit discovery stops at the nearest `.git` root, or after three parents
+when there is no repository, and never crosses into `$HOME`, the system
+temporary directory, or `/`. Use `--config-file PATH` for an explicit path.
+`sink check` prints the resolved path and refuses a config owned by another
+user, world-writable, or outside the detected repository unless
+`--trust-config` is passed. Other commands warn but do not block.
+
 ## Secret handling
 
 Sink never renders database passwords into commands. Local clients use a

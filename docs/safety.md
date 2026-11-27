@@ -77,6 +77,21 @@ the root are transferred, and a symlink loop is reported as unresolvable.
 Pulls cannot pre-scan the remote, so they rely on `--safe-links` to ignore
 escaping remote links.
 
+## Configuration trust
+
+`sink.yaml` is executable code and credential material. It can select the
+SSH and MySQL hosts, identities, URL targets, rsync binary, diff tool, and
+action commands. Implicit discovery stops at the nearest `.git` root, or
+after three parents when there is no repository, and never crosses into
+`$HOME`, the system temporary directory, or `/`. Use `--config-file PATH` for
+an explicit config.
+
+`sink check` prints the resolved path and refuses a config owned by another
+user, world-writable, or outside the detected repository unless
+`--trust-config` is passed. Other commands print a warning but do not block.
+A configured non-default `rsync_binary` or `difftool` is announced before it
+is used, and configured actions print the command before execution.
+
 ## Credentials
 
 `sink info` prints a redacted view of the config by default: passwords,

@@ -31,6 +31,15 @@
   missing `pulls_dir` with `0700` and refuses a group- or world-accessible
   directory. Local MySQL clients use a private `0600` defaults file instead
   of `MYSQL_PWD`, which is no longer exported to any pipeline stage.
+- Config discovery now stops at the nearest `.git` root, or after three
+  parents when there is no repository, and never crosses `$HOME`, the system
+  temporary directory, or `/`. Added `--config-file PATH` for an explicit
+  config.
+- `sink check` prints the resolved config path and refuses a config owned by
+  another user, world-writable, or outside the repository unless
+  `--trust-config` is passed. Other commands warn but do not block.
+  Configured `rsync_binary`, `difftool`, and action commands are announced
+  before use.
 
 ### Fixed
 

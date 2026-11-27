@@ -45,6 +45,8 @@ class Actions:
             self.list_actions()
             raise CommandError(f'"{command_name}" command not found') from None
 
+        ui.warn(f'configured action "{command_name}" will run: {cmd}')
+
         if self.server is None:
             argv = tuple(shlex.split(cmd))
             if not argv:

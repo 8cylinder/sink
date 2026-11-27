@@ -104,6 +104,20 @@ error. Extra keys are allowed and ignored by normal commands; `sink check`
 reports them as warnings so misspelled Sink keys are still visible. Secrets are redacted from `misc api` and `misc settings` unless
 `--show-secrets` is passed.
 
+## Configuration trust
+
+`sink.yaml` is executable code and credential material. It chooses SSH and
+MySQL hosts, identities, URL targets, the rsync binary, the diff tool, and
+action commands. Review it before running commands, keep it in a trusted
+repository, and restrict write access.
+
+Discovery stops at the nearest `.git` root, or after three parents when there
+is no repository, and never walks into `$HOME`, the system temporary
+directory, or `/`. Use `--config-file PATH` for a config outside that
+boundary. `sink check` prints the resolved path and refuses an untrusted
+config (another owner, world-writable, or outside the repository) unless
+`--trust-config` is passed. Other commands warn but do not block.
+
 ## Command overview
 
 | Command | Purpose |

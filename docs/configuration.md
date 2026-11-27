@@ -1,7 +1,17 @@
 # Configuration
 
-Sink reads `sink.yaml` from the current directory or the nearest parent.
-Use `sink --config` to print the discovered absolute path.
+Sink reads `sink.yaml` from the current directory or a bounded parent.
+Discovery stops at the nearest `.git` root, or after three parents when there
+is no repository, and never crosses into `$HOME`, the system temporary
+directory, or `/`. Use `--config-file PATH` to load an explicit file.
+`sink --config` prints the resolved absolute path.
+
+`sink.yaml` is executable code and credential material. It selects SSH and
+MySQL hosts, identities, URL targets, the rsync binary, the diff tool, and
+action commands. Review it before running commands. `sink check` prints the
+resolved path and refuses a config owned by another user, world-writable, or
+outside the detected repository unless `--trust-config` is passed. Other
+commands warn but do not block.
 
 ```console
 sink misc init > sink.yaml

@@ -2,19 +2,27 @@ Usage: sink [OPTIONS] COMMAND [ARGS]...
 
   🐙 Tools to manage projects.
 
-  [red]Use[/] `sink COMMAND -h` for help on specific commands.
+  Use `sink COMMAND -h` for help on specific commands.
 
 Options:
-  -s, --suppress-commands  Don't display the bash commands used.
-  --version                Show the version and exit.
-  -h, --help               Show this message and exit.
+  -q, --quiet                  Hide rendered commands; -qq hides all output.
+  -s, --suppress-commands      Alias for -q: do not display shell commands.
+  --silent                     Alias for -qq: emit only the exit code.
+  -v, --verbose                Increase diagnostics.
+  --color [auto|always|never]  Color output: auto, always, or never.
+  --config                     Print the discovered sink.yaml path and exit.
+  --config-file FILE           Load this sink.yaml instead of discovering one.
+  --completions                Write static bash completions and print their
+                               path.
+  --version                    Show the version and exit.
+  -h, --help                   Show this message and exit.
 
 Commands:
-  db      Overwrite a db with a gzipped sql file.
-  file    Send files to and fro.
-  ssh     SSH into a server.
-  diff    Diff a local and remote file.
-  info    View or edit the config file.
-  check   Test server settings in config.
   action  Run a pre defined command on the server.
+  check   Test server settings in config.
+  db      Overwrite a db with a gzipped sql file.
+  diff    Diff a local and remote file.
+  file    Send files to and fro.
+  info    View or edit the config file.
   misc    [Group] Misc stuff.
+  ssh     SSH into a server.

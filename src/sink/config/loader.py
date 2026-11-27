@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -95,14 +96,49 @@ URL_KEYS = {
 }
 ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
+# Implicit discovery stops at a repository root, or after this many parents
+# when there is no repository.  It never walks into the home directory, the
+# system temporary directory, or the filesystem root from below.
+MAX_PARENT_DEPTH = 3
+
+
+def _stop_directories() -> set[Path]:
+    """Return directories that implicit config discovery must not enter."""
+    return {
+        Path.home().resolve(),
+        Path(tempfile.gettempdir()).resolve(),
+        Path("/"),
+    }
+
+
+def find_repo_root(start: Path) -> Path | None:
+    """Return the nearest directory containing ``.git``, if any."""
+    start = start.resolve()
+    stops = _stop_directories()
+    for directory in (start, *start.parents):
+        if directory != start and directory in stops:
+            break
+        if (directory / ".git").exists():
+            return directory
+    return None
+
 
 def find_config(start: Path) -> Path | None:
-    """Walk up from ``start`` to find ``sink.yaml``."""
+    """Find ``sink.yaml`` within the project or repository boundary."""
     start = start.resolve()
-    for directory in (start, *start.parents):
+    stops = _stop_directories()
+    repo = find_repo_root(start)
+    for depth, directory in enumerate((start, *start.parents)):
+        if depth and directory in stops:
+            break
         candidate = directory / "sink.yaml"
         if candidate.is_file():
             return candidate
+        if repo is not None:
+            if directory == repo:
+                break
+        elif depth >= MAX_PARENT_DEPTH:
+            break
     return None
 
 

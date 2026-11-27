@@ -3,5 +3,7 @@ Usage: sink check [OPTIONS] [SERVER_NAMES]...
   Test server settings in config.
 
 Options:
-  -r, --required
+  -R, --required
+  --insecure      Do not verify TLS certificates.
+  --trust-config  Run probes even if the config is untrusted.
   -h, --help      Show this message and exit.

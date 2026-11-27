@@ -1,3 +1,5 @@
+Config: <CONFIG_DIR>/sink.yaml
+
 Local dirs
 [✓] pulls_dir: <CONFIG_DIR>/pulls
 [✓] rsync_binary: <CONFIG_DIR>/bin/rsync
