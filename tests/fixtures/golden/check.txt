@@ -12,7 +12,7 @@ dev
 [✓] ssh login good (deploy).
 + ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'cd /var/www/demo'
 [✓] root dir exists.
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; cat > /tmp/<CREDS_FILE>'
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -f /tmp/<CREDS_FILE>'"'"' EXIT; mysql --defaults-file=/tmp/<CREDS_FILE> demo --execute=exit;'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'umask 077; mkdir -m 700 /tmp/<CREDS_DIR> && set -C && cat > /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'trap '"'"'rm -rf /tmp/<CREDS_DIR>'"'"' EXIT; mysql --defaults-file=/tmp/<CREDS_FILE> demo --execute=exit;'
 [✓] DB(demo) as dbuser: mysql username, password and db are good.
-+ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'rm -f /tmp/<CREDS_FILE>'
++ ssh -T -p 2222 -i <CONFIG_DIR>/id_rsa -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 deploy@example.com 'rm -rf /tmp/<CREDS_DIR>'

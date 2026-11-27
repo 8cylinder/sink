@@ -213,6 +213,10 @@ MySQL client; for remote commands those paths are on the server. Use
 is deprecated. Sink writes a complete `--defaults-file`, so ambient
 `~/.my.cnf` and `/etc/my.cnf` cannot alter the connection.
 
+Remote database credentials are written into a private `0700` directory
+under the remote temporary directory and removed by an `EXIT` trap. Option
+values containing NUL, CR, or LF are rejected.
+
 ## Completions
 
 ```console

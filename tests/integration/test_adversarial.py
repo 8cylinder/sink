@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from helpers import combined
 
@@ -122,6 +124,43 @@ def test_db_pull_tag_cannot_escape_the_pulls_directory(live_project) -> None:
     assert not (project.path / "escape.sql.gz").exists()
     assert not (project.path.parent / "escape.sql.gz").exists()
     assert not list((project.path / "pulls").glob("*escape*"))
+
+
+def test_remote_credentials_do_not_follow_a_precreated_symlink(
+    live_project, monkeypatch
+) -> None:
+    project = live_project()
+    token = uuid.uuid4().hex
+    attacker = f"/tmp/sink-cred-{token}"  # noqa: S108 - test path
+    credential_dir = f"/tmp/sink-mysql-{token}"  # noqa: S108 - test path
+    project.sandbox.exec("server", "mkdir", "-m", "700", attacker)
+    project.sandbox.exec(
+        "server", "ln", "-s", attacker, credential_dir, user="deploy"
+    )
+
+    class FixedUUID:
+        """A deterministic UUID for the credential path."""
+
+        hex = token
+
+    monkeypatch.setattr("sink.credentials.uuid.uuid4", lambda: FixedUUID())
+    try:
+        result = project.invoke("db", "pull", "dev", "--real")
+
+        assert result.exit_code != 0, combined(result)
+        leaked = project.sandbox.exec(
+            "server", "find", attacker, "-type", "f", "-print"
+        ).stdout
+        assert leaked.strip() == ""
+    finally:
+        project.sandbox.exec(
+            "server",
+            "rm",
+            "-rf",
+            attacker,
+            credential_dir,
+            check=False,
+        )
 
 
 def test_database_password_is_never_rendered(live_project) -> None:

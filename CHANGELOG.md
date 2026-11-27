@@ -53,6 +53,10 @@
 - The rsync `--rsh` value is now built with `shlex.join`, so key and
   known-hosts paths containing spaces or shell metacharacters round-trip
   without becoming extra SSH options.
+- Remote MySQL credentials are staged in a private `0700` directory with a
+  noclobber write, not a predictable file in `/tmp`. The directory is removed
+  by the EXIT trap and fallback cleanup. NUL, CR, and LF in option values are
+  rejected.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

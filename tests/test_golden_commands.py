@@ -36,7 +36,8 @@ def normalize(text: str, project) -> str:
     text = re.sub(
         r"sink-mysql-local-[^/\s]+/client\.cnf", "<LOCAL_CREDS_FILE>", text
     )
-    text = re.sub(r"sink-mysql-[0-9a-f]+\.cnf", "<CREDS_FILE>", text)
+    text = re.sub(r"sink-mysql-[0-9a-f]+/client\.cnf", "<CREDS_FILE>", text)
+    text = re.sub(r"sink-mysql-[0-9a-f]+", "<CREDS_DIR>", text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
     return "\n".join(lines).strip("\n") + "\n"
 

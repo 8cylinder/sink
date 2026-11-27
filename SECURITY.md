@@ -42,8 +42,9 @@ must exist; real mode fails instead of falling back to the agent. Set
 
 Sink never renders database passwords into commands. Local clients use a
 `0600` defaults file in a private temporary directory; remote clients use a
-temporary remote credentials file written over ssh stdin. `MYSQL_PWD` is not
-exported. Remote MySQL hosts default to `--ssl-mode=VERIFY_IDENTITY`; set
+temporary remote credentials file written into a private `0700` directory
+over ssh stdin. Option values containing NUL, CR, or LF are rejected.
+`MYSQL_PWD` is not exported. Remote MySQL hosts default to `--ssl-mode=VERIFY_IDENTITY`; set
 `ssl_ca`/`ssl_cert`/`ssl_key` for a private CA or client certificate. Sink
 passes a complete `--defaults-file` so ambient option files cannot override
 the connection. `skip_secure_auth` is deprecated. `misc api`, `misc settings`,

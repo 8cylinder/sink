@@ -161,8 +161,11 @@ def test_credentials_edges() -> None:
     assert "password" not in credentials.content
     assert "port=3306" in credentials.content
     assert credentials.option.startswith("--defaults-file=")
-    assert "cat >" in credentials.stage_command().render(False)
-    assert "rm -f" in credentials.cleanup_command().render(False)
+    stage = credentials.stage_command().render(False)
+    assert "mkdir -m 700" in stage
+    assert "set -C" in stage
+    assert "cat >" in stage
+    assert "rm -rf" in credentials.cleanup_command().render(False)
 
     password = "p"  # noqa: S105 - test fixture
     with remote_mysql_credentials(ssh, password=password, real=False):
@@ -192,7 +195,7 @@ def test_credentials_trap_removes_the_file_on_exit() -> None:
     guarded = credentials.trap_command("mysqldump demo")
 
     assert guarded.startswith("trap ")
-    assert "rm -f " in guarded
+    assert "rm -rf " in guarded
     assert guarded.endswith("mysqldump demo")
 
 

@@ -36,6 +36,10 @@ def _option_value(value: object) -> str:
     so the option-file parser receives the original value.
     """
     text = str(value)
+    if any(character in text for character in ("\x00", "\n", "\r")):
+        raise CommandError(
+            "MySQL option values must not contain NUL, CR, or LF"
+        )
     escaped = text.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
@@ -91,7 +95,9 @@ class RemoteCredentials:
     skip_secure_auth: str | bool | None = None
     path: str = field(
         default_factory=lambda: str(
-            Path(tempfile.gettempdir()) / f"sink-mysql-{uuid.uuid4().hex}.cnf"
+            Path(tempfile.gettempdir())
+            / f"sink-mysql-{uuid.uuid4().hex}"
+            / "client.cnf"
         )
     )
 
@@ -111,31 +117,38 @@ class RemoteCredentials:
         )
 
     @property
+    def directory(self) -> Path:
+        """Return the private remote credential directory."""
+        return Path(self.path).parent
+
+    @property
     def option(self) -> str:
         """Return the mysql defaults-file option."""
         return f"--defaults-file={self.path}"
 
     def stage_command(self) -> RemoteCommand:
-        """Return the command that writes the file over ssh."""
+        """Return the command that creates the private credential file."""
+        directory = shlex.quote(str(self.directory))
+        path = shlex.quote(self.path)
         return remote_command(
             self.ssh,
-            f"umask 077; cat > {shlex.quote(self.path)}",
+            f"umask 077; mkdir -m 700 {directory} && set -C && cat > {path}",
             batch=True,
             timeout=DEFAULT_TIMEOUT,
         )
 
     def cleanup_command(self) -> RemoteCommand:
-        """Return the command that removes the remote file."""
+        """Return the command that removes the remote directory."""
         return remote_command(
             self.ssh,
-            f"rm -f {shlex.quote(self.path)}",
+            f"rm -rf {shlex.quote(str(self.directory))}",
             batch=True,
             timeout=DEFAULT_TIMEOUT,
         )
 
     def trap_command(self, fragment: str) -> str:
-        """Wrap a remote fragment with an EXIT trap for the credentials file."""
-        cleanup = f"rm -f {shlex.quote(self.path)}"
+        """Wrap a remote fragment with an EXIT trap for the directory."""
+        cleanup = f"rm -rf {shlex.quote(str(self.directory))}"
         return f"trap {shlex.quote(cleanup)} EXIT; {fragment}"
 
 

@@ -176,7 +176,7 @@ class Sandbox:
             "server",
             "sh",
             "-c",
-            "ls /tmp/sink-mysql-*.cnf 2>/dev/null || true",
+            "ls -d /tmp/sink-mysql-* 2>/dev/null || true",
         )
         return [line for line in result.stdout.splitlines() if line.strip()]
 
