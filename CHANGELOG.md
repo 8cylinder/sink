@@ -61,6 +61,8 @@
   `misc api`, `misc settings`, and `info`. URL userinfo and sensitive query
   parameters are masked. Action listings hide commands by default;
   `--show-commands` displays them with a warning.
+- `misc init` validates server names and refuses names that could break or
+  inject YAML, plus duplicates. Generated keys are YAML-safe.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

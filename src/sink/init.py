@@ -1,5 +1,28 @@
 """Generate a starter ``sink.yaml`` document."""
 
+import json
+import re
+
+from sink.errors import CommandError
+
+_SERVER_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
+
+
+def _validate_name(name: str) -> None:
+    """Reject a server name that is not a safe YAML key."""
+    if name in {".", ".."} or _SERVER_NAME.fullmatch(name) is None:
+        raise CommandError(
+            f"Invalid server name {name!r}: use letters, digits, dot, dash, "
+            "or underscore, starting with a letter, digit, or underscore"
+        )
+
+
+def _yaml_key(name: str) -> str:
+    """Return a server name as a safe YAML key."""
+    if _SERVER_NAME.fullmatch(name) is not None:
+        return name
+    return json.dumps(name)
+
 
 class Init:
     """Build the starter YAML template."""
@@ -8,7 +31,13 @@ class Init:
         self.server_names = None
 
     def servers(self, names: tuple[str, ...]) -> None:
-        """Set the server names to include."""
+        """Validate and set the server names to include."""
+        seen: set[str] = set()
+        for name in names:
+            _validate_name(name)
+            if name in seen:
+                raise CommandError(f"Duplicate server name: {name}")
+            seen.add(name)
         self.server_names = names
 
     def create(self) -> str:
@@ -61,12 +90,16 @@ class Init:
 
           servers:"""
         if not self.server_names:
-            self.server_names = ["example_server"]
-        for server in self.server_names:
+            self.server_names = ("example_server",)
+        names = tuple(self.server_names)
+        for name in names:
+            _validate_name(name)
+        for server in names:
+            key = _yaml_key(server)
             blank_config = (
                 blank_config
                 + f"""
-            {server}:
+            {key}:
               # Everything below this point should match
               # everything below the project root.
               root:

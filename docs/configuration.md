@@ -18,6 +18,10 @@ sink misc init > sink.yaml
 sink misc init dev stag prod > sink.yaml
 ```
 
+Server names must match `[A-Za-z0-9_][A-Za-z0-9._-]*`. Names with
+whitespace, control characters, colons, `#`, quotes, or a leading dash/dot
+are rejected, and duplicates are refused.
+
 A minimal project:
 
 ```yaml

@@ -57,6 +57,12 @@ sink misc init > sink.yaml
 sink misc init dev stag prod > sink.yaml
 ```
 
+Server names passed to `misc init` must match
+`[A-Za-z0-9_][A-Za-z0-9._-]*`. Names containing whitespace, control
+characters, colons, `#`, quotes, or a leading dash/dot are rejected, and
+duplicate names are refused. The generated YAML is parsed and round-tripped
+by the test suite.
+
 A minimal `sink.yaml`:
 
 ```yaml
@@ -162,7 +168,7 @@ config (another owner, world-writable, or outside the repository) unless
 | `sink misc api` | Read config values as JSON. |
 | `sink misc settings` | Print client connection settings. |
 | `sink misc pack` | Print a command to archive uncommitted files. |
-| `sink misc init` | Print a starter config. |
+| `sink misc init` | Print a starter config; server names are validated. |
 
 See [docs/cli.md](docs/cli.md) or `sink COMMAND -h` for the full reference.
 
