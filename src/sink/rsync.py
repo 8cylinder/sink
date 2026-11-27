@@ -171,6 +171,14 @@ def _stdin_is_tty() -> bool:
     return bool(sys.stdin.isatty())
 
 
+def _safe_pager_env() -> dict[str, str]:
+    """Return an environment without less preprocessor hooks."""
+    env = os.environ.copy()
+    env.pop("LESSOPEN", None)
+    env.pop("LESSCLOSE", None)
+    return env
+
+
 # Rsync ignore owner, group, time, and perms:
 # https://unix.stackexchange.com/q/102211
 class Transfer:
@@ -579,6 +587,8 @@ class Transfer:
                 "--no-pager",
                 "diff",
                 "--color=always",
+                "--no-ext-diff",
+                "--no-textconv",
                 *flags,
                 "--diff-algorithm=minimal",
                 tmp_file_fixed,
@@ -587,10 +597,12 @@ class Transfer:
             stages = [Argv(tuple(argv))]
             # A pager is useful interactively but would hide git's status and
             # block a pipe, so only add it when stdout is a terminal.
+            env: dict[str, str] | None = None
             if sys.stdout.isatty():
                 stages.append(Argv(("less",)))
+                env = _safe_pager_env()
             pipeline = Pipeline(tuple(stages))
-            result = run(pipeline, real=self.real, capture=False)
+            result = run(pipeline, real=self.real, capture=False, env=env)
             if self.real:
                 # git diff uses 0 for "same" and 1 for "different"; values
                 # above 1 are real failures.  Propagate the difference status

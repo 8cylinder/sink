@@ -63,6 +63,12 @@
   `--show-commands` displays them with a warning.
 - `misc init` validates server names and refuses names that could break or
   inject YAML, plus duplicates. Generated keys are YAML-safe.
+- Hardened remaining output and process edges: Rich markup is escaped in
+  status text, `git diff` uses `--no-ext-diff --no-textconv`, the diff pager
+  drops `LESSOPEN`/`LESSCLOSE`, `PATH` with `.`/empty entries warns, recursive
+  YAML aliases are rejected, CI actions are pinned by commit SHA, and the
+  gitleaks download is checksum-verified. `EDITOR`/`VISUAL` is announced
+  before `info --edit`.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

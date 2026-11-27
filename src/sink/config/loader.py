@@ -108,6 +108,7 @@ ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 # when there is no repository.  It never walks into the home directory, the
 # system temporary directory, or the filesystem root from below.
 MAX_PARENT_DEPTH = 3
+MAX_YAML_DEPTH = 100
 
 
 def _stop_directories() -> set[Path]:
@@ -194,12 +195,40 @@ def load(path: Path) -> Config:
     )
 
 
-def _expand_env(value: object, path: Path) -> object:
+def _expand_env(
+    value: object,
+    path: Path,
+    _seen: set[int] | None = None,
+    _depth: int = 0,
+) -> object:
     """Recursively expand ``${NAME}`` references in YAML values."""
+    if _seen is None:
+        _seen = set()
+    if _depth > MAX_YAML_DEPTH:
+        raise ConfigError(f"{path}: YAML nesting is too deep")
     if isinstance(value, Mapping):
-        return {key: _expand_env(item, path) for key, item in value.items()}
+        identity = id(value)
+        if identity in _seen:
+            raise ConfigError(f"{path}: recursive YAML alias")
+        _seen.add(identity)
+        try:
+            return {
+                key: _expand_env(item, path, _seen, _depth + 1)
+                for key, item in value.items()
+            }
+        finally:
+            _seen.remove(identity)
     if isinstance(value, list):
-        return [_expand_env(item, path) for item in value]
+        identity = id(value)
+        if identity in _seen:
+            raise ConfigError(f"{path}: recursive YAML alias")
+        _seen.add(identity)
+        try:
+            return [
+                _expand_env(item, path, _seen, _depth + 1) for item in value
+            ]
+        finally:
+            _seen.remove(identity)
     if not isinstance(value, str):
         return value
 

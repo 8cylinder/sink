@@ -152,7 +152,9 @@ is no repository, and never walks into `$HOME`, the system temporary
 directory, or `/`. Use `--config-file PATH` for a config outside that
 boundary. `sink check` prints the resolved path and refuses an untrusted
 config (another owner, world-writable, or outside the repository) unless
-`--trust-config` is passed. Other commands warn but do not block.
+`--trust-config` is passed. Other commands warn but do not block. Recursive
+YAML aliases are rejected, and a `PATH` containing `.` or an empty entry
+warns.
 
 ## Command overview
 

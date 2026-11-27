@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.text import Text
 
 
@@ -63,7 +64,7 @@ class ui:
         if cls.quiet >= 2:
             yield None
             return
-        with cls.console.status(message) as status:
+        with cls.console.status(escape(message)) as status:
             yield status
 
     @staticmethod

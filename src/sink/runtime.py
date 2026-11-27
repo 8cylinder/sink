@@ -12,6 +12,19 @@ from sink.errors import NotInProject
 from sink.ui import ui
 
 
+def _path_warnings() -> list[str]:
+    """Warn when PATH can resolve a binary from the current directory."""
+    warnings: list[str] = []
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if entry in {"", "."}:
+            warnings.append(
+                "PATH contains an empty entry or '.'; use trusted absolute "
+                "directories"
+            )
+            break
+    return warnings
+
+
 def config_trust(config: Config, cwd: Path) -> tuple[bool, str | None]:
     """Return whether a config is safe to use without explicit consent."""
     path = config.path
@@ -78,6 +91,8 @@ class Runtime:
                 )
             self._config = load(path)
             for warning in self._config.warnings:
+                ui.warn(warning)
+            for warning in _path_warnings():
                 ui.warn(warning)
             trusted, reason = config_trust(self._config, self.cwd)
             if not trusted:

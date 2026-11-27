@@ -29,7 +29,11 @@ when there is no repository, and never crosses into `$HOME`, the system
 temporary directory, or `/`. Use `--config-file PATH` for an explicit path.
 `sink check` prints the resolved path and refuses a config owned by another
 user, world-writable, or outside the detected repository unless
-`--trust-config` is passed. Other commands warn but do not block.
+`--trust-config` is passed. Other commands warn but do not block. Config
+loading rejects recursive YAML aliases and excessive nesting. `git diff`
+disables external diff and textconv drivers, and CI actions are pinned by
+commit SHA with a checksum-verified gitleaks download. Sink warns when `PATH`
+contains an empty entry or `.`.
 
 All non-interactive SSH paths enforce `StrictHostKeyChecking=yes` and
 `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.

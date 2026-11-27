@@ -168,6 +168,16 @@ sensitive query parameters. Action listings show names only by default;
 `--show-commands` displays the commands with a warning that they may contain
 secrets.
 
+## Output and process hardening
+
+Rich status text escapes config-derived markup, so a URL cannot inject
+formatting. `git diff` runs with `--no-ext-diff --no-textconv`, and the
+interactive pager receives an environment without `LESSOPEN` or `LESSCLOSE`.
+An `EDITOR`/`VISUAL` value is announced before `info --edit` uses it. Sink
+warns when `PATH` contains an empty entry or `.`, and recursive YAML aliases
+or excessive nesting are configuration errors. CI actions are pinned by
+commit SHA, and the gitleaks download is checksum-verified.
+
 ## Failure behavior
 
 A database pull writes to `<name>.part`, renames it to the final dump only

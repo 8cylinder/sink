@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -101,6 +102,9 @@ def _confirm_show_secrets(yes: bool) -> None:
 
 def edit_config(path: Path) -> None:
     """Edit and validate the config, offering a retry on YAML errors."""
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
+    if editor:
+        ui.warn(f"Using editor from environment: {editor}")
     click.edit(filename=str(path))
     try:
         with path.open() as stream:
