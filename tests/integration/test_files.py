@@ -2,12 +2,29 @@
 
 from __future__ import annotations
 
+import shutil
 import uuid
 
 import pytest
 from helpers import combined
 
 pytestmark = pytest.mark.integration
+
+
+def test_rsync_accepts_a_key_path_with_spaces(
+    live_project, sandbox, tmp_path
+) -> None:
+    key = tmp_path / "key with space"
+    shutil.copy(sandbox.key, key)
+    key.chmod(0o600)
+    project = live_project(ssh_overrides={"key": str(key)})
+
+    result = project.invoke(
+        "file", "put", "dev", "project/index.html", "--real"
+    )
+
+    assert result.exit_code == 0, combined(result)
+    assert project.remote_read("index.html") == "local index\n"
 
 
 def test_rsync_rejects_an_unknown_host_key(

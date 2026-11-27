@@ -50,6 +50,9 @@
 - A whole-project pull now asks before overwriting `project.root` and
   requires `--force` when stdin is not a terminal. Directory pulls continue
   to exclude `sink.yaml`, `.git/`, `.sink/`, env files, keys, and dumps.
+- The rsync `--rsh` value is now built with `shlex.join`, so key and
+  known-hosts paths containing spaces or shell metacharacters round-trip
+  without becoming extra SSH options.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

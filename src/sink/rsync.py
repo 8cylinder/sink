@@ -695,7 +695,7 @@ class Transfer:
         if ssh.known_hosts:
             rsh.extend(["-o", f"UserKnownHostsFile={ssh.known_hosts}"])
             rsh.extend(["-o", "GlobalKnownHostsFile=/dev/null"])
-        argv.extend(["--rsh", " ".join(rsh)])
+        argv.extend(["--rsh", shlex.join(rsh)])
 
         if action == Action.PUT and (server.group or server.user):
             # To have rsync change owner or group, sudo will probably

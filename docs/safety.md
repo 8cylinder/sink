@@ -126,7 +126,8 @@ the file.
 A configured key must exist. Dry-run warns and renders the command without
 `-i`; real mode exits non-zero and does not run the command. Sink never falls
 back to the agent or default identities implicitly. Set `key: agent` to use
-the SSH agent deliberately.
+the SSH agent deliberately. Key and known-hosts paths are quoted when they
+are placed in rsync's `--rsh` string.
 
 ## Credentials
 
