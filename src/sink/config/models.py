@@ -46,8 +46,24 @@ class DatabaseConfig:
     password: str | None = None
     hostname: str | None = None
     port: int | None = 3306
+    ssl_mode: str | None = None
+    ssl_ca: str | None = None
+    ssl_cert: str | None = None
+    ssl_key: str | None = None
     skip_secure_auth: str | bool | None = None
     note: str | None = None
+
+    @property
+    def effective_ssl_mode(self) -> str | None:
+        """Return the configured TLS mode or a safe remote default."""
+        if self.ssl_mode:
+            return self.ssl_mode
+        host = (self.hostname or "").strip().lower()
+        if host in {"", "localhost", "127.0.0.1", "::1"} or host.startswith(
+            "/"
+        ):
+            return None
+        return "VERIFY_IDENTITY"
 
 
 @dataclass(frozen=True, slots=True)

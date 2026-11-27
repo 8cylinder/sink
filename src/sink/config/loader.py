@@ -83,9 +83,16 @@ DATABASE_KEYS = {
     "password",
     "hostname",
     "port",
+    "ssl_mode",
+    "ssl_ca",
+    "ssl_cert",
+    "ssl_key",
     "skip_secure_auth",
     "note",
 }
+SSL_MODES = frozenset(
+    {"DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY"}
+)
 URL_KEYS = {
     "url",
     "admin_url",
@@ -300,6 +307,12 @@ def _server(
         unknown_keys,
         f"servers.{name}",
     )
+    for index, database in enumerate(databases):
+        if database.skip_secure_auth:
+            warnings.append(
+                f"{where}.mysql[{index}].skip_secure_auth is deprecated; "
+                "use a modern MySQL account and TLS"
+            )
     urls = _urls(
         data.get("urls"),
         path,
@@ -420,6 +433,14 @@ def _databases(
             f"{unknown_location}.mysql[{index}]",
             unknown_keys,
         )
+        ssl_mode = _string(raw.get("ssl_mode"), path, f"{item_where}.ssl_mode")
+        if ssl_mode:
+            ssl_mode = ssl_mode.upper()
+            if ssl_mode not in SSL_MODES:
+                raise ConfigError(
+                    f"{path}: {item_where}.ssl_mode must be one of "
+                    f"{', '.join(sorted(SSL_MODES))}"
+                )
         databases.append(
             DatabaseConfig(
                 db=_string(raw.get("db"), path, f"{item_where}.db"),
@@ -434,6 +455,14 @@ def _databases(
                 ),
                 port=_optional_int(
                     raw.get("port"), path, f"{item_where}.port", 3306
+                ),
+                ssl_mode=ssl_mode,
+                ssl_ca=_string(raw.get("ssl_ca"), path, f"{item_where}.ssl_ca"),
+                ssl_cert=_string(
+                    raw.get("ssl_cert"), path, f"{item_where}.ssl_cert"
+                ),
+                ssl_key=_string(
+                    raw.get("ssl_key"), path, f"{item_where}.ssl_key"
                 ),
                 skip_secure_auth=raw.get("skip_secure_auth"),
                 note=_string(raw.get("note"), path, f"{item_where}.note"),

@@ -85,6 +85,10 @@ servers:
         password: ${DATABASE_PASSWORD}
         db: example
         hostname: localhost
+        # Remote hosts default to VERIFY_IDENTITY. Set ssl_ca, and optionally
+        # ssl_cert/ssl_key, for a private CA or client certificate.
+        # ssl_mode: VERIFY_IDENTITY
+        # ssl_ca: /etc/mysql/ca.pem
 ```
 
 Directory transfers exclude secret material by default: `sink.yaml`,
@@ -188,6 +192,13 @@ and refuses a group- or world-accessible directory. Dumps are written to a
 interrupted, or startup-failed pull leaves no final dump or `.part` and does
 not update `LATEST-*`. Local MySQL clients use a `0600` defaults file in a
 private temporary directory; Sink does not export `MYSQL_PWD`.
+
+For remote MySQL hosts Sink defaults to `ssl-mode=VERIFY_IDENTITY`. Set
+`ssl_ca` (and optional `ssl_cert`/`ssl_key`) to the paths visible to the
+MySQL client; for remote commands those paths are on the server. Use
+`ssl_mode: DISABLED` only for a trusted local endpoint. `skip_secure_auth`
+is deprecated. Sink writes a complete `--defaults-file`, so ambient
+`~/.my.cnf` and `/etc/my.cnf` cannot alter the connection.
 
 ## Completions
 

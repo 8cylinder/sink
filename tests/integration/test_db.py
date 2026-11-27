@@ -116,6 +116,7 @@ def test_db_pull_uses_the_first_database_entry(live_project) -> None:
                 "password": "wrong",
                 "db": "demo",
                 "hostname": "db",
+                "ssl_mode": "DISABLED",
             }
         ]
     )

@@ -95,7 +95,7 @@ def test_database_password_is_never_rendered(live_project) -> None:
     assert result.exit_code == 0, combined(result)
     text = combined(result)
     assert project.db_password not in text
-    assert "defaults-extra-file=" in text
+    assert "defaults-file=" in text
 
 
 def test_nested_symlinks_do_not_escape_on_put(live_project) -> None:

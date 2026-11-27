@@ -112,7 +112,7 @@ def test_mamp_pull_uses_local_defaults_file(project_factory) -> None:
     assert result.exit_code == 0, combined(result)
     text = combined(result)
     assert "MYSQL_PWD" not in text
-    assert "--defaults-extra-file=" in text
+    assert "--defaults-file=" in text
     assert "sink-mysql-local-" in text
 
 
@@ -125,5 +125,5 @@ def test_mamp_put_uses_local_defaults_file(project_factory) -> None:
     assert result.exit_code == 0, combined(result)
     text = combined(result)
     assert "MYSQL_PWD" not in text
-    assert "--defaults-extra-file=" in text
+    assert "--defaults-file=" in text
     assert "sink-mysql-local-" in text

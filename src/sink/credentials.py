@@ -2,7 +2,7 @@
 
 The password never appears in a rendered command, argv, or log.  A remote
 credentials file is created with mode 0600 by piping it over ssh stdin, then
-the command points at the file with ``--defaults-extra-file``.  An EXIT trap
+the command points at the file with ``--defaults-file``.  An EXIT trap
 in the command's remote shell removes it even when the command fails or the
 connection drops, and a separate cleanup command remains as a fallback.
 
@@ -46,6 +46,10 @@ def _credentials_content(
     password: str,
     host: str | None,
     port: int | None,
+    ssl_mode: str | None = None,
+    ssl_ca: str | None = None,
+    ssl_cert: str | None = None,
+    ssl_key: str | None = None,
     skip_secure_auth: str | bool | None = None,
 ) -> str:
     """Build a MySQL option-file body."""
@@ -58,6 +62,14 @@ def _credentials_content(
         lines.append(f"host={_option_value(host)}")
     if port:
         lines.append(f"port={port}")
+    if ssl_mode:
+        lines.append(f"ssl-mode={ssl_mode}")
+    if ssl_ca:
+        lines.append(f"ssl-ca={_option_value(ssl_ca)}")
+    if ssl_cert:
+        lines.append(f"ssl-cert={_option_value(ssl_cert)}")
+    if ssl_key:
+        lines.append(f"ssl-key={_option_value(ssl_key)}")
     if skip_secure_auth:
         lines.append("skip-secure-auth")
     return "\n".join(lines) + "\n"
@@ -72,6 +84,11 @@ class RemoteCredentials:
     user: str | None = None
     host: str | None = None
     port: int | None = None
+    ssl_mode: str | None = None
+    ssl_ca: str | None = None
+    ssl_cert: str | None = None
+    ssl_key: str | None = None
+    skip_secure_auth: str | bool | None = None
     path: str = field(
         default_factory=lambda: str(
             Path(tempfile.gettempdir()) / f"sink-mysql-{uuid.uuid4().hex}.cnf"
@@ -86,12 +103,17 @@ class RemoteCredentials:
             password=self.password,
             host=self.host,
             port=self.port,
+            ssl_mode=self.ssl_mode,
+            ssl_ca=self.ssl_ca,
+            ssl_cert=self.ssl_cert,
+            ssl_key=self.ssl_key,
+            skip_secure_auth=self.skip_secure_auth,
         )
 
     @property
     def option(self) -> str:
         """Return the mysql defaults-file option."""
-        return f"--defaults-extra-file={self.path}"
+        return f"--defaults-file={self.path}"
 
     def stage_command(self) -> RemoteCommand:
         """Return the command that writes the file over ssh."""
@@ -126,7 +148,7 @@ class LocalCredentials:
     @property
     def option(self) -> str:
         """Return the mysql defaults-file option."""
-        return f"--defaults-extra-file={self.path}"
+        return f"--defaults-file={self.path}"
 
 
 @contextmanager
@@ -136,6 +158,10 @@ def local_mysql_credentials(
     password: str = "",
     host: str | None = None,
     port: int | None = None,
+    ssl_mode: str | None = None,
+    ssl_ca: str | None = None,
+    ssl_cert: str | None = None,
+    ssl_key: str | None = None,
     skip_secure_auth: str | bool | None = None,
     real: bool,
 ) -> Generator[LocalCredentials]:
@@ -158,6 +184,10 @@ def local_mysql_credentials(
                         password=password,
                         host=host,
                         port=port,
+                        ssl_mode=ssl_mode,
+                        ssl_ca=ssl_ca,
+                        ssl_cert=ssl_cert,
+                        ssl_key=ssl_key,
                         skip_secure_auth=skip_secure_auth,
                     )
                 )
@@ -176,6 +206,11 @@ def remote_mysql_credentials(
     user: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    ssl_mode: str | None = None,
+    ssl_ca: str | None = None,
+    ssl_cert: str | None = None,
+    ssl_key: str | None = None,
+    skip_secure_auth: str | bool | None = None,
     real: bool,
 ) -> Generator[RemoteCredentials]:
     """Stage credentials remotely and always clean them up."""
@@ -185,6 +220,11 @@ def remote_mysql_credentials(
         user=user,
         host=host,
         port=port,
+        ssl_mode=ssl_mode,
+        ssl_ca=ssl_ca,
+        ssl_cert=ssl_cert,
+        ssl_key=ssl_key,
+        skip_secure_auth=skip_secure_auth,
     )
     # The secrets travel on stdin, never in argv.  In dry-run mode this only
     # prints the staging command; real mode writes the 0600 file remotely.

@@ -54,6 +54,10 @@ servers:
         password: ${DATABASE_PASSWORD}
         db: example
         hostname: localhost
+        # Remote hosts default to VERIFY_IDENTITY. Set ssl_ca, and optionally
+        # ssl_cert/ssl_key, for a private CA or client certificate.
+        # ssl_mode: VERIFY_IDENTITY
+        # ssl_ca: /etc/mysql/ca.pem
 ```
 
 `ssh.known_hosts` is optional. Sink enforces `StrictHostKeyChecking=yes` and
@@ -85,6 +89,13 @@ and a directory put refuses absolute symlinks or links whose targets leave
 `db pull` creates a missing `pulls_dir` with mode `0700` and refuses a
 group- or world-accessible directory. New dumps are `0600`. Local MySQL
 clients use a private `0600` defaults file; `MYSQL_PWD` is not exported.
+
+Remote MySQL hosts default to `ssl_mode: VERIFY_IDENTITY`. Set `ssl_ca`
+(and optional `ssl_cert`/`ssl_key`) to paths visible to the MySQL client; for
+remote commands those paths are on the server. Use `ssl_mode: DISABLED` only
+for a trusted local endpoint. Sink passes a complete `--defaults-file`, so
+ambient `~/.my.cnf` and `/etc/my.cnf` cannot override connection settings.
+`skip_secure_auth` is deprecated; use a modern account and TLS instead.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Secrets are redacted from rendered commands and from `misc api` /

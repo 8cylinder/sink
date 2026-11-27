@@ -38,6 +38,11 @@
 - A failed single-file pull now removes only rsync temp files created during
   that transfer. Pre-existing backups and editor swap files named like
   `.<name>.*` are preserved.
+- MySQL connections can set `ssl_mode`, `ssl_ca`, `ssl_cert`, and `ssl_key`;
+  remote hosts default to `VERIFY_IDENTITY`. Client credentials use a
+  complete `--defaults-file` instead of `--defaults-extra-file`, so ambient
+  `~/.my.cnf` and `/etc/my.cnf` cannot change the connection.
+  `skip_secure_auth` is deprecated and emits a warning.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

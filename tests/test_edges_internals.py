@@ -160,7 +160,7 @@ def test_credentials_edges() -> None:
     )
     assert "password" not in credentials.content
     assert "port=3306" in credentials.content
-    assert credentials.option.startswith("--defaults-extra-file=")
+    assert credentials.option.startswith("--defaults-file=")
     assert "cat >" in credentials.stage_command().render(False)
     assert "rm -f" in credentials.cleanup_command().render(False)
 

@@ -1,2 +1,2 @@
-+ cat project/dump.sql.gz | gunzip -c | mamp/mysql --defaults-extra-file=/tmp/<LOCAL_CREDS_FILE> demo
++ cat project/dump.sql.gz | gunzip -c | mamp/mysql --defaults-file=/tmp/<LOCAL_CREDS_FILE> demo
 [Success (DRY RUN)] dev: sql upload complete

@@ -134,6 +134,11 @@ class TestConfig:
                             user=db.username,
                             host=db.hostname,
                             port=_port(db),
+                            ssl_mode=db.effective_ssl_mode,
+                            ssl_ca=db.ssl_ca,
+                            ssl_cert=db.ssl_cert,
+                            ssl_key=db.ssl_key,
+                            skip_secure_auth=db.skip_secure_auth,
                             real=True,
                         ) as credentials:
                             argv = [

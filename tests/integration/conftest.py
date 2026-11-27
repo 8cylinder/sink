@@ -675,6 +675,7 @@ def live_project(tmp_path: Path, sandbox: Sandbox, monkeypatch):
                     "password": mysql_password,
                     "db": DB_NAME,
                     "hostname": "db",
+                    "ssl_mode": "DISABLED",
                 }
             ]
         databases = [*databases, *(extra_databases or [])]

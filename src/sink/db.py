@@ -50,6 +50,15 @@ def _client_options(
     port = _port(db)
     if port and port != 3306:
         options.extend(["--port", str(port)])
+    ssl_mode = db.effective_ssl_mode
+    if ssl_mode:
+        options.extend(["--ssl-mode", ssl_mode])
+    if db.ssl_ca:
+        options.extend(["--ssl-ca", db.ssl_ca])
+    if db.ssl_cert:
+        options.extend(["--ssl-cert", db.ssl_cert])
+    if db.ssl_key:
+        options.extend(["--ssl-key", db.ssl_key])
     if db.skip_secure_auth:
         options.append("--skip-secure-auth")
     return options
@@ -336,6 +345,10 @@ class DB:
                 password=db.password or "",
                 host=db.hostname,
                 port=_port(db),
+                ssl_mode=db.effective_ssl_mode,
+                ssl_ca=db.ssl_ca,
+                ssl_cert=db.ssl_cert,
+                ssl_key=db.ssl_key,
                 skip_secure_auth=db.skip_secure_auth,
                 real=self.real,
             ) as credentials:
@@ -359,6 +372,11 @@ class DB:
             user=db.username,
             host=db.hostname,
             port=_port(db),
+            ssl_mode=db.effective_ssl_mode,
+            ssl_ca=db.ssl_ca,
+            ssl_cert=db.ssl_cert,
+            ssl_key=db.ssl_key,
+            skip_secure_auth=db.skip_secure_auth,
             real=self.real,
         ) as credentials:
             dump_argv = _dump_argv(
@@ -538,6 +556,10 @@ class DB:
                 password=db.password or "",
                 host=db.hostname,
                 port=_port(db),
+                ssl_mode=db.effective_ssl_mode,
+                ssl_ca=db.ssl_ca,
+                ssl_cert=db.ssl_cert,
+                ssl_key=db.ssl_key,
                 skip_secure_auth=db.skip_secure_auth,
                 real=self.real,
             ) as credentials:
@@ -559,6 +581,11 @@ class DB:
             user=db.username,
             host=db.hostname,
             port=_port(db),
+            ssl_mode=db.effective_ssl_mode,
+            ssl_ca=db.ssl_ca,
+            ssl_cert=db.ssl_cert,
+            ssl_key=db.ssl_key,
+            skip_secure_auth=db.skip_secure_auth,
             real=self.real,
         ) as credentials:
             mysql = shlex.join(_mysql_argv(db, credentials))

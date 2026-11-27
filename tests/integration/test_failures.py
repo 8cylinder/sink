@@ -152,6 +152,7 @@ def test_check_probes_every_database_and_filters_servers(
                 "password": "wrong",
                 "db": "demo",
                 "hostname": "db",
+                "ssl_mode": "DISABLED",
             }
         ],
         extra_servers={
