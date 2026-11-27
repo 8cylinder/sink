@@ -87,6 +87,16 @@ as `--delete*`, `--remove-source-files`, `--rsync-path`, `--files-from`,
 `--allow-dangerous-rsync` is passed. Extra operands are always refused. The
 effective command is printed, and filter flags warn that they can hide files.
 
+## Whole-project pull
+
+A pull whose destination is `project.root` is treated as a whole-project
+overwrite. It prints the resolved source and destination and asks for
+confirmation before running. In a non-interactive context it fails closed
+unless `--force` is passed. Directory pulls always keep the secret and
+metadata exclusions, so a remote tree cannot overwrite `sink.yaml`, `.git/`,
+`.sink/`, env files, keys, or dumps. An explicit single-file pull of one of
+those paths remains possible.
+
 ## Configuration trust
 
 `sink.yaml` is executable code and credential material. It can select the

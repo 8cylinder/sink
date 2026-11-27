@@ -114,6 +114,11 @@ limits, and similar options). Destructive or executing options such as
 `--allow-dangerous-rsync` override. Extra operands are refused, the effective
 command is printed, and filter flags produce a warning.
 
+A whole-project pull asks before overwriting the project root and refuses to
+run non-interactively without `--force`. Directory pulls always keep the
+secret and metadata exclusions, so `sink.yaml`, `.git/`, `.sink/`, env files,
+and dumps are not overwritten by a remote tree.
+
 Every non-interactive SSH path uses `StrictHostKeyChecking=yes` and
 `BatchMode=yes`; `IdentitiesOnly=yes` is added when a key is configured.
 Interactive `sink ssh` also enforces strict host keys. Set

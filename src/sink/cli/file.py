@@ -52,6 +52,11 @@ def _resolve_target(
     is_flag=True,
     help="Allow secret-looking files in a directory put.",
 )
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Skip the whole-project pull confirmation.",
+)
 @click.pass_obj
 def files(
     rt: Runtime,
@@ -63,6 +68,7 @@ def files(
     extra_flags: str | None,
     allow_dangerous_rsync: bool,
     allow_secret_files: bool,
+    force: bool,
 ) -> None:
     """Send files to and fro.
 
@@ -92,6 +98,7 @@ def files(
         silent=silent,
         allow_secret_files=allow_secret_files,
         allow_dangerous_rsync=allow_dangerous_rsync,
+        force=force,
     )
     extra_flags = extra_flags if extra_flags else ""
 

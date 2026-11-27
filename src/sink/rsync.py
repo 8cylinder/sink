@@ -166,6 +166,11 @@ _SAFE_EXCLUDE_FILE_PATTERNS = tuple(
 )
 
 
+def _stdin_is_tty() -> bool:
+    """Return whether stdin is an interactive terminal."""
+    return bool(sys.stdin.isatty())
+
+
 # Rsync ignore owner, group, time, and perms:
 # https://unix.stackexchange.com/q/102211
 class Transfer:
@@ -181,6 +186,7 @@ class Transfer:
         quiet: bool = False,
         allow_secret_files: bool = False,
         allow_dangerous_rsync: bool = False,
+        force: bool = False,
     ) -> None:
         """Transfer files to and from a server with rsync
 
@@ -190,6 +196,7 @@ class Transfer:
         allow_secret_files: permits secret-looking files in a directory
         transfer after printing their paths
         allow_dangerous_rsync: permits destructive extra rsync flags
+        force: skips the whole-project pull confirmation
         """
         self.verbose = bool(verbose)
         self.real = real
@@ -199,6 +206,7 @@ class Transfer:
         self.silent = silent
         self.allow_secret_files = bool(allow_secret_files)
         self.allow_dangerous_rsync = bool(allow_dangerous_rsync)
+        self.force = bool(force)
         self.multiple = False
 
     def _excluded(self) -> tuple[str, ...]:
@@ -407,6 +415,22 @@ class Transfer:
             remote = dest_override
         self._rsync(local, remote, Action.PUT, extra_flags)
 
+    def _confirm_whole_project_pull(self, remote: str | Path) -> None:
+        """Confirm a whole-project pull before writing to the project root."""
+        if not self.real or self.force:
+            return
+        if not _stdin_is_tty():
+            raise TransferError(
+                "Whole-project pull requires --force when stdin is not a "
+                "terminal."
+            )
+        message = (
+            f" WARNING: You are about to overwrite {self.project.root} "
+            f'with the remote "{remote}", continue?'
+        )
+        if not click.confirm(message):
+            raise TransferError("Pull cancelled.")
+
     def pull(
         self, filename: str | Path, extra_flags: str | Sequence[str] | None
     ) -> None:
@@ -419,6 +443,8 @@ class Transfer:
         if local.is_dir():
             remote = f"{remote}/"
             self.multiple = True
+        if self.multiple and local.resolve() == self.project.root.resolve():
+            self._confirm_whole_project_pull(remote)
         before: set[Path] = set()
         if not self.multiple:
             with suppress(OSError):

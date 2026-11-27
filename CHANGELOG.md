@@ -47,6 +47,9 @@
   options such as `--delete*`, `--remove-source-files`, `--rsync-path`,
   `--files-from`, `--log-file`, `--rsh`, and `--copy-links` require
   `--allow-dangerous-rsync`; operands and unknown flags are refused.
+- A whole-project pull now asks before overwriting `project.root` and
+  requires `--force` when stdin is not a terminal. Directory pulls continue
+  to exclude `sink.yaml`, `.git/`, `.sink/`, env files, keys, and dumps.
 - Config discovery now stops at the nearest `.git` root, or after three
   parents when there is no repository, and never crosses `$HOME`, the system
   temporary directory, or `/`. Added `--config-file PATH` for an explicit

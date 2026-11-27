@@ -179,7 +179,7 @@ def test_pull_ignores_remote_escaping_symlinks(live_project) -> None:
         user="deploy",
     )
 
-    result = project.invoke("file", "pull", "dev", "--real")
+    result = project.invoke("file", "pull", "dev", "--real", "--force")
 
     assert result.exit_code == 0, combined(result)
     local = project.path / "project"
@@ -224,7 +224,7 @@ def test_whole_project_pull_does_not_overwrite_local_config(
     project.remote_write("sink.yaml", "project: {}\n")
     project.remote_write(".env.prod", "TOKEN=remote\n")
 
-    result = project.invoke("file", "pull", "dev", "--real")
+    result = project.invoke("file", "pull", "dev", "--real", "--force")
 
     assert result.exit_code == 0, combined(result)
     assert local_config.read_text() == before

@@ -17,4 +17,5 @@ Options:
                            require the override.
   --allow-dangerous-rsync  Allow destructive extra rsync flags.
   --allow-secret-files     Allow secret-looking files in a directory put.
+  --force                  Skip the whole-project pull confirmation.
   -h, --help               Show this message and exit.

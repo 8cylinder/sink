@@ -90,13 +90,27 @@ def test_warn_declined_does_not_overwrite(live_project) -> None:
     assert not project.remote_exists("index.html")
 
 
+def test_whole_project_pull_requires_confirmation(
+    live_project, monkeypatch
+) -> None:
+    project = live_project()
+    monkeypatch.setattr("sink.rsync._stdin_is_tty", lambda: True)
+
+    result = project.invoke("file", "pull", "dev", "--real", input="n\n")
+
+    assert result.exit_code != 0, combined(result)
+    assert "Pull cancelled" in combined(result)
+
+
 def test_directory_pull_updates_local_files(live_project) -> None:
     project = live_project()
     put = project.invoke("file", "put", "dev", "project", "--real")
     assert put.exit_code == 0, combined(put)
 
     project.remote_write("sub/file.txt", "remote sub\n")
-    result = project.invoke("file", "pull", "dev", "project", "--real")
+    result = project.invoke(
+        "file", "pull", "dev", "project", "--real", "--force"
+    )
 
     assert result.exit_code == 0, combined(result)
     local = project.path / "project" / "sub" / "file.txt"
