@@ -1,15 +1,18 @@
-Usage: sink file [OPTIONS] {put|pull|diff} SERVER [FILENAME]
+Usage: sink file [OPTIONS] {put|pull} [SERVER] [FILENAME]
 
   Send files to and fro.
 
   Push or pull a single file or directory from a remote server.
 
   ACTION: pull or put
-  SERVER: server name, if not specified sink will use the default server.
-  FILENAME: file/dir to be transfered.
+  SERVER: server name; if omitted the default server is used.
+  FILENAME: file/dir to transfer; if omitted the whole project is used.
+  With one token, a configured server name selects that server,
+  otherwise the token is treated as a filename.
 
 Options:
   -r, --real
-  -s, --silent        Reduced output, for use in Emacs.
-  --extra-flags TEXT  extra flags to pass to rsync.
-  -h, --help          Show this message and exit.
+  --silent              Deprecated alias for -qq.
+  --extra-flags TEXT    extra flags to pass to rsync.
+  --allow-secret-files  Allow secret-looking files in a directory put.
+  -h, --help            Show this message and exit.

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Security
+
+- Directory transfers now exclude secret material before per-server
+  includes: `sink.yaml`, the pulls directory, `*.sql.gz`, `.env*`, `*.pem`,
+  `*.key`, `id_*`, `.ssh/`, `.git/`, cloud credential paths, and common
+  backup/editor files. `file put` refuses a directory that contains one of
+  those paths and prints the exact entries; `--allow-secret-files` is the
+  put-only override. Directory pulls always apply the exclusions. Explicit
+  single-file transfers are unchanged.
+- Automatic `.env.<server>` inclusion was removed because dotenv files are
+  credential material. Transfer one deliberately with an explicit file path
+  or `--allow-secret-files`.
+- The starter config now uses `root: public` and a `pulls_dir` outside the
+  deployed root.
+
 ### Fixed
 
 - `db pull --tag` accepts only one filename component. Values such as

@@ -98,6 +98,46 @@ def test_database_password_is_never_rendered(live_project) -> None:
     assert "defaults-extra-file=" in text
 
 
+def test_whole_project_put_refuses_secret_material(live_project) -> None:
+    project = live_project()
+    root = project.path / "project"
+    names = (
+        "sink.yaml",
+        ".env.prod",
+        "pulls/dump.sql.gz",
+        "id_ed25519",
+        ".ssh/config",
+    )
+    for name in names:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("secret\n")
+
+    result = project.invoke("file", "put", "dev", "--real")
+
+    assert result.exit_code != 0, combined(result)
+    assert "secret-looking" in combined(result)
+    assert not project.remote_exists("index.html")
+    for name in names:
+        assert not project.remote_exists(name)
+
+
+def test_whole_project_pull_does_not_overwrite_local_config(
+    live_project,
+) -> None:
+    project = live_project(project_overrides={"root": "."})
+    local_config = project.path / "sink.yaml"
+    before = local_config.read_text()
+    project.remote_write("sink.yaml", "project: {}\n")
+    project.remote_write(".env.prod", "TOKEN=remote\n")
+
+    result = project.invoke("file", "pull", "dev", "--real")
+
+    assert result.exit_code == 0, combined(result)
+    assert local_config.read_text() == before
+    assert not (project.path / ".env.prod").exists()
+
+
 def test_hostile_server_name_keeps_dumps_inside_pulls(live_project) -> None:
     name = "../../escape"
     project = live_project(server_name=name)

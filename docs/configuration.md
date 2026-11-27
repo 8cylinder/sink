@@ -13,11 +13,13 @@ A minimal project:
 ```yaml
 project:
   name: example
-  root: .
-  pulls_dir: pulls
+  # Create this directory first. Only deployable content belongs here; keep
+  # sink.yaml, pulls/, env files, and keys above it.
+  root: public
+  # Outside root; create it before the first db pull.
+  pulls_dir: .sink/pulls
   exclude:
     - .git
-    - .env
   # Optional: use pv for local database imports when it is installed.
   pv: no
   # Optional: use mysqlpump --watch-progress for remote dumps.
@@ -46,6 +48,15 @@ servers:
 Extra keys are allowed. Sink ignores them during normal commands so a
 `sink.yaml` can hold unrelated project data; `sink check` lists them as
 unknown-key warnings to catch misspellings.
+
+Directory transfers exclude secret material by default: `sink.yaml`,
+`pulls/`, `*.sql.gz`, `.env*`, `*.pem`, `*.key`, `id_*`, `.ssh/`, `.git/`,
+and cloud credential files. A directory `file put` that contains one of
+those paths is refused unless `--allow-secret-files` is passed. Explicit
+single-file transfers are not filtered. Directory pulls always keep the
+built-in exclusions, so a remote cannot overwrite `sink.yaml` or add a dump
+to the working tree. The exclusions are applied before per-server includes;
+automatic `.env.<server>` inclusion is no longer available.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Secrets are redacted from rendered commands and from `misc api` /

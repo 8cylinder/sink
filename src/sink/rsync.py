@@ -1,5 +1,7 @@
 """Build and run rsync transfers."""
 
+import fnmatch
+import os
 import shlex
 import sys
 import tempfile
@@ -13,6 +15,38 @@ from sink.config.models import Action, Project, Server
 from sink.errors import TransferError
 from sink.shell import Argv, Pipeline, run
 from sink.ui import ui
+
+# Directory transfers must never upload credential or production-data files
+# by accident.  These rules are applied before per-server includes so a later
+# include cannot re-expose a secret path.  Explicit single-file transfers are
+# still allowed; a directory transfer needs --allow-secret-files to override.
+SAFE_EXCLUDES = (
+    "sink.yaml",
+    "sink.yaml.*",
+    ".sink/",
+    "pulls/",
+    "*.sql.gz",
+    ".env*",
+    "*.pem",
+    "*.key",
+    "id_*",
+    ".ssh/",
+    ".git/",
+    ".aws/",
+    ".config/gcloud/",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    "*.kdbx",
+    "*.bak",
+    "*~",
+    ".#*",
+)
+
+_SAFE_EXCLUDE_DIRS = frozenset({".sink", "pulls", ".ssh", ".git", ".aws"})
+_SAFE_EXCLUDE_FILE_PATTERNS = tuple(
+    pattern for pattern in SAFE_EXCLUDES if not pattern.endswith("/")
+)
 
 
 # Rsync ignore owner, group, time, and perms:
@@ -28,12 +62,15 @@ class Transfer:
         verbose: bool = False,
         silent: bool = False,
         quiet: bool = False,
+        allow_secret_files: bool = False,
     ) -> None:
         """Transfer files to and from a server with rsync
 
         verbose: adds --verbose to rsync
         silent: adds --quiet to rsync & does not display command output
         quiet: adds --quiet to rsync
+        allow_secret_files: permits secret-looking files in a directory
+        transfer after printing their paths
         """
         self.verbose = bool(verbose)
         self.real = real
@@ -41,12 +78,97 @@ class Transfer:
         self.server = server
         self.quiet = quiet
         self.silent = silent
+        self.allow_secret_files = bool(allow_secret_files)
         self.multiple = False
 
     def _excluded(self) -> tuple[str, ...]:
         """Combine project and server exclusions."""
         values = {*self.project.exclude, *self.server.exclude}
         return tuple(sorted(value for value in values if value))
+
+    def _pulls_relative(self) -> Path | None:
+        """Return the configured pulls directory relative to the root."""
+        pulls = self.project.pulls_dir
+        if pulls is None:
+            return None
+        try:
+            return pulls.resolve().relative_to(self.project.root.resolve())
+        except ValueError:
+            return None
+
+    def _pulls_absolute(self) -> Path | None:
+        """Return the absolute configured pulls directory."""
+        pulls = self.project.pulls_dir
+        if pulls is None:
+            return None
+        return Path(pulls).resolve()
+
+    def _safe_excludes(self) -> tuple[str, ...]:
+        """Return built-in exclusions for directory transfers."""
+        patterns = list(SAFE_EXCLUDES)
+        pulls = self._pulls_relative()
+        if pulls is not None and pulls.as_posix() not in {".", ""}:
+            pattern = f"{pulls.as_posix()}/"
+            if pattern not in patterns:
+                patterns.append(pattern)
+        return tuple(patterns)
+
+    def _is_secret_path(
+        self, path: Path, root: Path, pulls: Path | None
+    ) -> bool:
+        """Return whether *path* is secret material under *root*."""
+        if pulls is not None and (path == pulls or pulls in path.parents):
+            return True
+        if path.name in _SAFE_EXCLUDE_DIRS:
+            return True
+        if path.name == "gcloud" and path.parent.name == ".config":
+            return True
+        relative = path.relative_to(root)
+        if any(part in _SAFE_EXCLUDE_DIRS for part in relative.parts):
+            return True
+        parts = relative.parts
+        for index in range(len(parts) - 1):
+            if parts[index] == ".config" and parts[index + 1] == "gcloud":
+                return True
+        return any(
+            fnmatch.fnmatch(path.name, pattern)
+            for pattern in _SAFE_EXCLUDE_FILE_PATTERNS
+        )
+
+    def _secret_paths(self, local: Path) -> list[Path]:
+        """Return secret-looking paths under the local transfer root."""
+        root = Path(local).resolve()
+        pulls = self._pulls_absolute()
+        found: set[Path] = set()
+        if self._is_secret_path(root, root, pulls):
+            found.add(root)
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+            base = Path(dirpath)
+            for name in list(dirnames):
+                path = base / name
+                if self._is_secret_path(path, root, pulls):
+                    found.add(path)
+                    # Do not descend into a credential or metadata tree.
+                    dirnames.remove(name)
+            for name in filenames:
+                path = base / name
+                if self._is_secret_path(path, root, pulls):
+                    found.add(path)
+        return sorted(found)
+
+    def _check_secret_material(self, local: Path) -> None:
+        """Refuse or warn about secret files in a directory transfer."""
+        paths = self._secret_paths(local)
+        if not paths:
+            return
+        rendered = "\n".join(f"  {path}" for path in paths)
+        if not self.allow_secret_files:
+            raise TransferError(
+                "Refusing to transfer secret-looking files:\n"
+                f"{rendered}\n"
+                "Use --allow-secret-files to override."
+            )
+        ui.warn(f"Allowing secret-looking files:\n{rendered}")
 
     def put(
         self,
@@ -60,8 +182,9 @@ class Transfer:
         # append a / to the remote path if its a dir so rsync will
         # sync two dirs with the same name
         if local.is_dir():
-            local = f"{local}/"
             self.multiple = True
+            self._check_secret_material(local)
+            local = f"{local}/"
         remote = locations["remote"]
         if dest_override:
             remote = dest_override
@@ -292,8 +415,24 @@ class Transfer:
         if self.multiple:
             argv.append("--recursive")
 
+        # Safe excludes must precede includes because rsync applies filter
+        # rules in order and the first match wins.  The automatic
+        # .env.<server> include was removed: a dotenv file is credential
+        # material, so an explicit --allow-secret-files transfer is required.
+        # A pull is a write to the local trust anchor, so its exclusions are
+        # not overridable.  --allow-secret-files only applies to a put.
+        safe_excludes_required = (
+            action == Action.PULL or not self.allow_secret_files
+        )
+        if (
+            self.multiple
+            and action in (Action.PUT, Action.PULL)
+            and safe_excludes_required
+        ):
+            for exclude in self._safe_excludes():
+                argv.extend(["--exclude", exclude])
+
         for include in (
-            f".env.{server.name}",
             f"robots.txt.{server.name}",
             f".htaccess.{server.name}",
         ):

@@ -48,6 +48,24 @@ When a server sets `warn: yes`, Sink asks before an `rsync` overwrite and
 before a database import. Declining leaves the remote unchanged and exits
 successfully.
 
+## Secret material
+
+Directory transfers exclude secret material by default: `sink.yaml`,
+`.sink/`, `pulls/`, the configured `pulls_dir`, `*.sql.gz`, `.env*`, `*.pem`,
+`*.key`, `id_*`, `.ssh/`, `.git/`, `.aws/`, `.config/gcloud/`, `.netrc`,
+`.npmrc`, `.pypirc`, `*.kdbx`, `*.bak`, `*~`, and `.#*`. The exclusions are
+applied before per-server includes and cannot be removed through project or
+server `exclude` entries.
+
+`file put` scans a directory before it starts rsync. If it finds a
+secret-looking path, it prints the paths and exits non-zero. Pass
+`--allow-secret-files` to print the paths and proceed. The override is
+put-only: a directory pull always applies the safe exclusions so a remote
+cannot overwrite local config or add a dump to the working tree. Explicit
+single-file transfers are not filtered: `sink file put dev .env.prod`
+remains available for an intentional transfer. Automatic `.env.<server>`
+inclusion was removed; dotenv files are credential material.
+
 ## Credentials
 
 Local MySQL imports use `MYSQL_PWD` in the child environment. Remote imports

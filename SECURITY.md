@@ -22,3 +22,10 @@ Sink never renders database passwords into commands. Local clients use
 over ssh stdin. `misc api` and `misc settings` redact secrets unless
 `--show-secrets` is passed. The repository's gitleaks hook and CI scan guard
 against accidental committed secrets.
+
+Directory transfers exclude secret material by default: `sink.yaml`,
+`pulls/`, `*.sql.gz`, `.env*`, `*.pem`, `*.key`, `id_*`, `.ssh/`, `.git/`,
+and cloud credential files. A directory `sink file put` refuses to start when
+it finds one of those paths unless `--allow-secret-files` is passed; explicit
+single-file transfers are not filtered. Directory pulls always apply the
+exclusions. Automatic `.env.<server>` inclusion is not supported.

@@ -1,2 +1,2 @@
-+ rsync --dry-run --rsh 'ssh -p 2222 -i <CONFIG_DIR>/id_rsa' --itemize-changes --links --compress --checksum --include .env.dev --include robots.txt.dev --include .htaccess.dev <PROJECT_ROOT>/index.html deploy@example.com:/var/www/demo/index.html
++ rsync --dry-run --rsh 'ssh -p 2222 -i <CONFIG_DIR>/id_rsa' --itemize-changes --links --compress --checksum --include robots.txt.dev --include .htaccess.dev <PROJECT_ROOT>/index.html deploy@example.com:/var/www/demo/index.html
 [Success (DRY RUN)] dev: upload complete

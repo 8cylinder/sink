@@ -31,14 +31,16 @@ def test_file_put_and_pull(live_project) -> None:
 
 def test_directory_put_honors_exclusions(live_project) -> None:
     project = live_project()
-    (project.path / "project" / ".env").write_text("do not upload\n")
+    excluded = project.path / "project" / "storage" / "logs" / "app.log"
+    excluded.parent.mkdir(parents=True)
+    excluded.write_text("do not upload\n")
 
     result = project.invoke("file", "put", "dev", "project", "--real")
 
     assert result.exit_code == 0, combined(result)
     assert project.remote_exists("index.html")
     assert project.remote_exists("sub/file.txt")
-    assert not project.remote_exists(".env")
+    assert not project.remote_exists("storage/logs/app.log")
 
 
 def test_dry_run_does_not_mutate_the_remote(live_project) -> None:

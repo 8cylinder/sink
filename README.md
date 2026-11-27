@@ -62,11 +62,13 @@ A minimal `sink.yaml`:
 ```yaml
 project:
   name: example
-  root: .
-  pulls_dir: pulls
+  # Create this directory first. Only deployable content belongs here; keep
+  # sink.yaml, pulls/, env files, and keys above it.
+  root: public
+  # Outside root; create it before the first db pull.
+  pulls_dir: .sink/pulls
   exclude:
     - .git
-    - .env
 
 servers:
   dev:
@@ -83,6 +85,14 @@ servers:
         db: example
         hostname: localhost
 ```
+
+Directory transfers exclude secret material by default: `sink.yaml`,
+`pulls/`, `*.sql.gz`, `.env*`, `*.pem`, `*.key`, `id_*`, `.ssh/`, `.git/`,
+and cloud credential files. A directory `file put` that contains one of
+those paths is refused unless `--allow-secret-files` is passed; explicit
+single-file transfers are never filtered. Directory pulls always keep those
+exclusions, so a remote cannot overwrite `sink.yaml` or drop a dump into the
+working tree. Automatic `.env.<server>` inclusion is gone.
 
 Environment references use `${NAME}`. A missing variable is a configuration
 error. Extra keys are allowed and ignored by normal commands; `sink check`

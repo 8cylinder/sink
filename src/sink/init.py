@@ -19,13 +19,16 @@ class Init:
           project:
             # used for db pull file name (as well as the server id).
             name: 'project-name-here'
-            # dir to put pulled db's in.
-            pulls_dir:
+            # dir to put pulled db's in.  Keep this outside root and create
+            # it before the first db pull.
+            pulls_dir: .sink/pulls
             # dir to the common root.  Everything below this point must be
             # the same structure on all the servers.  This can be an
             # absolute path or a relative path.  A relative path will be
-            # relative to the location of this file.
-            root: .
+            # relative to the location of this file.  Create it before the
+            # first transfer, and keep only deployable content here;
+            # sink.yaml, pulls/, env files, and keys belong above it.
+            root: public
             # specify the rsync binary for each platform.  If not specified it
             # will use the default rsync.
             rsync_binary:
@@ -34,7 +37,11 @@ class Init:
             # specify a gui diff tool to use.  Use {local} and {remote} for the arguments.
             # eg: meld {local} {remote}
             difftool: meld {local} {remote}
-            # these files will be excluded from any dir syncing:
+            # Secret material is excluded from directory transfers by
+            # default: sink.yaml, pulls/, *.sql.gz, .env*, *.pem, *.key,
+            # id_*, .ssh/, .git/, and cloud credential files.  Use
+            # --allow-secret-files only for an intentional exception.
+            # these files will also be excluded from any dir syncing:
             exclude:
               - .git
               - '.#*'
